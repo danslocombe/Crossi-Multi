@@ -1,10 +1,8 @@
-#[macro_use]
-extern crate num_derive;
-
-mod game;
+extern crate crossy_multi_core;
+use crossy_multi_core::*;
 
 use num_traits::FromPrimitive;
-use game::*;
+
 
 #[no_mangle]
 pub unsafe fn create_local() -> f64 {
@@ -62,58 +60,3 @@ struct Local
 }
 
 static mut LOCAL: Local = Local { game: None };
-
-/*
-struct Client
-{
-    last_server_tick : u32,
-    last_input : Input,
-    game : Game,
-}
-
-impl Client
-{
-    fn tick(&mut self, input : Input)
-    {
-        if input != self.last_input
-        {
-            self.last_input = input;
-            self.send_server();
-        }
-    }
-
-    fn send_server(&self)
-    {
-    }
-}
-
-struct ClientMessage
-{
-    tick: u32,
-    state: PlayerState,
-}
-
-struct Server
-{
-    tick : u32,
-    game : Game,
-}
-
-impl Server
-{
-    fn tick(&mut self)
-    {
-
-    }
-
-    fn receive_message(self, msg : &ClientMessage)
-    {
-    }
-}
-
-struct ServerMessage
-{
-    tick: u32,
-    states : Vec<PlayerState>
-}
-*/

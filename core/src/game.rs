@@ -176,7 +176,7 @@ pub enum MoveState
 }
 
 // In ms
-const MOVE_COOLDOWN_MAX : f64 = 150.0 * 1000.0;
+const MOVE_COOLDOWN_MAX : f64 = 350.0 * 1000.0;
 
 impl PlayerState
 {
