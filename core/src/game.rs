@@ -1,14 +1,15 @@
 use std::collections::VecDeque;
 use num_derive::FromPrimitive;    
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Pos
 {
     Coord(CoordPos),
     Log(LogId),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct CoordPos
 {
     pub x : i32,
@@ -30,13 +31,13 @@ impl CoordPos
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
-pub struct PlayerId(u8);
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
+pub struct PlayerId(pub u8);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct LogId(u32);
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+pub struct LogId(pub u32);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 #[repr(i32)]
 pub enum Input
 {
@@ -90,7 +91,7 @@ impl Game {
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GameState
 {
     // Can keep around an hour before overflowing
@@ -155,7 +156,7 @@ impl GameState
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PlayerState
 {
     pub id : PlayerId,
@@ -166,7 +167,7 @@ pub struct PlayerState
     pub pos : Pos,
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum MoveState
 {
     Stationary,
@@ -235,7 +236,7 @@ impl PlayerState
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 struct LogState
 {
     id : LogId,
