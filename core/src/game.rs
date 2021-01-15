@@ -2,6 +2,8 @@ use std::collections::VecDeque;
 use num_derive::FromPrimitive;    
 use serde::{Serialize, Deserialize};
 
+pub const MAX_PLAYERS : usize = 8;
+
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Pos
 {
@@ -48,18 +50,40 @@ pub enum Input
     Down = 4,
 }
 
-pub struct SimulationInput
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+pub struct PlayerInputs
 {
-    pub inputs : Vec<Input>,
+    pub inputs : [Input;MAX_PLAYERS],
 }
 
-impl SimulationInput
+pub struct TimedInput
 {
-    fn get_player_input(&self, id: PlayerId) -> Input
+    pub time_us : u32,
+    pub input : Input,
+    pub player_id : PlayerId,
+}
+
+impl PlayerInputs
+{
+    pub fn new() -> Self
+    {
+        PlayerInputs {
+            inputs : [Input::None;MAX_PLAYERS],
+        }
+    }
+
+    pub fn set(&mut self, id: PlayerId, input : Input)
+    {
+        self.inputs[id.0 as usize] = input;
+    }
+
+    pub fn get(&self, id: PlayerId) -> Input
     {
         self.inputs[id.0 as usize]
     }
 }
+
+const STATE_BUFFER_SIZE : usize = 16;
 
 pub struct Game
 {
@@ -73,21 +97,104 @@ impl Game {
         let mut states = VecDeque::new();
         states.push_front(GameState::new());
         Game {
-            player_count: 1,
+            player_count: 0,
             rand_seed : 0,
             states : states,
         }
     }
 
-    pub fn tick(&mut self, input : SimulationInput, dt_us : f64) {
+    pub fn tick(&mut self, input : Option<PlayerInputs>, dt_us : f64) {
         let state = self.states.get(0).unwrap();
         let new = state.simulate(input, dt_us);
-        self.states.push_front(new);
+        self.push_state(new);
+    }
+
+    pub fn add_player(&mut self, player_id : PlayerId) {
+        println!("Adding new player {:?}", player_id);
+
+        let state = self.states.get(0).unwrap();
+        let new = state.add_player(player_id);
+        self.push_state(new);
+    }
+
+    pub fn top_state(&self) -> &GameState
+    {
+        self.states.get(0).unwrap()
+    }
+
+    pub fn propagate_inputs(&mut self, mut inputs : Vec<TimedInput>)
+    {
+        inputs.sort_by(|x, y| {x.time_us.cmp(&y.time_us)});
+
+        for input in &inputs
+        {
+            // TODO optimisation
+            // group all updates within same frame
+            self.propagate_input(input);
+
+            // TMP
+            return;
+        }
+    }
+
+    fn propagate_input(&mut self, input : &TimedInput)
+    {
+        // Try and get the state we should start propagating from
+        // If the input is too old we drop it
+        if let Some(mut oldest_index) = self.get_index_for_us(input.time_us)
+        {
+            if (oldest_index == 0)
+            {
+                // Packet got here so quick! (Latency estimate must be off)
+                // We look at the diff between the last two states
+                oldest_index = 1;
+            }
+
+            for i in (1..oldest_index + 1).rev() {
+                let state_inputs = self.states[i-1].player_inputs;
+                if (state_inputs.get(input.player_id) == input.input)
+                {
+                    // Up to date, nothing to do
+                    return
+                }
+
+                println!("Modifying! {}", i);
+
+                let mut new_inputs = state_inputs.clone();
+                new_inputs.set(input.player_id, input.input);
+
+                let dt = self.states[i-1].time_us - self.states[i].time_us;
+
+                let replacement_state = self.states[i].simulate(Some(new_inputs), dt as f64);
+                self.states[i] = replacement_state;
+            }
+        }
     }
 
     pub fn current_state(&self) -> &GameState
     {
         self.states.get(0).unwrap()
+    }
+
+    // Find the first state at a time point before a given time.
+    fn get_index_for_us(&self, time_us : u32) -> Option<usize> {
+        // TODO binary search
+        for i in 0..self.states.len() {
+            let state = &self.states[i];
+            if (state.time_us < time_us) {
+                return Some(i);
+            }
+        }
+
+        None
+    }
+
+    fn push_state(&mut self, state: GameState) {
+        self.states.push_front(state);
+        while self.states.len() > STATE_BUFFER_SIZE
+        {
+            self.states.pop_back();
+        }
     }
 }
 
@@ -97,27 +204,22 @@ pub struct GameState
     // Can keep around an hour before overflowing
     // Should be fine
     // Only worry is drift from summing, going to matter? 
-    time_us : u32,
+    pub time_us : u32,
 
-    player_states : Vec<PlayerState>,
-    log_states : Vec<LogState>,
+    pub player_states : Vec<PlayerState>,
+    pub player_inputs : PlayerInputs,
+    pub log_states : Vec<LogState>,
 }
 
 impl GameState
 {
     fn new() -> Self
     {
-        let p0 = PlayerState {
-            id: PlayerId(0),
-            move_state : MoveState::Stationary,
-            move_cooldown: MOVE_COOLDOWN_MAX,
-            pos: Pos::Coord(CoordPos{x : 10, y : 10}),
-        };
-
         GameState
         {
             time_us : 0,
-            player_states : vec![p0],
+            player_states : vec![],
+            player_inputs : PlayerInputs::new(),
             log_states : vec![],
         }
     }
@@ -131,17 +233,37 @@ impl GameState
     {
         &mut self.player_states[id.0 as usize]
     }
+    
+    pub fn add_player(&self, id: PlayerId) -> Self
+    {
+        let mut new = self.clone();
 
-    fn simulate(&self, input : SimulationInput, dt_us : f64) -> Self
+        let state = PlayerState {
+            id: id,
+            move_state : MoveState::Stationary,
+            move_cooldown: MOVE_COOLDOWN_MAX,
+            pos: Pos::Coord(CoordPos{x : 10, y : 10}),
+        };
+
+        new.player_states.push(state);
+
+        new
+    }
+
+    fn simulate(&self, input : Option<PlayerInputs>, dt_us : f64) -> Self
     {
         let mut new = self.clone();
         new.simulate_mut(input, dt_us);
         new
     }
 
-    fn simulate_mut(&mut self, input : SimulationInput, dt_us : f64)
+    fn simulate_mut(&mut self, player_inputs : Option<PlayerInputs>, dt_us : f64)
     {
         self.time_us += dt_us as u32;
+
+        if let Some(inputs) = player_inputs {
+            self.player_inputs = inputs;
+        }
 
         for _log in &mut self.log_states
         {
@@ -150,13 +272,13 @@ impl GameState
 
         for player in &mut self.player_states
         {
-            let player_input = input.get_player_input(player.id);
+            let player_input = self.player_inputs.get(player.id);
             player.tick(player_input, dt_us);
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PlayerState
 {
     pub id : PlayerId,
@@ -167,7 +289,7 @@ pub struct PlayerState
     pub pos : Pos,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub enum MoveState
 {
     Stationary,
@@ -237,7 +359,7 @@ impl PlayerState
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct LogState
+pub struct LogState
 {
     id : LogId,
     y : i32,

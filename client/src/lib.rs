@@ -18,9 +18,17 @@ static mut CLIENT : Option<client::Client> = None;
 
 #[no_mangle]
 pub unsafe fn create_client() -> f64 {
-    CLIENT = client::Client::try_create().ok();
-
-    if CLIENT.is_some() {1.0} else {0.0}
+    match client::Client::try_create()
+    {
+        Ok(c) => {
+            CLIENT = Some(c);
+            0.0
+        }
+        Err(e) => {
+            println!("Error initializing client {}", e);
+            1.0
+        }
+    }
 }
 
 #[no_mangle]
@@ -35,18 +43,22 @@ pub unsafe fn create_local() -> f64 {
     LOCAL.socket = Some(socket.unwrap());
     */
     LOCAL.game = Some(Game::new());
+    LOCAL.game.as_mut().unwrap().add_player(PlayerId(0));
 
     0.0
 }
 
 #[no_mangle]
 pub unsafe fn tick_local(dir : f64, dt_us : f64) -> f64 {
-    let input = SimulationInput
-    {
-        inputs: vec![FromPrimitive::from_i32(dir as i32).unwrap()],
-    };
+    let player_input = FromPrimitive::from_i32(dir as i32).unwrap();  
+    let mut input = PlayerInputs::new();
+    input.set(PlayerId(0), player_input);
 
-    LOCAL.game.as_mut().unwrap().tick(input, dt_us);
+    LOCAL.game.as_mut().unwrap().tick(Some(input), dt_us);
+
+    let current_us = LOCAL.game.as_ref().unwrap().current_state().time_us;
+    CLIENT.as_mut().unwrap().send(player_input, current_us);
+
     0.0
 }
 
