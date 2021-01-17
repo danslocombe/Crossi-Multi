@@ -24,6 +24,7 @@ pub struct InitServerResponse
 {
     pub server_version : u8,
     pub player_count : u8,
+    pub seed : u32,
     pub player_id : super::game::PlayerId,
 }
 
@@ -86,7 +87,8 @@ pub fn crossy_send(x : &CrossyMessage, socket: &mut UdpSocket, addr : &SocketAdd
 
 pub fn crossy_receive(socket : &mut UdpSocket) -> std::io::Result<(CrossyMessage, SocketAddr)>
 {
-    let mut buffer = [0;std::mem::size_of::<CrossyMessage>()];
+    //let mut buffer = [0;std::mem::size_of::<CrossyMessage>()];
+    let mut buffer = [0;2048];
     let (size, addr) = socket.recv_from(&mut buffer)?;
     let deserialized = bincode::deserialize(&buffer).unwrap();
 

@@ -56,11 +56,18 @@ pub struct PlayerInputs
     pub inputs : [Input;MAX_PLAYERS],
 }
 
+#[derive(Debug)]
 pub struct TimedInput
 {
     pub time_us : u32,
     pub input : Input,
     pub player_id : PlayerId,
+}
+
+pub struct TimedState
+{
+    pub time_us : u32,
+    pub player_states : Vec<PlayerState>,
 }
 
 impl PlayerInputs
@@ -83,12 +90,12 @@ impl PlayerInputs
     }
 }
 
-const STATE_BUFFER_SIZE : usize = 16;
+const STATE_BUFFER_SIZE : usize = 32;
 
 pub struct Game
 {
-    player_count : u8,
-    rand_seed : u32,
+    pub player_count : u8,
+    pub seed : u32,
     states : VecDeque<GameState>,
 }
 
@@ -98,15 +105,36 @@ impl Game {
         states.push_front(GameState::new());
         Game {
             player_count: 0,
-            rand_seed : 0,
+            seed : 0,
             states : states,
         }
     }
 
-    pub fn tick(&mut self, input : Option<PlayerInputs>, dt_us : f64) {
+    pub fn from_server_parts(seed : u32, time_us : u32, player_states : Vec<PlayerState>, player_count : u8) -> Self {
+        let mut states = VecDeque::new();
+        states.push_front(GameState::from_server_parts(seed, time_us, player_states));
+        Game {
+            player_count: player_count,
+            seed : seed,
+            states : states,
+        }
+    }
+
+    pub fn tick(&mut self, input : Option<PlayerInputs>, dt_us : u32) {
         let state = self.states.get(0).unwrap();
         let new = state.simulate(input, dt_us);
         self.push_state(new);
+    }
+
+    pub fn tick_current_time(&mut self, input : Option<PlayerInputs>, time_us : u32) {
+        let state = self.states.get(0).unwrap();
+        let new = state.simulate(input, time_us - state.time_us);
+        self.push_state(new);
+    }
+
+    pub fn get_last_player_inputs(&self) -> PlayerInputs
+    {
+        self.top_state().player_inputs.clone()
     }
 
     pub fn add_player(&mut self, player_id : PlayerId) {
@@ -124,25 +152,32 @@ impl Game {
 
     pub fn propagate_inputs(&mut self, mut inputs : Vec<TimedInput>)
     {
+        if (inputs.len() == 0) {
+            return;
+        }
+
+        println!("Propagating {} inputs", inputs.len());
         inputs.sort_by(|x, y| {x.time_us.cmp(&y.time_us)});
 
         for input in &inputs
         {
+            //println!("{}", input.time_us);
             // TODO optimisation
             // group all updates within same frame
             self.propagate_input(input);
-
-            // TMP
-            return;
         }
     }
 
+    //
+    // TODO subdivision problem?
+    // Not a problem as long as the cooldown time > frame length
     fn propagate_input(&mut self, input : &TimedInput)
     {
         // Try and get the state we should start propagating from
         // If the input is too old we drop it
         if let Some(mut oldest_index) = self.get_index_for_us(input.time_us)
         {
+            println!("Propagating {:?} oldest_index = {}", input, oldest_index);
             if (oldest_index == 0)
             {
                 // Packet got here so quick! (Latency estimate must be off)
@@ -150,24 +185,84 @@ impl Game {
                 oldest_index = 1;
             }
 
+            let mut first = true;
+
             for i in (1..oldest_index + 1).rev() {
                 let state_inputs = self.states[i-1].player_inputs;
                 if (state_inputs.get(input.player_id) == input.input)
                 {
                     // Up to date, nothing to do
+                    //println!("Nothing to do");
                     return
                 }
 
-                println!("Modifying! {}", i);
+                //println!("Modifying! {} t={}", i, input.time_us);
 
                 let mut new_inputs = state_inputs.clone();
-                new_inputs.set(input.player_id, input.input);
+                if first {
+                    println!("replacing frame {} with new input", self.states[i-1].frame_id);
+                    {
+                        // HACK HACK
+                        //self.states[i].player_states[input.player_id.0 as usize].move_cooldown = 0.0;
+                    }
+
+                    new_inputs.set(input.player_id, input.input);
+                    first = false;
+                }
+                else {
+                    println!("propagating {} with new input", self.states[i-1].frame_id);
+                    new_inputs.set(input.player_id, Input::None);
+                }
 
                 let dt = self.states[i-1].time_us - self.states[i].time_us;
 
-                let replacement_state = self.states[i].simulate(Some(new_inputs), dt as f64);
-                self.states[i] = replacement_state;
+                let replacement_state = self.states[i].simulate(Some(new_inputs), dt as u32);
+                self.states[i-1] = replacement_state;
             }
+        }
+    }
+
+    pub fn propagate_state(&mut self, server_timed_state : TimedState, local_player : PlayerId)
+    {
+        // Insert the new state into the ring buffer
+        // Pop everything after it off
+        // Simulate up to now
+
+        let mut last_state = self.states.pop_back();
+        while (last_state.as_ref().map(|x| x.time_us < server_timed_state.time_us).unwrap_or(false))
+        {
+            last_state = self.states.pop_back();
+        }
+
+        //println!("{} states left after popping back", {self.states.len()});
+
+        // last_state is either empty or at time > state
+        let mut server_state = GameState::from_server_parts(
+            self.seed,
+            server_timed_state.time_us,
+            server_timed_state.player_states);
+
+        if let (Some(prev_state), Some(next_state)) = (last_state.as_ref(), self.states.back()) {
+            let inputs = next_state.player_inputs;
+            let dt = server_state.time_us - prev_state.time_us;
+            let game_state_with_local_pos = prev_state.simulate(Some(inputs), dt);
+            let override_player_state = game_state_with_local_pos.get_player(local_player).unwrap().clone();
+            server_state.set_player_state(local_player, override_player_state);
+        }
+
+        self.states.push_back(server_state);
+
+        // TODO make sure it has local pplayers inputs ok?
+
+        // Simulate up to now
+        for i in (0..self.states.len()-1).rev() {
+            println!("Simulating up to date {}", i);
+            //let local_player_input = self.states[i].player_inputs.get(local_player);
+            let dt = self.states[i].time_us - self.states[i+1].time_us;
+            let inputs = Some(self.states[i].player_inputs);
+            //inputs
+            let new_state = self.states[i+1].simulate(inputs, dt);
+            self.states[i] = new_state;
         }
     }
 
@@ -198,7 +293,7 @@ impl Game {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GameState
 {
     // Can keep around an hour before overflowing
@@ -209,6 +304,7 @@ pub struct GameState
     pub player_states : Vec<PlayerState>,
     pub player_inputs : PlayerInputs,
     pub log_states : Vec<LogState>,
+    pub frame_id : u32,
 }
 
 impl GameState
@@ -221,17 +317,48 @@ impl GameState
             player_states : vec![],
             player_inputs : PlayerInputs::new(),
             log_states : vec![],
+            frame_id : 0,
         }
     }
 
-    pub fn get_player(&self, id: PlayerId) -> &PlayerState
+    pub fn from_server_parts(_seed : u32, time_us : u32, player_states : Vec<PlayerState>) -> Self {
+        GameState
+        {
+            time_us : time_us,
+            player_states : player_states,
+            player_inputs : PlayerInputs::new(),
+            log_states : vec![],
+            //TODO
+            frame_id : 0,
+        }
+    }
+
+    pub fn get_player(&self, id: PlayerId) -> Option<&PlayerState>
     {
-        &self.player_states[id.0 as usize]
+        let index = id.0 as usize;
+        if (index < self.player_states.len())
+        {
+            Some(&self.player_states[index])
+        }
+        else
+        {
+            None
+        }
     }
 
     fn get_player_mut(&mut self, id: PlayerId) -> &mut PlayerState
     {
         &mut self.player_states[id.0 as usize]
+    }
+
+    fn set_player_state(&mut self, id: PlayerId, state: PlayerState)
+    {
+        self.player_states[id.0 as usize] = state;
+    }
+
+    pub fn get_player_count(&self) -> usize {
+        println!("{} players in game", self.player_states.len());
+        self.player_states.len()
     }
     
     pub fn add_player(&self, id: PlayerId) -> Self
@@ -250,20 +377,25 @@ impl GameState
         new
     }
 
-    fn simulate(&self, input : Option<PlayerInputs>, dt_us : f64) -> Self
+    fn simulate(&self, input : Option<PlayerInputs>, dt_us : u32) -> Self
     {
         let mut new = self.clone();
         new.simulate_mut(input, dt_us);
         new
     }
 
-    fn simulate_mut(&mut self, player_inputs : Option<PlayerInputs>, dt_us : f64)
+    fn simulate_mut(&mut self, player_inputs : Option<PlayerInputs>, dt_us : u32)
     {
-        self.time_us += dt_us as u32;
+        self.time_us += dt_us;
+        self.frame_id+=1;
 
+        /*
         if let Some(inputs) = player_inputs {
             self.player_inputs = inputs;
         }
+        */
+
+        self.player_inputs = player_inputs.unwrap_or(PlayerInputs::new());
 
         for _log in &mut self.log_states
         {
@@ -273,10 +405,12 @@ impl GameState
         for player in &mut self.player_states
         {
             let player_input = self.player_inputs.get(player.id);
-            player.tick(player_input, dt_us);
+            player.tick(player_input, dt_us as f64);
         }
     }
 }
+
+// TODO change these times to u32 from f64 micros
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PlayerState
@@ -299,7 +433,7 @@ pub enum MoveState
 }
 
 // In ms
-const MOVE_COOLDOWN_MAX : f64 = 350.0 * 1000.0;
+const MOVE_COOLDOWN_MAX : f64 = 150.0 * 1000.0;
 
 impl PlayerState
 {
@@ -358,7 +492,7 @@ impl PlayerState
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LogState
 {
     id : LogId,

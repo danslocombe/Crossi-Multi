@@ -1,5 +1,3 @@
-extern crate crossy_multi_core;
-
 use crossy_multi_core::interop::*;
 use crossy_multi_core::game;
 
@@ -8,9 +6,10 @@ use std::net::{UdpSocket, SocketAddr};
 use std::time::{Duration, Instant};
 
 const SERVER_VERSION : u8 = 1;
+const DESIRED_TICK_TIME : Duration = Duration::from_millis(14);
 
 fn main() {
-    let socket_config = "127.0.0.1:8081";
+    let socket_config = "127.0.0.1:8085";
     println!("Binding socket to {}", socket_config);
     let socket = UdpSocket::bind(socket_config).unwrap();
     socket.set_nonblocking(true).unwrap();
@@ -47,12 +46,9 @@ struct Server
     start : Instant,
 }
 
-// Run at >60hz
-const DESIRED_TICK_TIME : Duration = Duration::from_millis(15);
-
 impl Server
 {
-    fn receive_updates(&mut self) -> Result<(Vec<game::TimedInput>, Vec<game::PlayerId>)>
+    fn receive_updates(&mut self, tick_start : &Instant) -> Result<(Vec<game::TimedInput>, Vec<game::PlayerId>)>
     {
         let mut client_updates = Vec::new();
         let mut new_players = Vec::new();
@@ -69,12 +65,15 @@ impl Server
                         let client_id = game::PlayerId(self.clients.len() as u8);
                         new_players.push(client_id);
 
+                        let client_offset_us = tick_start.saturating_duration_since(self.start).as_micros() as u32;
+                        println!("Client offset us {}", client_offset_us);
+
                         let client = Client 
                         {
                             addr : src,
                             id : client_id,
                             // TODO ping the client and add that.
-                            offset_us : Instant::now().saturating_duration_since(self.start).as_micros() as u32,
+                            offset_us : client_offset_us,
                         };
 
                         self.clients.push(client);
@@ -82,7 +81,8 @@ impl Server
                         let response = CrossyMessage::HelloResponse(InitServerResponse
                         {
                             server_version : SERVER_VERSION,
-                            player_count : self.clients.len() as u8,
+                            player_count : self.game.player_count,
+                            seed : self.game.seed,
                             player_id : client_id,
                         });
 
@@ -93,6 +93,8 @@ impl Server
                         match self.get_client_by_addr(&src)
                         {
                             Some(client) => {
+                                let client_time = (t.time_us + client.offset_us).checked_sub(crossy_multi_core::STATIC_LAG)
+                                    .unwrap_or(t.time_us + client.offset_us);
                                 client_updates.push(game::TimedInput
                                 {
                                     time_us : t.time_us + client.offset_us,
@@ -136,13 +138,13 @@ impl Server
         loop
         {
             let tick_start = Instant::now();
-            let (client_updates, new_players) = self.receive_updates()?;
+            let (client_updates, new_players) = self.receive_updates(&tick_start)?;
 
             // Do simulations
             let simulation_time_start = Instant::now();
             let dt_simulation = simulation_time_start.saturating_duration_since(self.prev_tick);
             self.prev_tick = simulation_time_start;
-            self.game.tick(None, dt_simulation.as_micros() as f64);
+            self.game.tick(None, dt_simulation.as_micros() as u32);
             for new_player in new_players
             {
                 self.game.add_player(new_player);
@@ -153,6 +155,10 @@ impl Server
             let top_state = self.game.top_state();
 
             for client in &self.clients {
+                if client.offset_us > top_state.time_us {
+                    panic!("Oh fuck, client offset {}, top state offset {}", client.offset_us, top_state.time_us)
+                }
+
                 let tick = CrossyMessage::ServerTick(ServerTick {
                     time_us : top_state.time_us - client.offset_us,
                     states : top_state.player_states.clone(),
