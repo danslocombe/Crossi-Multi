@@ -1,5 +1,3 @@
-mod client;
-
 use crossy_multi_core::*;
 
 use std::net::UdpSocket;

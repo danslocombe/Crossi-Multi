@@ -196,8 +196,29 @@ impl Game {
                     return
                 }
 
-                //println!("Modifying! {} t={}", i, input.time_us);
+                let mut new_inputs = state_inputs.clone();
+                if first {
+                    // Bifurcate
 
+                    let dt = input.time_us - self.states[i].time_us;
+                    let mut partial_state = self.states[i].simulate(None, dt as u32);
+                    partial_state.frame_id -= 1.0;
+                    self.states.pop_back();
+                    self.states.push_back(partial_state);
+
+                    println!("replacing frame {} with new input", self.states[i-1].frame_id);
+                    new_inputs.set(input.player_id, input.input);
+                    first = false;
+                }
+                else {
+                    println!("propagating {} with new input", self.states[i-1].frame_id);
+                    new_inputs.set(input.player_id, Input::None);
+                }
+
+                let dt = self.states[i-1].time_us - self.states[i].time_us;
+                let replacement_state = self.states[i].simulate(Some(new_inputs), dt as u32);
+                self.states[i-1] = replacement_state;
+                /*
                 let mut new_inputs = state_inputs.clone();
                 if first {
                     println!("replacing frame {} with new input", self.states[i-1].frame_id);
@@ -218,21 +239,47 @@ impl Game {
 
                 let replacement_state = self.states[i].simulate(Some(new_inputs), dt as u32);
                 self.states[i-1] = replacement_state;
+                */
             }
         }
     }
 
     pub fn propagate_state(&mut self, server_timed_state : TimedState, local_player : PlayerId)
     {
+        println!("Propagating state {}", server_timed_state.time_us);
         // Insert the new state into the ring buffer
         // Pop everything after it off
         // Simulate up to now
 
-        let mut last_state = self.states.pop_back();
-        while (last_state.as_ref().map(|x| x.time_us < server_timed_state.time_us).unwrap_or(false))
+        let mut state_before_server = None;
+        let mut state_after_server = None;
+
+        while {
+            let cur = self.states.pop_back();
+            println!("Popping back {:?}", cur.as_ref().map(|x| x.time_us));
+            if cur.as_ref().map(|x| x.time_us < server_timed_state.time_us)
+                .unwrap_or(false)
+            {
+                state_before_server = cur;
+                true
+            }
+            else
+            {
+                state_after_server = cur;
+                false
+            }
+        } {};
+
+        /*
+        println!("Popping back");
+        let mut state_before_server = self.states.pop_back();
+        while (state_before_server.as_ref().map(|x| x.time_us < server_timed_state.time_us).unwrap_or(false))
         {
-            last_state = self.states.pop_back();
+            println!("{} Popping back", state_before_server.as_ref().unwrap().time_us);
+            state_before_server = self.states.pop_back();
         }
+        */
+
 
         //println!("{} states left after popping back", {self.states.len()});
 
@@ -242,11 +289,20 @@ impl Game {
             server_timed_state.time_us,
             server_timed_state.player_states);
 
-        if let (Some(prev_state), Some(next_state)) = (last_state.as_ref(), self.states.back()) {
+        if let (Some(prev_state), Some(next_state)) = (state_before_server.as_ref(), state_after_server.as_ref()) {
+            println!("XXX prev {} next {}", prev_state.time_us, next_state.time_us);
             let inputs = next_state.player_inputs;
             let dt = server_state.time_us - prev_state.time_us;
             let game_state_with_local_pos = prev_state.simulate(Some(inputs), dt);
             let override_player_state = game_state_with_local_pos.get_player(local_player).unwrap().clone();
+
+            let server_pos = server_state.get_player(local_player).unwrap().pos;
+            let local_pos = override_player_state.pos;
+            if (server_pos != local_pos)
+            {
+                println!("Overriding server pos {:?} with local {:?}", server_pos, local_pos);
+            }
+
             server_state.set_player_state(local_player, override_player_state);
         }
 
@@ -304,7 +360,7 @@ pub struct GameState
     pub player_states : Vec<PlayerState>,
     pub player_inputs : PlayerInputs,
     pub log_states : Vec<LogState>,
-    pub frame_id : u32,
+    pub frame_id : f64,
 }
 
 impl GameState
@@ -317,7 +373,7 @@ impl GameState
             player_states : vec![],
             player_inputs : PlayerInputs::new(),
             log_states : vec![],
-            frame_id : 0,
+            frame_id : 0.0,
         }
     }
 
@@ -329,7 +385,7 @@ impl GameState
             player_inputs : PlayerInputs::new(),
             log_states : vec![],
             //TODO
-            frame_id : 0,
+            frame_id : 0.0,
         }
     }
 
@@ -357,7 +413,6 @@ impl GameState
     }
 
     pub fn get_player_count(&self) -> usize {
-        println!("{} players in game", self.player_states.len());
         self.player_states.len()
     }
     
@@ -387,7 +442,7 @@ impl GameState
     fn simulate_mut(&mut self, player_inputs : Option<PlayerInputs>, dt_us : u32)
     {
         self.time_us += dt_us;
-        self.frame_id+=1;
+        self.frame_id+=1.0;
 
         /*
         if let Some(inputs) = player_inputs {

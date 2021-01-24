@@ -1,5 +1,5 @@
-use crossy_multi_core::interop::*;
-use crossy_multi_core::game;
+use super::interop::*;
+use super::game;
 
 use std::io::Result;
 use std::net::{UdpSocket, SocketAddr, Ipv4Addr, SocketAddrV4};
@@ -12,12 +12,13 @@ pub struct Client
     pub game : game::Game,
     pub local_player_id : game::PlayerId,
     start : Instant,
-    last_tick : Instant,
+    last_tick : u32,
 }
 
-fn connect(socket: &mut UdpSocket, addr : &SocketAddr) -> Result<(ServerTick, u32, game::PlayerId)>
+fn connect(socket: &mut UdpSocket, addr : &SocketAddr) -> Result<(ServerTick, u32, game::PlayerId, Instant)>
 {
     println!("Connecting..");
+    let time_start = Instant::now();
     //socket.send_to(&INIT_MESSAGE, addr)?;
     let hello = CrossyMessage::Hello(ClientHello::new());
     crossy_send(&hello, socket, addr).unwrap();
@@ -25,10 +26,15 @@ fn connect(socket: &mut UdpSocket, addr : &SocketAddr) -> Result<(ServerTick, u3
         (CrossyMessage::HelloResponse(response), _) => response,
         x => panic!("Got unexpected response from server {:?}", x),
     };
+
+    // TODO this is wrong because it messes up timings
+    // but also need to sync start
+    //let time_start = Instant::now();
+
     let first_tick = crossy_receive(socket)?;
     match first_tick {
         (CrossyMessage::ServerTick(tick), _) => {
-            Ok((tick, init_response.seed, init_response.player_id))
+            Ok((tick, init_response.seed, init_response.player_id, time_start))
         },
         x => panic!("Got unexpected response from server {:?}", x),
     }
@@ -41,8 +47,9 @@ impl Client
         let mut socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), port))?;
         let server = SocketAddr::from(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8085));
 
-        let (server_tick, seed, local_player_id) = connect(&mut socket, &server)?;
+        let (server_tick, seed, local_player_id, time_start) = connect(&mut socket, &server)?;
         println!("Connected! Our id {:?}, seed {}, server response {:?}", local_player_id, seed, server_tick);
+        println!("AA {}", Instant::now().saturating_duration_since(time_start).as_micros());
 
         socket.set_nonblocking(true)?;
 
@@ -51,8 +58,8 @@ impl Client
             socket: socket,
             game : game::Game::from_server_parts(seed, server_tick.time_us, server_tick.states, 1),
             local_player_id : local_player_id,
-            start : Instant::now(),
-            last_tick : Instant::now(),
+            start : time_start,
+            last_tick : server_tick.time_us,
         })
     }
 
@@ -60,13 +67,22 @@ impl Client
     {
         let tick_start = Instant::now();
         let current_time = tick_start.saturating_duration_since(self.start);
-        let dt = tick_start.saturating_duration_since(self.last_tick);
-        self.last_tick = tick_start;
+        //let dt = tick_start.saturating_duration_since(self.last_tick);
+        let dt = current_time.as_micros() as u32 - self.last_tick;
+        println!("Tick dt {} current_time {}", dt, current_time.as_micros());
+        self.last_tick = current_time.as_micros() as u32;
 
-        let server_tick = self.recv().unwrap();
+        // Pop all server messages off queue
+        // Take last
+        let mut server_tick = None;
+        while let Some(tick) = self.recv().unwrap()
+        {
+            server_tick = Some(tick);
+        }
+
         server_tick.map(|x| {
             self.game.propagate_state(game::TimedState {
-                time_us : x.time_us - crossy_multi_core::STATIC_LAG,
+                time_us : x.time_us, //- crossy_multi_core::STATIC_LAG,
                 player_states : x.states,
             }, self.local_player_id);
         });
@@ -80,8 +96,6 @@ impl Client
         {
             self.send(input, current_time.as_micros() as u32);
         }
-
-        let server_tick = self.recv();
     }
 
     fn recv(&mut self) -> Result<Option<ServerTick>>
@@ -89,6 +103,7 @@ impl Client
         match crossy_receive(&mut self.socket) {
             Ok((CrossyMessage::ServerTick(server_tick), _)) =>
             {
+                println!("Received tick {}", server_tick.time_us);
                 Ok(Some(server_tick))
             },
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {

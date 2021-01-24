@@ -65,7 +65,7 @@ impl Server
                         let client_id = game::PlayerId(self.clients.len() as u8);
                         new_players.push(client_id);
 
-                        let client_offset_us = tick_start.saturating_duration_since(self.start).as_micros() as u32;
+                        let client_offset_us = tick_start.saturating_duration_since(self.start).as_micros() as u32 - crossy_multi_core::STATIC_LAG;
                         println!("Client offset us {}", client_offset_us);
 
                         let client = Client 
@@ -93,8 +93,9 @@ impl Server
                         match self.get_client_by_addr(&src)
                         {
                             Some(client) => {
-                                let client_time = (t.time_us + client.offset_us).checked_sub(crossy_multi_core::STATIC_LAG)
-                                    .unwrap_or(t.time_us + client.offset_us);
+                                //let client_time = (t.time_us + client.offset_us).checked_sub(crossy_multi_core::STATIC_LAG)
+                                    //.unwrap_or(t.time_us + client.offset_us);
+                                let client_time = t.time_us + client.offset_us;
                                 client_updates.push(game::TimedInput
                                 {
                                     time_us : t.time_us + client.offset_us,
@@ -113,9 +114,19 @@ impl Server
                     // No more messages
                     return Ok((client_updates, new_players));
                 },
+                // Connection closed, todo cleanup player
+                Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionAborted => {
+                    println!("Connection aborted")
+                },
+                Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                    println!("Connection reset {:?}", &e);
+                    // tmp
+                    return Err(e);
+                    //self.clients.retain(|x| x.addr != src);
+                    // Clear the client
+                },
                 Err(e) => return Err(e),
             }
-
         }
     }
 
@@ -163,6 +174,9 @@ impl Server
                     time_us : top_state.time_us - client.offset_us,
                     states : top_state.player_states.clone(),
                 });
+
+                println!("Sending tick {:?}", tick);
+
                 crossy_send(&tick, &mut self.socket, &client.addr);
             }
 
