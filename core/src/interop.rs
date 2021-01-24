@@ -10,6 +10,8 @@ pub enum CrossyMessage
     HelloResponse(InitServerResponse),
     ClientTick(ClientTick),
     ServerTick(ServerTick),
+    OffsetPing(),
+    OffsetPong(OffsetPong),
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -17,6 +19,15 @@ pub struct ClientHello
 {
     header : [u8; 4],
     version : u8,
+    pub latency_us : u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct OffsetPong
+{
+    pub us_server : u32,
+    // assume 0 for now
+    //pub delta_us_processing : u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -33,12 +44,13 @@ pub const CURRENT_VERSION : u8 = 1;
 
 impl ClientHello
 {
-    pub fn new() -> Self
+    pub fn new(latency : u32) -> Self
     {
         ClientHello
         {
             header : INIT_MESSAGE,
             version : CURRENT_VERSION,
+            latency_us : latency,
         }
     }
 

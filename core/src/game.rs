@@ -244,53 +244,87 @@ impl Game {
         }
     }
 
+    fn get_sandwich(&self, time_us : u32) -> (Option<usize>, Option<usize>) {
+        let mut before = None;
+        let mut after = None;
+        for i in (0..self.states.len()).rev() {
+
+            let t = self.states[i].time_us;
+            if t > time_us {
+                break;
+            } 
+
+            before = Some(i);
+            after = if i == 0 {
+                None
+            }
+            else {
+                Some(i-1)
+            };
+        }
+
+        println!("{:?}, {:?}", before, after);
+        (before, after)
+    }
+
     pub fn propagate_state(&mut self, server_timed_state : TimedState, local_player : PlayerId)
     {
-        println!("Propagating state {}", server_timed_state.time_us);
+        //println!("Propagating state {}", server_timed_state.time_us);
         // Insert the new state into the ring buffer
         // Pop everything after it off
         // Simulate up to now
 
+        match self.states.front() {
+            Some(x) => {
+                //println!("DT server and top state {}", x.time_us - server_timed_state.time_us);
+            },
+            _ => {},
+        }
+
+        /*
         let mut state_before_server = None;
         let mut state_after_server = None;
 
         while {
-            let cur = self.states.pop_back();
-            println!("Popping back {:?}", cur.as_ref().map(|x| x.time_us));
-            if cur.as_ref().map(|x| x.time_us < server_timed_state.time_us)
-                .unwrap_or(false)
+            //println!("Popping back {:?}", cur.as_ref().map(|x| x.time_us));
+            let stop = self.states.back().map(|x| x.time_us < server_timed_state.time_us)
+                .unwrap_or(false);
+
+            if stop
             {
-                state_before_server = cur;
+                state_before_server = self.states.pop_back();
                 true
             }
             else
             {
-                state_after_server = cur;
+                state_after_server = self.states.back();
                 false
             }
         } {};
-
-        /*
-        println!("Popping back");
-        let mut state_before_server = self.states.pop_back();
-        while (state_before_server.as_ref().map(|x| x.time_us < server_timed_state.time_us).unwrap_or(false))
-        {
-            println!("{} Popping back", state_before_server.as_ref().unwrap().time_us);
-            state_before_server = self.states.pop_back();
-        }
         */
 
+        let (before, after) = self.get_sandwich(server_timed_state.time_us);
 
-        //println!("{} states left after popping back", {self.states.len()});
+        println!("before popping {}", self.states.len());
 
-        // last_state is either empty or at time > state
+        if let Some(x) = before {
+            while self.states.len() > x+1 {
+                self.states.pop_back();
+            }
+        }
+
+        println!("after popping {}", self.states.len());
+        let state_before_server = if before.is_some() {self.states.pop_back()} else {None};
+        let state_after_server = after.map(|x| &self.states[x]);
+
         let mut server_state = GameState::from_server_parts(
             self.seed,
             server_timed_state.time_us,
             server_timed_state.player_states);
 
-        if let (Some(prev_state), Some(next_state)) = (state_before_server.as_ref(), state_after_server.as_ref()) {
-            println!("XXX prev {} next {}", prev_state.time_us, next_state.time_us);
+        if let (Some(prev_state), Some(next_state)) = (state_before_server, state_after_server) {
+            //println!("XXX prev {} next {}", prev_state.time_us, next_state.time_us);
+            //println!("Interpolating between two");
             let inputs = next_state.player_inputs;
             let dt = server_state.time_us - prev_state.time_us;
             let game_state_with_local_pos = prev_state.simulate(Some(inputs), dt);
@@ -306,20 +340,23 @@ impl Game {
             server_state.set_player_state(local_player, override_player_state);
         }
 
+        println!("Pushing back t={}", server_state.time_us);
         self.states.push_back(server_state);
 
+        println!("States len {}", self.states.len());
         // TODO make sure it has local pplayers inputs ok?
 
         // Simulate up to now
         for i in (0..self.states.len()-1).rev() {
-            println!("Simulating up to date {}", i);
             //let local_player_input = self.states[i].player_inputs.get(local_player);
             let dt = self.states[i].time_us - self.states[i+1].time_us;
+            println!("Simulating up to date {} dt {}, t {}", i, dt, self.states[i].time_us);
             let inputs = Some(self.states[i].player_inputs);
             //inputs
             let new_state = self.states[i+1].simulate(inputs, dt);
             self.states[i] = new_state;
         }
+
     }
 
     pub fn current_state(&self) -> &GameState

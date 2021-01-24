@@ -14,12 +14,16 @@ fn main() {
     let socket = UdpSocket::bind(socket_config).unwrap();
     socket.set_nonblocking(true).unwrap();
 
+    let start = Instant::now();
+
+    std::thread::spawn(move || ping_server(start));
+
     let mut s = Server {
         clients: vec![],
         socket : socket,
         game: game::Game::new(),
-        prev_tick: Instant::now(),
-        start: Instant::now(),
+        prev_tick: start,
+        start: start,
     };
 
     match s.run() {
@@ -27,6 +31,31 @@ fn main() {
             println!("Err {}", e)
         },
         _ => {},
+    }
+}
+
+fn ping_server(start : Instant) {
+    let ping_server_config = "127.0.0.1:8086";
+    println!("Setting up ping socket on {}", ping_server_config);
+    let mut socket = UdpSocket::bind(ping_server_config).unwrap();
+    loop {
+        match crossy_receive(&mut socket)
+        {
+            Ok((update, src)) => match update
+            {
+                CrossyMessage::OffsetPing() => 
+                {
+                    let time_us = Instant::now().saturating_duration_since(start).as_micros() as u32;
+                    let pong = CrossyMessage::OffsetPong(OffsetPong {
+                        us_server: time_us, 
+                    });
+
+                    crossy_send(&pong, &mut socket, &src).unwrap();
+                },
+                _ => {},
+            },
+            _ => {},
+        }
     }
 }
 
@@ -65,7 +94,7 @@ impl Server
                         let client_id = game::PlayerId(self.clients.len() as u8);
                         new_players.push(client_id);
 
-                        let client_offset_us = tick_start.saturating_duration_since(self.start).as_micros() as u32 - crossy_multi_core::STATIC_LAG;
+                        let client_offset_us = tick_start.saturating_duration_since(self.start).as_micros() as u32 - hello.latency_us;
                         println!("Client offset us {}", client_offset_us);
 
                         let client = Client 
@@ -89,12 +118,9 @@ impl Server
                         crossy_send(&response, &mut self.socket, &src)?;
                     },
                     CrossyMessage::ClientTick(t) => {
-                        //println!("{:?}", &t);
                         match self.get_client_by_addr(&src)
                         {
                             Some(client) => {
-                                //let client_time = (t.time_us + client.offset_us).checked_sub(crossy_multi_core::STATIC_LAG)
-                                    //.unwrap_or(t.time_us + client.offset_us);
                                 let client_time = t.time_us + client.offset_us;
                                 client_updates.push(game::TimedInput
                                 {
