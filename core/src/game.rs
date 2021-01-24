@@ -269,43 +269,11 @@ impl Game {
 
     pub fn propagate_state(&mut self, server_timed_state : TimedState, local_player : PlayerId)
     {
-        //println!("Propagating state {}", server_timed_state.time_us);
         // Insert the new state into the ring buffer
         // Pop everything after it off
         // Simulate up to now
 
-        match self.states.front() {
-            Some(x) => {
-                //println!("DT server and top state {}", x.time_us - server_timed_state.time_us);
-            },
-            _ => {},
-        }
-
-        /*
-        let mut state_before_server = None;
-        let mut state_after_server = None;
-
-        while {
-            //println!("Popping back {:?}", cur.as_ref().map(|x| x.time_us));
-            let stop = self.states.back().map(|x| x.time_us < server_timed_state.time_us)
-                .unwrap_or(false);
-
-            if stop
-            {
-                state_before_server = self.states.pop_back();
-                true
-            }
-            else
-            {
-                state_after_server = self.states.back();
-                false
-            }
-        } {};
-        */
-
         let (before, after) = self.get_sandwich(server_timed_state.time_us);
-
-        println!("before popping {}", self.states.len());
 
         if let Some(x) = before {
             while self.states.len() > x+1 {
@@ -313,7 +281,6 @@ impl Game {
             }
         }
 
-        println!("after popping {}", self.states.len());
         let state_before_server = if before.is_some() {self.states.pop_back()} else {None};
         let state_after_server = after.map(|x| &self.states[x]);
 
@@ -494,10 +461,13 @@ impl GameState
             // TODO
         }
 
-        for player in &mut self.player_states
+        //for player in &mut self.player_states
+        for i in 0..self.player_states.len()
         {
-            let player_input = self.player_inputs.get(player.id);
-            player.tick(player_input, dt_us as f64);
+            let id = self.player_states[i].id;
+            let player_input = self.player_inputs.get(id);
+            let iterated = self.player_states[i].tick_iterate(self, player_input, dt_us as f64);
+            self.player_states[i] = iterated;
         }
     }
 }
@@ -540,47 +510,61 @@ impl PlayerState
         }
     }
 
-    fn tick(&mut self, input : Input, dt_us : f64)
+    fn tick_iterate(&self, state: &GameState, input : Input, dt_us : f64) -> Self
     {
-        match self.move_state
+        let mut new = self.clone();
+        match new.move_state
         {
             MoveState::Stationary => {
-                self.move_cooldown = (self.move_cooldown - dt_us).max(0.0);
+                new.move_cooldown = (new.move_cooldown - dt_us).max(0.0);
             },
             MoveState::Moving(x, target_pos) => {
                 let rem_ms = x - dt_us;
                 if rem_ms > 0.0
                 {
-                    self.move_state = MoveState::Moving(rem_ms, target_pos);
+                    new.move_state = MoveState::Moving(rem_ms, target_pos);
                 }
                 else
                 {
                     // In new pos
-                    self.pos = target_pos;
-                    self.move_state = MoveState::Stationary;
+                    new.pos = target_pos;
+                    new.move_state = MoveState::Stationary;
 
                     // rem_ms <= 0 so we add it to the max cooldown
-                    self.move_cooldown = MOVE_COOLDOWN_MAX + rem_ms;
+                    new.move_cooldown = MOVE_COOLDOWN_MAX + rem_ms;
                 }
             }
         }
 
-        if self.can_move() && input != Input::None
+        if new.can_move() && input != Input::None
         {
-            // Start moving
-            // todo
+            let mut new_pos = None;
 
-            // no logs
-            match self.pos
+            match new.pos
             {
                 Pos::Coord(pos) =>
                 {
-                    let new_pos = Pos::Coord(pos.apply_input(input));
-                    self.move_state = MoveState::Moving(0.0, new_pos);
+                    let candidate_pos = Pos::Coord(pos.apply_input(input));
+                    new_pos = Some(candidate_pos);
+
+                    for player in &state.player_states {
+                        if player.id != new.id {
+                            if player.pos == candidate_pos {
+                                new_pos = None;
+                                break;
+                            }
+                        }
+                    }
                 },
                 _ => {},
             }
+
+            if let Some(pos) = new_pos {
+                new.move_state = MoveState::Moving(0.0, pos);
+            }
         }
+
+        new
     }
 }
 
