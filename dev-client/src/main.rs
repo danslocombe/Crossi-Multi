@@ -18,7 +18,7 @@ fn main() {
         {
             let top_state = client.game.top_state();
             let pos = top_state.player_states[0].pos;
-            if (cur_pos != pos)
+            if cur_pos != pos
             {
                 cur_pos = pos;
                 println!("Pos {:?}", &cur_pos);
