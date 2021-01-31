@@ -4,6 +4,21 @@ use super::game::*;
 
 const STATE_BUFFER_SIZE: usize = 32;
 
+#[derive(Debug, Clone)]
+pub struct RemoteInput {
+    pub time_us: u32,
+    pub input: Input,
+    pub player_id: PlayerId,
+}
+
+#[derive(Debug, Clone)]
+pub struct RemoteState {
+    pub time_us: u32,
+    pub last_sent_us : u32,
+    pub player_states: Vec<PlayerState>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Timeline {
     pub player_count: u8,
     pub seed: u32,
@@ -52,11 +67,11 @@ impl Timeline {
         self.top_state().player_inputs.clone()
     }
 
-    pub fn add_player(&mut self, player_id: PlayerId) {
+    pub fn add_player(&mut self, player_id: PlayerId, pos : Pos) {
         println!("Adding new player {:?}", player_id);
 
         let state = self.states.get(0).unwrap();
-        let new = state.add_player(player_id);
+        let new = state.add_player(player_id, pos);
         self.push_state(new);
     }
 
@@ -64,7 +79,7 @@ impl Timeline {
         self.states.get(0).unwrap()
     }
 
-    pub fn propagate_inputs(&mut self, mut inputs: Vec<TimedInput>) {
+    pub fn propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) {
         if (inputs.len() == 0) {
             return;
         }
@@ -79,7 +94,7 @@ impl Timeline {
         }
     }
 
-    fn propagate_input(&mut self, input: &TimedInput) {
+    fn propagate_input(&mut self, input: &RemoteInput) {
         if let Some(index) = self.split_with_input(input.player_id, input.input, input.time_us)
         {
             // TODO handle index == 0
@@ -132,24 +147,7 @@ impl Timeline {
         }
     }
 
-    fn get_sandwich(&self, time_us: u32) -> (Option<usize>, Option<usize>) {
-        let mut before = None;
-        let mut after = None;
-        for i in (0..self.states.len()).rev() {
-            let t = self.states[i].time_us;
-            if t > time_us {
-                break;
-            }
-
-            before = Some(i);
-            after = if i == 0 { None } else { Some(i - 1) };
-        }
-
-        println!("{:?}, {:?}", before, after);
-        (before, after)
-    }
-
-    pub fn propagate_state(&mut self, server_timed_state: TimedState, local_player: PlayerId) {
+    pub fn propagate_state(&mut self, remote_state: &RemoteState, local_player: PlayerId) {
 
         // /////////////////////////////////////////////////////////////
         //
@@ -176,63 +174,47 @@ impl Timeline {
         //
         // /////////////////////////////////////////////////////////////
 
-        let (before, after) = self.get_sandwich(server_timed_state.time_us);
 
-        if let Some(x) = before {
-            while self.states.len() > x + 1 {
+        if let Some(before) = self.get_index_before_us(remote_state.last_sent_us) {
+            // Before points to an index before the last tick that was sent to server
+            // Pop off state with index before
+            while self.states.len() > before {
                 self.states.pop_back();
             }
         }
 
-        let state_before_server = if before.is_some() {
-            self.states.pop_back()
-        } else {
+        if let Some(index) = self.split_with_state(local_player, &remote_state.player_states, remote_state.time_us) {
+            if (index > 0) {
+                self.simulate_up_to_date(index);
+            }
+        }
+    }
+
+    fn split_with_state(&mut self, player_id: PlayerId, states : &Vec<PlayerState>, time_us : u32) -> Option<usize> {
+
+        let before = self.get_index_before_us(time_us)?;
+
+        if before == 0 {
             None
-        };
-        let state_after_server = after.map(|x| &self.states[x]);
+        }
+        else {
+            let state_before = &self.states[before];
+            let dt = time_us - state_before.time_us;
 
-        let mut server_state = GameState::from_server_parts(
-            self.seed,
-            server_timed_state.time_us,
-            server_timed_state.player_states,
-        );
+            let mut split_state = state_before
+                .simulate(None, dt as u32);
 
-        if let (Some(prev_state), Some(next_state)) = (state_before_server, state_after_server) {
-            let inputs = next_state.player_inputs;
-            let dt = server_state.time_us - prev_state.time_us;
-            let game_state_with_local_pos = prev_state.simulate(Some(inputs), dt);
-            let override_player_state = game_state_with_local_pos
-                .get_player(local_player)
-                .unwrap()
-                .clone();
-
-            let server_pos = server_state.get_player(local_player).unwrap().pos;
-            let local_pos = override_player_state.pos;
-            if (server_pos != local_pos) {
-                println!(
-                    "Overriding server pos {:?} with local {:?}",
-                    server_pos, local_pos
-                );
+            for server_player_state in states {
+                if server_player_state.id != player_id {
+                    split_state.player_states[server_player_state.id.0 as usize] = server_player_state.clone();
+                }
             }
 
-            server_state.set_player_state(local_player, override_player_state);
-        }
+            split_state.frame_id -= 0.5;
+            drop(state_before);
 
-        println!("Pushing back t={}", server_state.time_us);
-        self.states.push_back(server_state);
-
-        println!("States len {}", self.states.len());
-
-        // Simulate up to now
-        for i in (0..self.states.len() - 1).rev() {
-            let dt = self.states[i].time_us - self.states[i + 1].time_us;
-            println!(
-                "Simulating up to date {} dt {}, t {}",
-                i, dt, self.states[i].time_us
-            );
-            let inputs = Some(self.states[i].player_inputs);
-            let new_state = self.states[i + 1].simulate(inputs, dt);
-            self.states[i] = new_state;
+            self.states.insert(before, split_state);
+            Some(before)
         }
     }
 
@@ -274,112 +256,146 @@ mod tests
     #[test]
     fn test_split()
     {
-        let mut game = Timeline::new();
-        game.add_player(PlayerId(0));
-        game.tick_current_time(Some(PlayerInputs::default()), 50 * 1000);
-        assert_eq!(3, game.states.len());
+        let mut timeline = Timeline::new();
+        timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        timeline.tick_current_time(Some(PlayerInputs::default()), 50_000);
+        assert_eq!(3, timeline.states.len());
 
-        let index = game.split_with_input(PlayerId(0), Input::Left, 10 * 1000);
+        let index = timeline.split_with_input(PlayerId(0), Input::Left, 10_000);
 
         assert_eq!(Some(1), index);
-        assert_eq!(4, game.states.len());
+        assert_eq!(4, timeline.states.len());
         assert_eq!(vec![50, 10, 0, 0],
-            game.states.iter().map(|x| x.time_us / 1000).collect::<Vec<_>>());
+            timeline.states.iter().map(|x| x.time_us / 1000).collect::<Vec<_>>());
 
-        let input = game.states[1].player_inputs.get(PlayerId(0));
+        let input = timeline.states[1].player_inputs.get(PlayerId(0));
         assert_eq!(Input::Left, input);
 
-        let state = &game.states[1].player_states[0];
-        assert_eq!(MoveState::Moving(MOVE_DUR, Pos::Coord(CoordPos {x: 9, y: 10})), state.move_state);
+        let state = &timeline.states[1].player_states[0];
+        assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-1, 0)), state.move_state);
     }
 
     #[test]
     fn test_split_front()
     {
-        let mut game = Timeline::new();
-        game.add_player(PlayerId(0));
-        game.tick_current_time(Some(PlayerInputs::default()), 15 * 1000);
-        assert_eq!(3, game.states.len());
+        let mut timeline = Timeline::new();
+        timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        timeline.tick_current_time(Some(PlayerInputs::default()), 15_000);
+        assert_eq!(3, timeline.states.len());
 
-        let index = game.split_with_input(PlayerId(0), Input::Left, 30 * 1000);
+        let index = timeline.split_with_input(PlayerId(0), Input::Left, 30_000);
 
         assert_eq!(None, index);
-        assert_eq!(3, game.states.len());
+        assert_eq!(3, timeline.states.len());
         assert_eq!(vec![15, 0, 0],
-            game.states.iter().map(|x| x.time_us / 1000).collect::<Vec<_>>());
+            timeline.states.iter().map(|x| x.time_us / 1000).collect::<Vec<_>>());
     }
 
     #[test]
     fn test_split_out_range()
     {
-        let mut game = Timeline::from_server_parts(0, 10*1000, Vec::new(), 0);
-        game.add_player(PlayerId(0));
-        game.tick_current_time(Some(PlayerInputs::default()), 15 * 1000);
-        assert_eq!(3, game.states.len());
+        let mut timeline = Timeline::from_server_parts(0, 10_000, Vec::new(), 0);
+        timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        timeline.tick_current_time(Some(PlayerInputs::default()), 15_000);
+        assert_eq!(3, timeline.states.len());
 
         // Before start
-        let index = game.split_with_input(PlayerId(0), Input::Left, 5 * 1000);
+        let index = timeline.split_with_input(PlayerId(0), Input::Left, 5_000);
         assert_eq!(None, index);
-        assert_eq!(3, game.states.len());
+        assert_eq!(3, timeline.states.len());
     }
 
     #[test]
     fn test_propagate_input()
     {
-        let mut game = Timeline::new();
-        game.add_player(PlayerId(0));
-        game.add_player(PlayerId(1));
+        let mut timeline = Timeline::new();
+        timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        timeline.add_player(PlayerId(1), Pos::new_coord(5, 5));
 
-        let pos_p0_0 = game.top_state().get_player(PlayerId(0)).unwrap().pos;
-        let pos_p1_0 = game.top_state().get_player(PlayerId(1)).unwrap().pos;
-        let pos_p0_shifted;
-        if let Pos::Coord(x) = pos_p0_0
-        {
-            pos_p0_shifted = Pos::Coord(x.apply_input(Input::Left));
-        } 
-        else
-        {
-            panic!("Expected initial pos of player 0 to be a coord");
-        }
+        timeline.tick_current_time(Some(PlayerInputs::default()), 50_000);
+        timeline.tick_current_time(Some(PlayerInputs::default()), 100_000);
+        timeline.tick_current_time(None, 150_000);
 
-        game.tick_current_time(Some(PlayerInputs::default()), 50 * 1000);
-        game.tick_current_time(Some(PlayerInputs::default()), 100 * 1000);
-        game.tick_current_time(None, 150 * 1000);
-
-        let timed_input = TimedInput
+        let timed_input = RemoteInput
         {
-            time_us: 65 * 1000,
+            time_us: 65_000,
             input : Input::Left,
             player_id: PlayerId(0),
         };
 
-        game.propagate_input(&timed_input);
+        timeline.propagate_input(&timed_input);
 
-        assert_eq!(7, game.states.len());
+        assert_eq!(7, timeline.states.len());
 
         for i in (0..5) {
-            let pos_p1 = game.states[i].get_player(PlayerId(1)).unwrap().pos;
-            let state_p1 = &game.states[i].get_player(PlayerId(1)).unwrap().move_state;
+            let pos = timeline.states[i].get_player(PlayerId(1)).unwrap().pos;
+            let state = &timeline.states[i].get_player(PlayerId(1)).unwrap().move_state;
 
             // Expect no change to p1
-            assert_eq!(pos_p1_0, pos_p1);
-            assert_eq!(MoveState::Stationary, *state_p1);
+            assert_eq!(Pos::new_coord(5, 5), pos);
+            assert_eq!(MoveState::Stationary, *state);
         }
 
         for i in 0..2 {
-            let pos_p0 = game.states[i].get_player(PlayerId(0)).unwrap().pos;
-            let state_p0 = &game.states[i].get_player(PlayerId(0)).unwrap().move_state;
-            assert_eq!(pos_p0_shifted, pos_p0, "i = {}", i);
-            assert_eq!(MoveState::Stationary, *state_p0);
+            let pos = timeline.states[i].get_player(PlayerId(0)).unwrap().pos;
+            let state = &timeline.states[i].get_player(PlayerId(0)).unwrap().move_state;
+            assert_eq!(Pos::new_coord(-1, 0), pos, "i = {}", i);
+            assert_eq!(MoveState::Stationary, *state);
         }
 
-        // At state 2 should be in original position but moving to new pos
-        let state_p0 = &game.states[2].get_player(PlayerId(0)).unwrap().move_state;
-        assert_eq!(MoveState::Moving(MOVE_DUR, pos_p0_shifted), *state_p0);
+        {
+            // At state 2 should be in original position but moving to new pos
+            let state = &timeline.states[2].get_player(PlayerId(0)).unwrap().move_state;
+            assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-1, 0)), *state);
+        }
 
         for i in 2..5 {
-            let pos_p0 = game.states[i].get_player(PlayerId(0)).unwrap().pos;
-            assert_eq!(pos_p0_0, pos_p0, "i = {}", i);
+            let pos = timeline.states[i].get_player(PlayerId(0)).unwrap().pos;
+            assert_eq!(Pos::new_coord(0, 0), pos, "i = {}", i);
         }
+    }
+
+    #[test]
+    fn test_propagate_state()
+    {
+        let mut client_timeline = Timeline::new();
+        client_timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        client_timeline.add_player(PlayerId(1), Pos::new_coord(5, 5));
+
+        let mut p0_left = PlayerInputs::default();
+        p0_left.set(PlayerId(0), Input::Left);
+        client_timeline.tick_current_time(Some(p0_left), 500_000);
+
+        let mut server_timeline = client_timeline.clone();
+
+        client_timeline.tick_current_time(Some(p0_left), 1_000_000);
+        client_timeline.tick_current_time(Some(p0_left), 1_500_000);
+
+        let mut p1_left = PlayerInputs::default();
+        p1_left.set(PlayerId(1), Input::Left);
+        server_timeline.tick_current_time(Some(p1_left), 1_250_000);
+
+        let server_state = RemoteState
+        {
+            time_us : 1_250000,
+            last_sent_us : 500_000,
+            player_states : server_timeline.top_state().player_states.clone(),
+        };
+
+
+        assert_eq!(6, client_timeline.states.len());
+        assert_eq!(Pos::new_coord(-2, 0), client_timeline.top_state().player_states[0].pos);
+        assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-3, 0)), client_timeline.top_state().player_states[0].move_state);
+
+        client_timeline.propagate_state(&server_state, PlayerId(0));
+
+        assert_eq!(vec![1500, 1250, 1000, 500],
+            client_timeline.states.iter().map(|x| x.time_us / 1000).collect::<Vec<_>>());
+
+        let s = client_timeline.top_state();
+        assert_eq!(Pos::new_coord(-2, 0), s.player_states[0].pos);
+        assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-3, 0)), s.player_states[0].move_state);
+        assert_eq!(Pos::new_coord(4, 5), s.player_states[1].pos);
+        assert_eq!(MoveState::Stationary, s.player_states[1].move_state);
     }
 }

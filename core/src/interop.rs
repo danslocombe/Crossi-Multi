@@ -36,11 +36,11 @@ pub const INIT_MESSAGE: [u8; 4] = ['h' as u8, 'e' as u8, 'l' as u8, 'o' as u8];
 pub const CURRENT_VERSION: u8 = 1;
 
 impl ClientHello {
-    pub fn new(latency: u32) -> Self {
+    pub fn new(latency_us: u32) -> Self {
         ClientHello {
             header: INIT_MESSAGE,
             version: CURRENT_VERSION,
-            latency_us: latency,
+            latency_us,
         }
     }
 
@@ -58,6 +58,7 @@ pub struct ClientTick {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ServerTick {
     pub time_us: u32,
+    pub last_sent_us : u32,
     pub states: Vec<super::game::PlayerState>,
 }
 

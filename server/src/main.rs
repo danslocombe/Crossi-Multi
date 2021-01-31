@@ -1,5 +1,5 @@
 use crossy_multi_core::game;
-use crossy_multi_core::timeline::Timeline;
+use crossy_multi_core::timeline::{Timeline, RemoteInput};
 use crossy_multi_core::interop::*;
 
 use std::io::Result;
@@ -60,6 +60,7 @@ struct Client {
     addr: SocketAddr,
     id: game::PlayerId,
     offset_us: u32,
+    last_tick_us : u32,
 }
 
 struct Server {
@@ -74,7 +75,7 @@ impl Server {
     fn receive_updates(
         &mut self,
         tick_start: &Instant,
-    ) -> Result<(Vec<game::TimedInput>, Vec<game::PlayerId>)> {
+    ) -> Result<(Vec<RemoteInput>, Vec<game::PlayerId>)> {
         let mut client_updates = Vec::new();
         let mut new_players = Vec::new();
 
@@ -102,6 +103,7 @@ impl Server {
                             id: client_id,
                             // TODO ping the client and add that.
                             offset_us: client_offset_us,
+                            last_tick_us : 0,
                         };
 
                         self.clients.push(client);
@@ -115,10 +117,11 @@ impl Server {
 
                         crossy_send(&response, &mut self.socket, &src)?;
                     }
-                    CrossyMessage::ClientTick(t) => match self.get_client_by_addr(&src) {
+                    CrossyMessage::ClientTick(t) => match self.get_client_mut_by_addr(&src) {
                         Some(client) => {
                             let client_time = t.time_us + client.offset_us;
-                            client_updates.push(game::TimedInput {
+                            client.last_tick_us = t.time_us;
+                            client_updates.push(RemoteInput {
                                 time_us: client_time,
                                 input: t.input,
                                 player_id: client.id,
@@ -150,6 +153,16 @@ impl Server {
         }
     }
 
+    fn get_client_mut_by_addr(&mut self, addr: &SocketAddr) -> Option<&mut Client> {
+        for client in &mut self.clients {
+            if client.addr == *addr {
+                return Some(client);
+            }
+        }
+
+        None
+    }
+
     fn get_client_by_addr(&self, addr: &SocketAddr) -> Option<&Client> {
         for client in &self.clients {
             if client.addr == *addr {
@@ -172,7 +185,7 @@ impl Server {
             self.prev_tick = simulation_time_start;
             self.timeline.tick(None, dt_simulation.as_micros() as u32);
             for new_player in new_players {
-                self.timeline.add_player(new_player);
+                self.timeline.add_player(new_player, game::Pos::new_coord(10, 10));
             }
             self.timeline.propagate_inputs(client_updates);
 
@@ -190,6 +203,7 @@ impl Server {
                 let tick = CrossyMessage::ServerTick(ServerTick {
                     time_us: top_state.time_us - client.offset_us,
                     states: top_state.player_states.clone(),
+                    last_sent_us : client.last_tick_us,
                 });
 
                 println!("Sending tick {:?}", tick);

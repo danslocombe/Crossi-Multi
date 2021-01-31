@@ -9,6 +9,14 @@ pub enum Pos {
     Log(LogId),
 }
 
+impl Pos {
+    pub fn new_coord(x : i32, y : i32) -> Self {
+        Pos::Coord(CoordPos{
+            x, y,
+        })
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct CoordPos {
     pub x: i32,
@@ -67,18 +75,6 @@ impl Default for PlayerInputs
             inputs : [Input::None; MAX_PLAYERS],
         }
     }
-}
-
-#[derive(Debug)]
-pub struct TimedInput {
-    pub time_us: u32,
-    pub input: Input,
-    pub player_id: PlayerId,
-}
-
-pub struct TimedState {
-    pub time_us: u32,
-    pub player_states: Vec<PlayerState>,
 }
 
 impl PlayerInputs {
@@ -155,18 +151,17 @@ impl GameState {
         self.player_states.len()
     }
 
-    pub fn add_player(&self, id: PlayerId) -> Self {
+    pub fn add_player(&self, id: PlayerId, pos : Pos) -> Self {
         let mut new = self.clone();
 
         let state = PlayerState {
             id,
+            pos,
             move_state: MoveState::Stationary,
             move_cooldown: 0.0,
-            pos: Pos::Coord(CoordPos { x: 10, y: 10 }),
         };
 
         new.player_states.push(state);
-
         new
     }
 
@@ -215,8 +210,8 @@ pub enum MoveState {
 }
 
 // In us
-pub const MOVE_COOLDOWN_MAX: f64 = 150.0 * 1000.0;
-pub const MOVE_DUR: f64 = 10.0 * 1000.0;
+pub const MOVE_COOLDOWN_MAX: f64 = 150_000.0;
+pub const MOVE_DUR: f64 = 10_000.0;
 
 impl PlayerState {
     fn can_move(&self) -> bool {

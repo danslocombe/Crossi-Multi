@@ -1,5 +1,5 @@
 use super::game;
-use super::timeline::Timeline;
+use super::timeline::{Timeline, RemoteState};
 use super::interop::*;
 
 use std::io::Result;
@@ -130,9 +130,10 @@ impl Client {
 
         server_tick.map(|x| {
             self.timeline.propagate_state(
-                game::TimedState {
+                &RemoteState {
                     time_us: x.time_us,
                     player_states: x.states,
+                    last_sent_us : x.last_sent_us,
                 },
                 self.local_player_id,
             );
