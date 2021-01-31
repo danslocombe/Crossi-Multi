@@ -1,4 +1,5 @@
 use crossy_multi_core::game;
+use crossy_multi_core::timeline::Timeline;
 use crossy_multi_core::interop::*;
 
 use std::io::Result;
@@ -20,8 +21,8 @@ fn main() {
 
     let mut s = Server {
         clients: vec![],
-        socket: socket,
-        game: game::Game::new(),
+        timeline: Timeline::new(),
+        socket,
         prev_tick: start,
         start: start,
     };
@@ -64,7 +65,7 @@ struct Client {
 struct Server {
     clients: Vec<Client>,
     socket: UdpSocket,
-    game: game::Game,
+    timeline: Timeline,
     prev_tick: Instant,
     start: Instant,
 }
@@ -107,8 +108,8 @@ impl Server {
 
                         let response = CrossyMessage::HelloResponse(InitServerResponse {
                             server_version: SERVER_VERSION,
-                            player_count: self.game.player_count,
-                            seed: self.game.seed,
+                            player_count: self.timeline.player_count,
+                            seed: self.timeline.seed,
                             player_id: client_id,
                         });
 
@@ -118,7 +119,7 @@ impl Server {
                         Some(client) => {
                             let client_time = t.time_us + client.offset_us;
                             client_updates.push(game::TimedInput {
-                                time_us: t.time_us + client.offset_us,
+                                time_us: client_time,
                                 input: t.input,
                                 player_id: client.id,
                             });
@@ -169,14 +170,14 @@ impl Server {
             let simulation_time_start = Instant::now();
             let dt_simulation = simulation_time_start.saturating_duration_since(self.prev_tick);
             self.prev_tick = simulation_time_start;
-            self.game.tick(None, dt_simulation.as_micros() as u32);
+            self.timeline.tick(None, dt_simulation.as_micros() as u32);
             for new_player in new_players {
-                self.game.add_player(new_player);
+                self.timeline.add_player(new_player);
             }
-            self.game.propagate_inputs(client_updates);
+            self.timeline.propagate_inputs(client_updates);
 
             // Send responses
-            let top_state = self.game.top_state();
+            let top_state = self.timeline.top_state();
 
             for client in &self.clients {
                 if client.offset_us > top_state.time_us {
@@ -193,7 +194,7 @@ impl Server {
 
                 println!("Sending tick {:?}", tick);
 
-                crossy_send(&tick, &mut self.socket, &client.addr);
+                crossy_send(&tick, &mut self.socket, &client.addr)?;
             }
 
             let now = Instant::now();

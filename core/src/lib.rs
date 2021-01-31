@@ -6,4 +6,6 @@ extern crate num_derive;
 pub mod game;
 pub mod interop;
 pub mod client;
+pub mod timeline;
+
 pub use game::*;

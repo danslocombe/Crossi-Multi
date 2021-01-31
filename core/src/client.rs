@@ -1,4 +1,5 @@
 use super::game;
+use super::timeline::Timeline;
 use super::interop::*;
 
 use std::io::Result;
@@ -8,7 +9,7 @@ use std::time::Instant;
 pub struct Client {
     server: SocketAddr,
     socket: UdpSocket,
-    pub game: game::Game,
+    pub timeline: Timeline,
     pub local_player_id: game::PlayerId,
     start: Instant,
     last_tick: u32,
@@ -102,7 +103,7 @@ impl Client {
         Ok(Client {
             server: server,
             socket: socket,
-            game: game::Game::from_server_parts(seed, server_tick.time_us, server_tick.states, 1),
+            timeline: Timeline::from_server_parts(seed, server_tick.time_us, server_tick.states, 1),
             local_player_id: local_player_id,
             start: time_start,
             last_tick: server_tick.time_us,
@@ -115,9 +116,9 @@ impl Client {
         self.last_tick = current_time.as_micros() as u32;
 
         // Tick logic
-        let mut player_inputs = self.game.get_last_player_inputs();
+        let mut player_inputs = self.timeline.get_last_player_inputs();
         player_inputs.set(self.local_player_id, input);
-        self.game
+        self.timeline
             .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
 
         // Pop all server messages off queue
@@ -128,7 +129,7 @@ impl Client {
         }
 
         server_tick.map(|x| {
-            self.game.propagate_state(
+            self.timeline.propagate_state(
                 game::TimedState {
                     time_us: x.time_us,
                     player_states: x.states,

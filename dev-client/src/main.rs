@@ -16,7 +16,7 @@ fn main() {
         client.tick(input);
 
         {
-            let top_state = client.game.top_state();
+            let top_state = client.timeline.top_state();
             let pos = top_state.player_states[0].pos;
             if cur_pos != pos
             {

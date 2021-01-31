@@ -38,7 +38,7 @@ unsafe fn get_player<'t>(id : f64) -> Option<&'t PlayerState>
 {
     let player_id = FromPrimitive::from_u8(id as u8).unwrap();
     CLIENT.as_ref()
-        .and_then(|x| x.game.current_state().get_player(player_id))
+        .and_then(|x| x.timeline.current_state().get_player(player_id))
 }
 
 #[no_mangle]
@@ -71,7 +71,7 @@ pub unsafe fn get_player_y(id : f64) -> f64 {
 
 #[no_mangle]
 pub unsafe fn get_player_count() -> f64 {
-    match CLIENT.as_ref().map(|x| x.game.top_state().get_player_count())
+    match CLIENT.as_ref().map(|x| x.timeline.top_state().get_player_count())
     {
         Some(x) => x as f64,
         None => 0.0,
