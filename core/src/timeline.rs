@@ -206,7 +206,7 @@ impl Timeline {
 
             for server_player_state in states {
                 if server_player_state.id != player_id {
-                    split_state.player_states[server_player_state.id.0 as usize] = server_player_state.clone();
+                    split_state.set_player_state(server_player_state.id, server_player_state.clone());
                 }
             }
 
@@ -271,7 +271,7 @@ mod tests
         let input = timeline.states[1].player_inputs.get(PlayerId(0));
         assert_eq!(Input::Left, input);
 
-        let state = &timeline.states[1].player_states[0];
+        let state = &timeline.states[1].get_player(PlayerId(0)).unwrap();
         assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-1, 0)), state.move_state);
     }
 
@@ -379,13 +379,16 @@ mod tests
         {
             time_us : 1_250000,
             last_sent_us : 500_000,
-            player_states : server_timeline.top_state().player_states.clone(),
+            player_states : server_timeline.top_state().get_valid_player_states(),
         };
 
 
         assert_eq!(6, client_timeline.states.len());
-        assert_eq!(Pos::new_coord(-2, 0), client_timeline.top_state().player_states[0].pos);
-        assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-3, 0)), client_timeline.top_state().player_states[0].move_state);
+        {
+            let p0 = client_timeline.top_state().get_player(PlayerId(0)).unwrap();
+            assert_eq!(Pos::new_coord(-2, 0), p0.pos);
+            assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-3, 0)), p0.move_state);
+        }
 
         client_timeline.propagate_state(&server_state, PlayerId(0));
 
@@ -393,9 +396,11 @@ mod tests
             client_timeline.states.iter().map(|x| x.time_us / 1000).collect::<Vec<_>>());
 
         let s = client_timeline.top_state();
-        assert_eq!(Pos::new_coord(-2, 0), s.player_states[0].pos);
-        assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-3, 0)), s.player_states[0].move_state);
-        assert_eq!(Pos::new_coord(4, 5), s.player_states[1].pos);
-        assert_eq!(MoveState::Stationary, s.player_states[1].move_state);
+        let p0 = s.get_player(PlayerId(0)).unwrap();
+        let p1 = s.get_player(PlayerId(1)).unwrap();
+        assert_eq!(Pos::new_coord(-2, 0), p0.pos);
+        assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-3, 0)), p0.move_state);
+        assert_eq!(Pos::new_coord(4, 5), p1.pos);
+        assert_eq!(MoveState::Stationary, p1.move_state);
     }
 }

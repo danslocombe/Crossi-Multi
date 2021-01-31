@@ -202,7 +202,7 @@ impl Server {
 
                 let tick = CrossyMessage::ServerTick(ServerTick {
                     time_us: top_state.time_us - client.offset_us,
-                    states: top_state.player_states.clone(),
+                    states: top_state.get_valid_player_states(),
                     last_sent_us : client.last_tick_us,
                 });
 

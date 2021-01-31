@@ -102,7 +102,7 @@ pub struct GameState {
     // Only worry is drift from summing, going to matter?
     pub time_us: u32,
 
-    pub player_states: Vec<PlayerState>,
+    player_states: Vec<Option<PlayerState>>,
     pub player_inputs: PlayerInputs,
     pub log_states: Vec<LogState>,
     pub frame_id: f64,
@@ -122,7 +122,7 @@ impl GameState {
     pub fn from_server_parts(_seed: u32, time_us: u32, player_states: Vec<PlayerState>) -> Self {
         GameState {
             time_us: time_us,
-            player_states,
+            player_states: player_states.into_iter().map(|x| Some(x)).collect(),
             player_inputs: PlayerInputs::new(),
             log_states: vec![],
             //TODO
@@ -133,22 +133,37 @@ impl GameState {
     pub fn get_player(&self, id: PlayerId) -> Option<&PlayerState> {
         let index = id.0 as usize;
         if (index < self.player_states.len()) {
-            Some(&self.player_states[index])
+            self.player_states[index].as_ref()
         } else {
             None
         }
     }
 
-    pub fn get_player_mut(&mut self, id: PlayerId) -> &mut PlayerState {
-        &mut self.player_states[id.0 as usize]
+    pub fn get_player_mut(&mut self, id: PlayerId) -> Option<&mut PlayerState> {
+        let idx = id.0 as usize;
+        if idx >= self.player_states.len() {
+            None
+        }
+        else {
+            self.player_states[idx].as_mut()
+        }
     }
 
     pub fn set_player_state(&mut self, id: PlayerId, state: PlayerState) {
-        self.player_states[id.0 as usize] = state;
+        let idx = id.0 as usize;
+        if idx >= self.player_states.len() {
+            self.player_states.resize(idx + 1, None);
+        }
+
+        self.player_states[idx] = Some(state);
     }
 
     pub fn get_player_count(&self) -> usize {
-        self.player_states.len()
+        self.player_states.iter().flatten().count()
+    }
+
+    pub fn get_valid_player_states(&self) -> Vec<PlayerState> {
+        self.player_states.iter().flatten().cloned().collect()
     }
 
     pub fn add_player(&self, id: PlayerId, pos : Pos) -> Self {
@@ -161,7 +176,7 @@ impl GameState {
             move_cooldown: 0.0,
         };
 
-        new.player_states.push(state);
+        new.set_player_state(id, state);
         new
     }
 
@@ -182,10 +197,14 @@ impl GameState {
         }
 
         for i in 0..self.player_states.len() {
-            let id = self.player_states[i].id;
-            let player_input = self.player_inputs.get(id);
-            let iterated = self.player_states[i].tick_iterate(self, player_input, dt_us as f64);
-            self.player_states[i] = iterated;
+            if let Some(player_state) = self.player_states[i].as_ref() {
+                let id = player_state.id;
+                let player_input = self.player_inputs.get(id);
+                let iterated = player_state.tick_iterate(self, player_input, dt_us as f64);
+                drop(player_state);
+
+                self.set_player_state(id, iterated);
+            }
         }
     }
 }
@@ -251,9 +270,9 @@ impl PlayerState {
                     let candidate_pos = Pos::Coord(pos.apply_input(input));
                     new_pos = Some(candidate_pos);
 
-                    for player in &state.player_states {
-                        if player.id != new.id {
-                            if player.pos == candidate_pos {
+                    for m_player in &state.player_states {
+                        if let Some(player) = m_player {
+                            if player.id != new.id && player.pos == candidate_pos {
                                 new_pos = None;
                                 break;
                             }
