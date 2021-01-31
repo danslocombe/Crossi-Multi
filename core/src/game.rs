@@ -61,6 +61,15 @@ pub struct PlayerInputs {
     pub inputs: [Input; MAX_PLAYERS],
 }
 
+impl Default for PlayerInputs
+{
+    fn default() -> Self {
+        PlayerInputs {
+            inputs : [Input::None; MAX_PLAYERS],
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct TimedInput {
     pub time_us: u32,
@@ -104,7 +113,7 @@ impl Game {
         Game {
             player_count: 0,
             seed: 0,
-            states: states,
+            states,
         }
     }
 
@@ -117,9 +126,9 @@ impl Game {
         let mut states = VecDeque::new();
         states.push_front(GameState::from_server_parts(seed, time_us, player_states));
         Game {
-            player_count: player_count,
-            seed: seed,
-            states: states,
+            player_count,
+            seed,
+            states,
         }
     }
 
@@ -160,7 +169,6 @@ impl Game {
         inputs.sort_by(|x, y| x.time_us.cmp(&y.time_us));
 
         for input in &inputs {
-            //println!("{}", input.time_us);
             // TODO optimisation
             // group all updates within same frame
             self.propagate_input(input);
@@ -168,50 +176,55 @@ impl Game {
     }
 
     fn propagate_input(&mut self, input: &TimedInput) {
-        // Try and get the state we should start propagating from
-        // If the input is too old we drop it
-        if let Some(mut oldest_index) = self.get_index_for_us(input.time_us) {
-            println!("Propagating {:?} oldest_index = {}", input, oldest_index);
-            if (oldest_index == 0) {
-                // Packet got here so quick! (Latency estimate must be off)
-                // We look at the diff between the last two states
-                oldest_index = 1;
+        if let Some(index) = self.split_with_input(input.player_id, input.input, input.time_us)
+        {
+            // TODO handle index == 0
+            if (index > 0) {
+                self.simulate_up_to_date(index);
             }
 
-            let mut first = true;
+        }
+    }
 
-            for i in (1..oldest_index + 1).rev() {
-                let state_inputs = self.states[i - 1].player_inputs;
-                if (state_inputs.get(input.player_id) == input.input) {
-                    // Up to date, nothing to do
-                    return;
-                }
+    fn simulate_up_to_date(&mut self, start_index : usize) {
+        for i in (0..start_index).rev() {
+            let inputs = self.states[i].player_inputs;
+            let dt = self.states[i].time_us - self.states[i+1].time_us;
+            let replacement_state = self.states[i+1].simulate(Some(inputs), dt as u32);
+            self.states[i] = replacement_state;
+        }
+    }
 
-                let mut new_inputs = state_inputs.clone();
-                if first {
-                    // Bifurcate
+    fn split_with_input(&mut self, player_id: PlayerId, input : Input, time_us : u32) -> Option<usize> {
 
-                    let dt = input.time_us - self.states[i].time_us;
-                    let mut partial_state = self.states[i].simulate(None, dt as u32);
-                    partial_state.frame_id -= 1.0;
-                    self.states.pop_back();
-                    self.states.push_back(partial_state);
+        // Given some time t
+        // Find the states before and after t s0 and s1, insert a new state s
+        // between them
+        //
+        //     t0  t  t1
+        //     |   |  |
+        //  .. s0  s  s1 ..
 
-                    println!(
-                        "replacing frame {} with new input",
-                        self.states[i - 1].frame_id
-                    );
-                    new_inputs.set(input.player_id, input.input);
-                    first = false;
-                } else {
-                    println!("propagating {} with new input", self.states[i - 1].frame_id);
-                    new_inputs.set(input.player_id, Input::None);
-                }
+        let before = self.get_index_before_us(time_us)?;
 
-                let dt = self.states[i - 1].time_us - self.states[i].time_us;
-                let replacement_state = self.states[i].simulate(Some(new_inputs), dt as u32);
-                self.states[i - 1] = replacement_state;
-            }
+        if before == 0 {
+            None
+        }
+        else {
+            let state_before = &self.states[before];
+            let dt = time_us - state_before.time_us;
+
+            let after = before-1;
+
+            let mut inputs = self.states[after].player_inputs.clone();
+            inputs.set(player_id, input);
+            let mut split_state = state_before
+                .simulate(Some(inputs), dt as u32);
+            split_state.frame_id -= 0.5;
+            drop(state_before);
+
+            self.states.insert(before, split_state);
+            Some(before)
         }
     }
 
@@ -233,9 +246,31 @@ impl Game {
     }
 
     pub fn propagate_state(&mut self, server_timed_state: TimedState, local_player: PlayerId) {
-        // Insert the new state into the ring buffer
-        // Pop everything after it off
-        // Simulate up to now
+
+        // /////////////////////////////////////////////////////////////
+        //
+        //              s_server
+        //                |
+        //        |       |
+        // s0 .. s1 .. s2 | s3 .. s_now
+        //
+        // s0 oldest state stored
+        // s1 last local state that had an influence on s_server
+        // s2 s3 sandwich s_server
+        //
+        // Strat:
+        // Pop all older than s1
+        // s1 becomes the "trusted" state to base all else on
+        //
+        // create modified s_server' by using local player state 
+        // from s2 and the inputs from s3
+        // modify s3 .. s_now into s3' .. s_now'
+        //
+        // /////////////////////////////////////////////////////////////
+        //
+        // s1 .. s2 s_server' s3' .. s_now'
+        //
+        // /////////////////////////////////////////////////////////////
 
         let (before, after) = self.get_sandwich(server_timed_state.time_us);
 
@@ -301,8 +336,13 @@ impl Game {
         self.states.get(0).unwrap()
     }
 
+    fn get_state_before_us(&self, time_us: u32) -> Option<&GameState>
+    {
+        self.get_index_before_us(time_us).map(|x| &self.states[x])
+    }
+
     // Find the first state at a time point before a given time.
-    fn get_index_for_us(&self, time_us: u32) -> Option<usize> {
+    fn get_index_before_us(&self, time_us: u32) -> Option<usize> {
         // TODO binary search
         for i in 0..self.states.len() {
             let state = &self.states[i];
@@ -349,7 +389,7 @@ impl GameState {
     pub fn from_server_parts(_seed: u32, time_us: u32, player_states: Vec<PlayerState>) -> Self {
         GameState {
             time_us: time_us,
-            player_states: player_states,
+            player_states,
             player_inputs: PlayerInputs::new(),
             log_states: vec![],
             //TODO
@@ -382,9 +422,9 @@ impl GameState {
         let mut new = self.clone();
 
         let state = PlayerState {
-            id: id,
+            id,
             move_state: MoveState::Stationary,
-            move_cooldown: MOVE_COOLDOWN_MAX,
+            move_cooldown: 0.0,
             pos: Pos::Coord(CoordPos { x: 10, y: 10 }),
         };
 
@@ -437,8 +477,9 @@ pub enum MoveState {
     Moving(f64, Pos),
 }
 
-// In ms
+// In us
 const MOVE_COOLDOWN_MAX: f64 = 150.0 * 1000.0;
+const MOVE_DUR: f64 = 10.0 * 1000.0;
 
 impl PlayerState {
     fn can_move(&self) -> bool {
@@ -491,7 +532,7 @@ impl PlayerState {
             }
 
             if let Some(pos) = new_pos {
-                new.move_state = MoveState::Moving(0.0, pos);
+                new.move_state = MoveState::Moving(MOVE_DUR, pos);
             }
         }
 
@@ -506,4 +547,122 @@ pub struct LogState {
 
     x: f64,
     xvel: f64,
+}
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+
+    #[test]
+    fn test_split()
+    {
+        let mut game = Game::new();
+        game.add_player(PlayerId(0));
+        game.tick_current_time(Some(PlayerInputs::default()), 50 * 1000);
+        assert_eq!(3, game.states.len());
+
+        let index = game.split_with_input(PlayerId(0), Input::Left, 10 * 1000);
+
+        assert_eq!(Some(1), index);
+        assert_eq!(4, game.states.len());
+        assert_eq!(vec![50, 10, 0, 0],
+            game.states.iter().map(|x| x.time_us / 1000).collect::<Vec<_>>());
+
+        let input = game.states[1].player_inputs.get(PlayerId(0));
+        assert_eq!(Input::Left, input);
+
+        let state = &game.states[1].player_states[0];
+        assert_eq!(MoveState::Moving(MOVE_DUR, Pos::Coord(CoordPos {x: 9, y: 10})), state.move_state);
+    }
+
+    #[test]
+    fn test_split_front()
+    {
+        let mut game = Game::new();
+        game.add_player(PlayerId(0));
+        game.tick_current_time(Some(PlayerInputs::default()), 15 * 1000);
+        assert_eq!(3, game.states.len());
+
+        let index = game.split_with_input(PlayerId(0), Input::Left, 30 * 1000);
+
+        assert_eq!(None, index);
+        assert_eq!(3, game.states.len());
+        assert_eq!(vec![15, 0, 0],
+            game.states.iter().map(|x| x.time_us / 1000).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_split_out_range()
+    {
+        let mut game = Game::from_server_parts(0, 10*1000, Vec::new(), 0);
+        game.add_player(PlayerId(0));
+        game.tick_current_time(Some(PlayerInputs::default()), 15 * 1000);
+        assert_eq!(3, game.states.len());
+
+        // Before start
+        let index = game.split_with_input(PlayerId(0), Input::Left, 5 * 1000);
+        assert_eq!(None, index);
+        assert_eq!(3, game.states.len());
+    }
+
+    #[test]
+    fn test_propagate_input()
+    {
+        let mut game = Game::new();
+        game.add_player(PlayerId(0));
+        game.add_player(PlayerId(1));
+
+        let pos_p0_0 = game.top_state().get_player(PlayerId(0)).unwrap().pos;
+        let pos_p1_0 = game.top_state().get_player(PlayerId(1)).unwrap().pos;
+        let pos_p0_shifted;
+        if let Pos::Coord(x) = pos_p0_0
+        {
+            pos_p0_shifted = Pos::Coord(x.apply_input(Input::Left));
+        } 
+        else
+        {
+            panic!("Expected initial pos of player 0 to be a coord");
+        }
+
+        game.tick_current_time(Some(PlayerInputs::default()), 50 * 1000);
+        game.tick_current_time(Some(PlayerInputs::default()), 100 * 1000);
+        game.tick_current_time(None, 150 * 1000);
+
+        let timed_input = TimedInput
+        {
+            time_us: 65 * 1000,
+            input : Input::Left,
+            player_id: PlayerId(0),
+        };
+
+        game.propagate_input(&timed_input);
+
+        assert_eq!(7, game.states.len());
+
+        for i in (0..5) {
+            let pos_p1 = game.states[i].get_player(PlayerId(1)).unwrap().pos;
+            let state_p1 = &game.states[i].get_player(PlayerId(1)).unwrap().move_state;
+
+            // Expect no change to p1
+            assert_eq!(pos_p1_0, pos_p1);
+            assert_eq!(MoveState::Stationary, *state_p1);
+        }
+
+        for i in 0..2 {
+            let pos_p0 = game.states[i].get_player(PlayerId(0)).unwrap().pos;
+            let state_p0 = &game.states[i].get_player(PlayerId(0)).unwrap().move_state;
+            assert_eq!(pos_p0_shifted, pos_p0, "i = {}", i);
+            assert_eq!(MoveState::Stationary, *state_p0);
+        }
+
+        // At state 2 should be in original position but moving to new pos
+        let state_p0 = &game.states[2].get_player(PlayerId(0)).unwrap().move_state;
+        assert_eq!(MoveState::Moving(MOVE_DUR, pos_p0_shifted), *state_p0);
+
+        for i in 2..5 {
+            let pos_p0 = game.states[i].get_player(PlayerId(0)).unwrap().pos;
+            assert_eq!(pos_p0_0, pos_p0, "i = {}", i);
+        }
+    }
 }
