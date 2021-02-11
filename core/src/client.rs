@@ -1,5 +1,5 @@
 use super::game;
-use super::timeline::{Timeline, RemoteState};
+use super::timeline::{Timeline};
 use super::interop::*;
 
 use std::io::Result;
@@ -87,26 +87,24 @@ impl Client {
 
         let (server_tick, seed, local_player_id, time_start) =
             connect(&mut socket, &server, &server_ping)?;
+
         println!(
             "Connected! Our id {:?}, seed {}, server response {:?}",
             local_player_id, seed, server_tick
         );
-        println!(
-            "AA {}",
-            Instant::now()
-                .saturating_duration_since(time_start)
-                .as_micros()
-        );
 
         socket.set_nonblocking(true)?;
 
+        let timeline =
+            Timeline::from_server_parts(seed, server_tick.latest.time_us, server_tick.latest.states, 1);
+
         Ok(Client {
-            server: server,
-            socket: socket,
-            timeline: Timeline::from_server_parts(seed, server_tick.time_us, server_tick.states, 1),
-            local_player_id: local_player_id,
+            server,
+            socket,
+            timeline,
+            local_player_id,
             start: time_start,
-            last_tick: server_tick.time_us,
+            last_tick: server_tick.latest.time_us,
         })
     }
 
@@ -129,12 +127,20 @@ impl Client {
         }
 
         server_tick.map(|x| {
+            
+            // debug
+            /*
+            if (x.time_us / 5000) % 50 == 0
+            {
+                for y in x.states.iter().filter(|x| x.id == self.local_player_id) {
+                    println!("server state at {} = {:?}", x.time_us, y);
+                }
+            }
+            */
+
             self.timeline.propagate_state(
-                &RemoteState {
-                    time_us: x.time_us,
-                    player_states: x.states,
-                    last_sent_us : x.last_sent_us,
-                },
+                &x.latest,
+                &x.last_client_sent,
                 self.local_player_id,
             );
         });

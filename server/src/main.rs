@@ -1,5 +1,5 @@
 use crossy_multi_core::game;
-use crossy_multi_core::timeline::{Timeline, RemoteInput};
+use crossy_multi_core::timeline::{Timeline, RemoteInput, RemoteTickState};
 use crossy_multi_core::interop::*;
 
 use std::io::Result;
@@ -142,9 +142,9 @@ impl Server {
                     println!("Connection aborted")
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => {
-                    println!("Connection reset {:?}", &e);
+                    //println!("Connection reset {:?}", &e);
                     // tmp
-                    return Err(e);
+                    //return Err(e);
                     //self.clients.retain(|x| x.addr != src);
                     // Clear the client
                 }
@@ -200,10 +200,19 @@ impl Server {
                     )
                 }
 
+                let client_last_tick_state = self.timeline.get_state_before_eq_us(client.last_tick_us).map(|x| {
+                    RemoteTickState {
+                        time_us: client.last_tick_us,
+                        states: x.get_valid_player_states(),
+                    }
+                });
+
                 let tick = CrossyMessage::ServerTick(ServerTick {
-                    time_us: top_state.time_us - client.offset_us,
-                    states: top_state.get_valid_player_states(),
-                    last_sent_us : client.last_tick_us,
+                    latest: RemoteTickState {
+                        time_us: top_state.time_us - client.offset_us,
+                        states: top_state.get_valid_player_states(),
+                    },
+                    last_client_sent: client_last_tick_state,
                 });
 
                 println!("Sending tick {:?}", tick);

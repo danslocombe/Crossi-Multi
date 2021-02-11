@@ -273,6 +273,7 @@ impl PlayerState {
                     for m_player in &state.player_states {
                         if let Some(player) = m_player {
                             if player.id != new.id && player.pos == candidate_pos {
+                                // Can push?
                                 new_pos = None;
                                 break;
                             }

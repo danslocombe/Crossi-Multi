@@ -57,9 +57,8 @@ pub struct ClientTick {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ServerTick {
-    pub time_us: u32,
-    pub last_sent_us : u32,
-    pub states: Vec<super::game::PlayerState>,
+    pub latest : super::timeline::RemoteTickState,
+    pub last_client_sent : Option<super::timeline::RemoteTickState>,
 }
 
 pub fn crossy_send(

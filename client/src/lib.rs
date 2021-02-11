@@ -1,5 +1,6 @@
 use crossy_multi_core::*;
 
+use std::io::Write;
 use std::net::UdpSocket;
 use num_traits::FromPrimitive;
 
@@ -76,4 +77,11 @@ pub unsafe fn get_player_count() -> f64 {
         Some(x) => x as f64,
         None => 0.0,
     }
+}
+
+#[no_mangle]
+pub unsafe fn dump_file() {
+    let mut file = std::fs::File::create("timeline.dump").unwrap();
+    let s = format!("{:#?}", CLIENT.as_ref().unwrap().timeline);
+    file.write_all(s.as_bytes()).unwrap();
 }

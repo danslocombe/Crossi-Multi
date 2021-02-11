@@ -6,7 +6,7 @@ use std::time::{Instant, Duration};
 const DESIRED_TICK_TIME : Duration = Duration::from_millis(15);
 
 fn main() {
-    let mut client = client::Client::try_create(8080).expect("Could not create client");
+    let mut client = client::Client::try_create(8089).expect("Could not create client");
     let mut tick = 0;
     let mut cur_pos = game::Pos::Coord(game::CoordPos{x: 0, y:0});
     let mut up = true;
