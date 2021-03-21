@@ -85,6 +85,8 @@ impl Timeline {
         }
 
         println!("Propagating {} inputs", inputs.len());
+        println!("Top state before: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.move_state));
+        println!("Top state before: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.pos));
         inputs.sort_by(|x, y| x.time_us.cmp(&y.time_us));
 
         for input in &inputs {
@@ -92,11 +94,14 @@ impl Timeline {
             // group all updates within same frame
             self.propagate_input(input);
         }
+        println!("Top state after: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.move_state));
+        println!("Top state after: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.pos));
     }
 
     fn propagate_input(&mut self, input: &RemoteInput) {
         if let Some(index) = self.split_with_input(input.player_id, input.input, input.time_us)
         {
+            println!("Splitting");
             // TODO handle index == 0
             if (index > 0) {
                 self.simulate_up_to_date(index);
@@ -127,6 +132,8 @@ impl Timeline {
         let before = self.get_index_before_us(time_us)?;
 
         if before == 0 {
+            // TODO handle super-low latency edgecase
+            // Can only happen when latency < frame delay
             None
         }
         else {

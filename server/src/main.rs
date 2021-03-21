@@ -121,6 +121,11 @@ impl Server {
                         Some(client) => {
                             let client_time = t.time_us + client.offset_us;
                             client.last_tick_us = t.time_us;
+
+                            if t.input != game::Input::None {
+                                println!("Received input from {:?}", client.id);
+                            }
+
                             client_updates.push(RemoteInput {
                                 time_us: client_time,
                                 input: t.input,
@@ -215,7 +220,9 @@ impl Server {
                     last_client_sent: client_last_tick_state,
                 });
 
-                println!("Sending tick {:?}", tick);
+                if top_state.frame_id as usize % 60 == 0 {
+                    println!("Sending tick {:?}", tick);
+                }
 
                 crossy_send(&tick, &mut self.socket, &client.addr)?;
             }
