@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::game::*;
 
-const STATE_BUFFER_SIZE: usize = 32;
+const STATE_BUFFER_SIZE: usize = 128;
 
 #[derive(Debug, Clone)]
 pub struct RemoteInput {
@@ -184,6 +184,7 @@ impl Timeline {
         //
         // /////////////////////////////////////////////////////////////
 
+        println!("{:?}", client_latest_remote_state);
         //if let Some(before) = client_latest_remote_state.as_ref().and_then(|x| self.get_index_before_us(x.time_us)) {
         if let Some(state) = client_latest_remote_state.as_ref() {
             if let Some(index) = self.split_with_state(None, &state.states, state.time_us) {
@@ -262,6 +263,10 @@ impl Timeline {
 
     pub fn get_index_before_eq_us(&self, time_us: u32) -> Option<usize> {
         // TODO binary search
+        //println!("first us {} searching for {}", self.states[0].time_us, time_us);
+        //println!("last us {}", self.states[self.states.len() - 1].time_us);
+        // self.states[0] is the latest with the highest time
+        // go down states until we find one with time < target
         for i in 0..self.states.len() {
             let state = &self.states[i];
             if (state.time_us <= time_us) {
@@ -277,6 +282,10 @@ impl Timeline {
         while self.states.len() > STATE_BUFFER_SIZE {
             self.states.pop_back();
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.states.len()
     }
 }
 

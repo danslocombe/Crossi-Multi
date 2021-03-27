@@ -34,7 +34,8 @@ fn main() {
             if cur_pos != pos
             {
                 cur_pos = pos;
-                println!("Pos {:?}", &cur_pos);
+                //println!("T = {}", top_state.time_us);
+                //println!("Pos {:?}", &cur_pos);
             }
         }
 

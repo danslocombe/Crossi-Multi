@@ -120,7 +120,7 @@ impl Server {
                     CrossyMessage::ClientTick(t) => match self.get_client_mut_by_addr(&src) {
                         Some(client) => {
                             let client_time = t.time_us + client.offset_us;
-                            client.last_tick_us = t.time_us;
+                            client.last_tick_us = client_time;
 
                             if t.input != game::Input::None {
                                 println!("Received input from {:?}", client.id);
@@ -189,13 +189,15 @@ impl Server {
             let dt_simulation = simulation_time_start.saturating_duration_since(self.prev_tick);
             self.prev_tick = simulation_time_start;
             self.timeline.tick(None, dt_simulation.as_micros() as u32);
+            self.timeline.propagate_inputs(client_updates);
             for new_player in new_players {
                 self.timeline.add_player(new_player, game::Pos::new_coord(10, 10));
             }
-            self.timeline.propagate_inputs(client_updates);
 
             // Send responses
             let top_state = self.timeline.top_state();
+
+            //println!("timeline size {}", self.timeline.len());
 
             for client in &self.clients {
                 if client.offset_us > top_state.time_us {

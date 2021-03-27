@@ -145,7 +145,7 @@ impl Client {
             );
         });
 
-        if (input != game::Input::None) {
+        { //if (input != game::Input::None) {
             self.send(input, current_time.as_micros() as u32);
         }
     }
