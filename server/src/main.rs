@@ -191,6 +191,8 @@ impl Server {
             self.timeline.tick(None, dt_simulation.as_micros() as u32);
             self.timeline.propagate_inputs(client_updates);
             for new_player in new_players {
+                // We need to make sure this gets propagated properly
+                // Weird edge case bugs
                 self.timeline.add_player(new_player, game::Pos::new_coord(10, 10));
             }
 
@@ -209,7 +211,7 @@ impl Server {
 
                 let client_last_tick_state = self.timeline.get_state_before_eq_us(client.last_tick_us).map(|x| {
                     RemoteTickState {
-                        time_us: client.last_tick_us,
+                        time_us: client.last_tick_us - client.offset_us,
                         states: x.get_valid_player_states(),
                     }
                 });

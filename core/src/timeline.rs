@@ -84,18 +84,21 @@ impl Timeline {
             return;
         }
 
-        println!("Propagating {} inputs", inputs.len());
-        println!("Top state before: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.move_state));
-        println!("Top state before: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.pos));
+        //println!("Propagating {} inputs", inputs.len());
+        //println!("Top state before: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.move_state));
+        //println!("Top state before: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.pos));
         inputs.sort_by(|x, y| x.time_us.cmp(&y.time_us));
 
         for input in &inputs {
             // TODO optimisation
             // group all updates within same frame
-            self.propagate_input(input);
+            if (input.input != Input::None)
+            {
+                self.propagate_input(input);
+            }
         }
-        println!("Top state after: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.move_state));
-        println!("Top state after: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.pos));
+        //println!("Top state after: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.move_state));
+        //println!("Top state after: {:?}", self.top_state().get_player(PlayerId(0)).map(|x| &x.pos));
     }
 
     fn propagate_input(&mut self, input: &RemoteInput) {
