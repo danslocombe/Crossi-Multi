@@ -1,32 +1,43 @@
 use super::game;
-use super::timeline::{Timeline};
 use super::interop::*;
+use super::timeline::Timeline;
 
-use std::io::{Write, Result};
 use std::cell::RefCell;
+use std::fs::File;
+use std::io::{Result, Write};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::time::Instant;
-use std::fs::File;
 
 use uuid::Uuid;
 
-struct DebugLogger
-{
+const ENABLE_DEBUG_LOGGING: bool = false;
+
+struct DebugLogger {
     file: Option<RefCell<File>>,
 }
 
-impl DebugLogger
-{
-    pub fn new(id : super::PlayerId) -> Self {
-        let uuid = Uuid::new_v4();
-        let file = File::create("C:\\users\\dan\\crossy_multi\\logs\\client_".to_owned() + &uuid.to_string() + "_" + &id.0.to_string() + ".log").unwrap();
+impl DebugLogger {
+    pub fn new(id: super::PlayerId) -> Self {
+        if ENABLE_DEBUG_LOGGING {
+            let uuid = Uuid::new_v4();
+            let file = File::create(
+                "C:\\users\\dan\\crossy_multi\\logs\\client_".to_owned()
+                    + &uuid.to_string()
+                    + "_"
+                    + &id.0.to_string()
+                    + ".log",
+            )
+            .unwrap();
 
-        DebugLogger {
-            file : Some(RefCell::new(file)),
+            DebugLogger {
+                file: Some(RefCell::new(file)),
+            }
+        } else {
+            DebugLogger { file: None }
         }
     }
 
-    pub fn log(&self, logline : &str) {
+    pub fn log(&self, logline: &str) {
         if let Some(rc) = self.file.as_ref() {
             let mut f = rc.borrow_mut();
             f.write(logline.as_bytes()).unwrap();
@@ -42,7 +53,7 @@ pub struct Client {
     pub local_player_id: game::PlayerId,
     start: Instant,
     last_tick: u32,
-    debug_logger : DebugLogger,
+    debug_logger: DebugLogger,
 }
 
 fn estimate_offset(socket: &mut UdpSocket, ping_addr: &SocketAddr) -> Result<u32> {
@@ -81,7 +92,6 @@ fn connect(
     addr: &SocketAddr,
     ping_addr: &SocketAddr,
 ) -> Result<(ServerTick, u32, game::PlayerId, Instant)> {
-
     println!("Connecting..");
     let latency = estimate_offset(socket, ping_addr)?;
     let time_start = Instant::now();
@@ -125,8 +135,12 @@ impl Client {
 
         socket.set_nonblocking(true)?;
 
-        let timeline =
-            Timeline::from_server_parts(seed, server_tick.latest.time_us, server_tick.latest.states, 1);
+        let timeline = Timeline::from_server_parts(
+            seed,
+            server_tick.latest.time_us,
+            server_tick.latest.states,
+            1,
+        );
 
         let debug_logger = DebugLogger::new(local_player_id);
         debug_logger.log("Hello!");
@@ -138,7 +152,7 @@ impl Client {
             local_player_id,
             start: time_start,
             last_tick: server_tick.latest.time_us,
-            debug_logger : debug_logger,
+            debug_logger: debug_logger,
         })
     }
 
@@ -161,39 +175,22 @@ impl Client {
         }
 
         server_tick.map(|x| {
-            
-            // debug
-            /*
-            if (x.time_us / 5000) % 50 == 0
-            {
-                for y in x.states.iter().filter(|x| x.id == self.local_player_id) {
-                    println!("server state at {} = {:?}", x.time_us, y);
-                }
-            }
-            */
+            self.debug_logger
+                .log(&format!("Client Last = {:?}", &x.last_client_sent));
 
-            self.debug_logger.log(&format!("Client Last = {:?}", &x.last_client_sent));
+            self.timeline
+                .propagate_state(&x.latest, &x.last_client_sent, self.local_player_id);
 
-            self.timeline.propagate_state(
-                &x.latest,
-                &x.last_client_sent,
-                self.local_player_id,
-            );
-
-            self.debug_logger.log(&format!("Top: {:?}", &self.timeline.top_state()));
+            self.debug_logger
+                .log(&format!("Top: {:?}", &self.timeline.top_state()));
         });
 
-        { //if (input != game::Input::None) {
-            self.send(input, current_time.as_micros() as u32);
-        }
+        self.send(input, current_time.as_micros() as u32);
     }
 
     fn recv(&mut self) -> Result<Option<ServerTick>> {
         match crossy_receive(&mut self.socket) {
-            Ok((CrossyMessage::ServerTick(server_tick), _)) => {
-                //println!("Received tick {}", server_tick.time_us);
-                Ok(Some(server_tick))
-            }
+            Ok((CrossyMessage::ServerTick(server_tick), _)) => Ok(Some(server_tick)),
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 // No messages
                 Ok(None)

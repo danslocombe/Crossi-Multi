@@ -10,10 +10,8 @@ pub enum Pos {
 }
 
 impl Pos {
-    pub fn new_coord(x : i32, y : i32) -> Self {
-        Pos::Coord(CoordPos{
-            x, y,
-        })
+    pub fn new_coord(x: i32, y: i32) -> Self {
+        Pos::Coord(CoordPos { x, y })
     }
 }
 
@@ -68,11 +66,10 @@ pub struct PlayerInputs {
     pub inputs: [Input; MAX_PLAYERS],
 }
 
-impl Default for PlayerInputs
-{
+impl Default for PlayerInputs {
     fn default() -> Self {
         PlayerInputs {
-            inputs : [Input::None; MAX_PLAYERS],
+            inputs: [Input::None; MAX_PLAYERS],
         }
     }
 }
@@ -92,8 +89,6 @@ impl PlayerInputs {
         self.inputs[id.0 as usize]
     }
 }
-
-
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GameState {
@@ -143,8 +138,7 @@ impl GameState {
         let idx = id.0 as usize;
         if idx >= self.player_states.len() {
             None
-        }
-        else {
+        } else {
             self.player_states[idx].as_mut()
         }
     }
@@ -166,7 +160,7 @@ impl GameState {
         self.player_states.iter().flatten().cloned().collect()
     }
 
-    pub fn add_player(&self, id: PlayerId, pos : Pos) -> Self {
+    pub fn add_player(&self, id: PlayerId, pos: Pos) -> Self {
         let mut new = self.clone();
 
         let state = PlayerState {
