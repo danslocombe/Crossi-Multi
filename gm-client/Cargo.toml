@@ -1,5 +1,5 @@
 [package]
-name = "crossy_multi_client"
+name = "crossy_multi_gm_client"
 version = "0.1.0"
 authors = ["Dan"]
 edition = "2018"

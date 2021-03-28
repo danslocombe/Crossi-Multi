@@ -1,7 +1,6 @@
 use crossy_multi_core::*;
 
 use std::io::Write;
-use std::net::UdpSocket;
 use num_traits::FromPrimitive;
 
 static mut CLIENT : Option<client::Client> = None;
