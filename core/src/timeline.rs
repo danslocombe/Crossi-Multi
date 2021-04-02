@@ -191,6 +191,7 @@ impl Timeline {
             }
         }
 
+        println!("PROPAGATE STAGE II ----------");
         if let Some(index) = self.split_with_state(
             Some(local_player),
             &latest_remote_state.states,
@@ -605,7 +606,11 @@ mod tests {
         server_timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
         server_timeline.add_player(PlayerId(1), Pos::new_coord(1, 0));
 
-        server_timeline.tick_current_time(None, 200_000);
+        // Set player 1 as moving so that player 0 can't move in when
+        // inputs synced from server.
+        let mut server_inputs = PlayerInputs::new();
+        server_inputs.set(PlayerId(1), Input::Up);
+        server_timeline.tick_current_time(Some(server_inputs), 295_000);
         server_timeline.tick_current_time(None, 400_000);
 
         let server_state_latest = RemoteTickState {
@@ -642,7 +647,7 @@ mod tests {
         assert_eq!(MoveState::Stationary, p0.move_state);
 
         let p1 = s.get_player(PlayerId(1)).unwrap();
-        assert_eq!(Pos::new_coord(1, 0), p1.pos);
+        assert_eq!(Pos::new_coord(1, -1), p1.pos);
         assert_eq!(MoveState::Stationary, p1.move_state);
     }
 }

@@ -302,6 +302,7 @@ impl PlayerState {
             match other.move_state {
                 MoveState::Moving(_, _pos) => false,
                 MoveState::Stationary => {
+                    // TODO figure out whether the push is valid
                     pushes.push(Push {
                         id : other.id,
                         dir,
@@ -330,4 +331,147 @@ pub struct LogState {
 
     x: f64,
     xvel: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_gamestate(states : Vec<PlayerState>) -> GameState {
+        GameState {
+            time_us : 0,
+            frame_id : 0.,
+            player_states: states.into_iter().map(|x| Some(x)).collect(),
+            player_inputs: PlayerInputs::default(),
+            log_states : vec![],
+        }
+    }
+
+
+    #[test]
+    fn move_success() {
+        let players = vec![
+            PlayerState {
+                id : PlayerId(0),
+                move_state : MoveState::Stationary,
+                move_cooldown : 0.,
+                pos : Pos::new_coord(0, 0),
+            }
+        ];
+
+        let mut inputs = PlayerInputs::default();
+        inputs.set(PlayerId(0), Input::Down);
+
+        let world = make_gamestate(players);
+        let new = world.simulate(Some(inputs), 100_000);
+
+        let new_player = new.get_player(PlayerId(0)).unwrap();
+        match new_player.move_state {
+            MoveState::Moving(t, to) => {
+                assert_eq!(to, Pos::new_coord(0, 1));
+                assert_eq!(t, MOVE_DUR);
+            }
+            _ => panic!("Not moving"),
+        }
+    }
+
+    #[test]
+    fn move_not_blocked()
+    {
+        let players = vec![
+            PlayerState {
+                id : PlayerId(0),
+                move_state : MoveState::Stationary,
+                move_cooldown : 0.,
+                pos : Pos::new_coord(0, 0),
+            },
+            PlayerState {
+                id : PlayerId(1),
+                move_state : MoveState::Stationary,
+                move_cooldown : 0.,
+                pos : Pos::new_coord(1, 0),
+            },
+        ];
+
+        let mut inputs = PlayerInputs::default();
+        inputs.set(PlayerId(0), Input::Down);
+
+        let world = make_gamestate(players);
+        let new = world.simulate(Some(inputs), 100_000);
+
+        let new_player = new.get_player(PlayerId(0)).unwrap();
+        match new_player.move_state {
+            MoveState::Moving(t, to) => {
+                assert_eq!(to, Pos::new_coord(0, 1));
+                assert_eq!(t, MOVE_DUR);
+            }
+            _ => panic!("Not moving"),
+        }
+    }
+
+    #[test]
+    fn move_blocked_other_moving()
+    {
+        let players = vec![
+            PlayerState {
+                id : PlayerId(0),
+                move_state : MoveState::Stationary,
+                move_cooldown : 0.,
+                pos : Pos::new_coord(0, 0),
+            },
+            PlayerState {
+                id : PlayerId(1),
+                move_state : MoveState::Moving(0.5, Pos::new_coord(1, 1)),
+                move_cooldown : 0.,
+                pos : Pos::new_coord(0, 1),
+            },
+        ];
+
+        let mut inputs = PlayerInputs::default();
+        inputs.set(PlayerId(0), Input::Down);
+
+        let world = make_gamestate(players);
+        let new = world.simulate(Some(inputs), 100_000);
+
+        let new_player = new.get_player(PlayerId(0)).unwrap();
+        match new_player.move_state {
+            MoveState::Moving(_, _) => {
+                panic!("Not expected to be moving")
+            }
+            _ => {},
+        }
+    }
+
+    #[test]
+    fn move_blocked_other_moving_to_pos()
+    {
+        let players = vec![
+            PlayerState {
+                id : PlayerId(0),
+                move_state : MoveState::Stationary,
+                move_cooldown : 0.,
+                pos : Pos::new_coord(0, 0),
+            },
+            PlayerState {
+                id : PlayerId(1),
+                move_state : MoveState::Moving(0.5, Pos::new_coord(0, 1)),
+                move_cooldown : 0.,
+                pos : Pos::new_coord(1, 1),
+            },
+        ];
+
+        let mut inputs = PlayerInputs::default();
+        inputs.set(PlayerId(0), Input::Down);
+
+        let world = make_gamestate(players);
+        let new = world.simulate(Some(inputs), 100_000);
+
+        let new_player = new.get_player(PlayerId(0)).unwrap();
+        match new_player.move_state {
+            MoveState::Moving(_, _) => {
+                panic!("Not expected to be moving")
+            }
+            _ => {},
+        }
+    }
 }
