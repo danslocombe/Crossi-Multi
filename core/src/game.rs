@@ -190,11 +190,13 @@ impl GameState {
             // TODO
         }
 
+        let mut pushes = Vec::new();
+
         for i in 0..self.player_states.len() {
             if let Some(player_state) = self.player_states[i].as_ref() {
                 let id = player_state.id;
                 let player_input = self.player_inputs.get(id);
-                let iterated = player_state.tick_iterate(self, player_input, dt_us as f64);
+                let iterated = player_state.tick_iterate(self, player_input, dt_us as f64, &mut pushes);
                 drop(player_state);
 
                 self.set_player_state(id, iterated);
@@ -222,6 +224,11 @@ pub enum MoveState {
     Moving(f64, Pos),
 }
 
+struct Push {
+    pub id : PlayerId,
+    pub dir : Input,
+}
+
 // In us
 pub const MOVE_COOLDOWN_MAX: f64 = 150_000.0;
 pub const MOVE_DUR: f64 = 10_000.0;
@@ -235,7 +242,7 @@ impl PlayerState {
         }
     }
 
-    fn tick_iterate(&self, state: &GameState, input: Input, dt_us: f64) -> Self {
+    fn tick_iterate(&self, state: &GameState, input: Input, dt_us: f64, pushes : &mut Vec<Push>) -> Self {
         let mut new = self.clone();
         match new.move_state {
             MoveState::Stationary => {
@@ -257,32 +264,62 @@ impl PlayerState {
         }
 
         if new.can_move() && input != Input::None {
-            let mut new_pos = None;
-
-            match new.pos {
-                Pos::Coord(pos) => {
-                    let candidate_pos = Pos::Coord(pos.apply_input(input));
-                    new_pos = Some(candidate_pos);
-
-                    for m_player in &state.player_states {
-                        if let Some(player) = m_player {
-                            if player.id != new.id && player.pos == candidate_pos {
-                                // Can push?
-                                new_pos = None;
-                                break;
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-
+            let new_pos = new.try_move(input, state, pushes);
             if let Some(pos) = new_pos {
                 new.move_state = MoveState::Moving(MOVE_DUR, pos);
             }
         }
 
         new
+    }
+
+    fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>) -> Option<Pos> {
+        let mut new_pos = None;
+
+        match self.pos {
+            Pos::Coord(pos) => {
+                let candidate_pos = Pos::Coord(pos.apply_input(input));
+                new_pos = Some(candidate_pos);
+
+                for player in state.player_states.iter()
+                    .flat_map(|x| x.as_ref())
+                    .filter(|x| x.id != self.id) {
+                    if (!self.try_move_player(input, candidate_pos, player, pushes))
+                    {
+                        return None;
+                    }
+                }
+            },
+            _ => {},
+        }
+
+        new_pos
+    }
+
+    fn try_move_player(&self, dir : Input, candidate_pos : Pos, other : &PlayerState, pushes : &mut Vec<Push>) -> bool
+    {
+        if other.pos == candidate_pos {
+            match other.move_state {
+                MoveState::Moving(_, _pos) => false,
+                MoveState::Stationary => {
+                    pushes.push(Push {
+                        id : other.id,
+                        dir,
+                    });
+
+                    true
+                }
+            }
+        }
+        else {
+            match other.move_state {
+                MoveState::Moving(_, pos) => {
+                    // Only allow moevement if we are going to a different position to another frog
+                    pos != candidate_pos
+                },
+                _ => true,
+            }
+        }
     }
 }
 
