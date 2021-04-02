@@ -190,16 +190,58 @@ impl GameState {
             // TODO
         }
 
-        let mut pushes = Vec::new();
-
         for i in 0..self.player_states.len() {
             if let Some(player_state) = self.player_states[i].as_ref() {
+                let mut pushes = Vec::new();
                 let id = player_state.id;
                 let player_input = self.player_inputs.get(id);
                 let iterated = player_state.tick_iterate(self, player_input, dt_us as f64, &mut pushes);
                 drop(player_state);
 
                 self.set_player_state(id, iterated);
+
+                if let Some(push) = pushes.first() {
+                    let player_state = self.get_player(push.id).unwrap();
+                    let pushed = player_state.push(push);
+                    drop(player_state);
+                    self.set_player_state(push.id, pushed);
+                }
+            }
+        }
+    }
+
+    fn space_occupied_with_player(&self, pos : Pos, ignore_id : PlayerId) -> bool {
+        for player in self.player_states.iter()
+            .flat_map(|x| x.as_ref())
+            .filter(|x| x.id != ignore_id) {
+
+            if player.pos == pos {
+                return true;
+            }
+            else {
+                match player.move_state {
+                    MoveState::Moving(_, target_pos) => {
+                        if target_pos == pos {
+                            return true;
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+
+        false 
+    }
+
+    fn can_push(&self, id : PlayerId, dir : Input) -> bool {
+        let player = self.get_player(id).unwrap();
+        match player.pos {
+            Pos::Coord(p) => {
+                let new = p.apply_input(dir);
+                !self.space_occupied_with_player(Pos::Coord(new), id)
+            }
+            _ => {
+                false
             }
         }
     }
@@ -273,6 +315,18 @@ impl PlayerState {
         new
     }
 
+    fn push(&self, push : &Push) -> Self {
+        let mut new = self.clone();
+        match new.pos {
+            Pos::Coord(p) => {
+                let new_pos = p.apply_input(push.dir);
+                new.move_state = MoveState::Moving(MOVE_DUR, Pos::Coord(new_pos));
+            }
+            _ => {},
+        }
+        new
+    }
+
     fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>) -> Option<Pos> {
         let mut new_pos = None;
 
@@ -284,7 +338,7 @@ impl PlayerState {
                 for player in state.player_states.iter()
                     .flat_map(|x| x.as_ref())
                     .filter(|x| x.id != self.id) {
-                    if (!self.try_move_player(input, candidate_pos, player, pushes))
+                    if (!self.try_move_player(input, candidate_pos, player, state, pushes))
                     {
                         return None;
                     }
@@ -296,19 +350,25 @@ impl PlayerState {
         new_pos
     }
 
-    fn try_move_player(&self, dir : Input, candidate_pos : Pos, other : &PlayerState, pushes : &mut Vec<Push>) -> bool
+    fn try_move_player(&self, dir : Input, candidate_pos : Pos, other : &PlayerState, state: &GameState, pushes : &mut Vec<Push>) -> bool
     {
         if other.pos == candidate_pos {
             match other.move_state {
                 MoveState::Moving(_, _pos) => false,
                 MoveState::Stationary => {
                     // TODO figure out whether the push is valid
-                    pushes.push(Push {
-                        id : other.id,
-                        dir,
-                    });
 
-                    true
+                    if (state.can_push(other.id, dir)) {
+                        pushes.push(Push {
+                            id : other.id,
+                            dir,
+                        });
+
+                        true
+                    }
+                    else {
+                        false
+                    }
                 }
             }
         }

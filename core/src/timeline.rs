@@ -191,7 +191,6 @@ impl Timeline {
             }
         }
 
-        println!("PROPAGATE STAGE II ----------");
         if let Some(index) = self.split_with_state(
             Some(local_player),
             &latest_remote_state.states,
