@@ -21,6 +21,18 @@ pub unsafe fn create_client(port : f64) -> f64 {
 }
 
 #[no_mangle]
+pub unsafe fn get_local_player_id() -> f64 {
+    match CLIENT.as_ref() {
+        Some(x) => {
+            x.local_player_id.0 as f64
+        },
+        None => {
+            f64::NAN
+        },
+    }
+}
+
+#[no_mangle]
 pub unsafe fn create_local() -> f64 {
     0.0
 }
@@ -66,6 +78,52 @@ pub unsafe fn get_player_y(id : f64) -> f64 {
         // TODO
         Some(Pos::Log(_)) => 0.0,
         None => f64::NAN,
+    }
+}
+
+#[no_mangle]
+pub unsafe fn get_player_movestate(id : f64) -> f64 {
+    match get_player(id).map(|x| &x.move_state) {
+        Some(MoveState::Stationary) => {
+            0.
+        },
+        Some(MoveState::Moving(_, Pos::Coord(_))) => {
+            1.
+        },
+        Some(MoveState::Moving(_, Pos::Log(_))) => {
+            2.
+        },
+        None => f64::NAN,
+    }
+}
+
+#[no_mangle]
+pub unsafe fn get_player_movestate_x(id : f64) -> f64 {
+    match get_player(id).map(|x| &x.move_state) {
+        Some(MoveState::Moving(_, Pos::Coord(p))) => {
+            p.x as f64
+        },
+        _ => f64::NAN,
+    }
+}
+
+#[no_mangle]
+pub unsafe fn get_player_movestate_y(id : f64) -> f64 {
+    match get_player(id).map(|x| &x.move_state) {
+        Some(MoveState::Moving(_, Pos::Coord(p))) => {
+            p.y as f64
+        },
+        _ => f64::NAN,
+    }
+}
+
+#[no_mangle]
+pub unsafe fn get_player_movestate_t(id : f64) -> f64 {
+    match get_player(id).map(|x| &x.move_state) {
+        Some(MoveState::Moving(t, _)) => {
+            *t / game::MOVE_DUR
+        },
+        _ => f64::NAN,
     }
 }
 

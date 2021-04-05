@@ -273,7 +273,7 @@ struct Push {
 
 // In us
 pub const MOVE_COOLDOWN_MAX: f64 = 150_000.0;
-pub const MOVE_DUR: f64 = 10_000.0;
+pub const MOVE_DUR: f64 = 50_000.0;
 
 impl PlayerState {
     fn can_move(&self) -> bool {
