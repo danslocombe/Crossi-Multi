@@ -174,6 +174,19 @@ impl GameState {
         new
     }
 
+    pub fn remove_player(&self, id: PlayerId) -> Self {
+        let mut new = self.clone();
+        let idx = id.0 as usize;
+        if idx >= new.player_states.len() {
+            // Nothing to do
+        }
+        else {
+            new.player_states[idx] = None;
+        }
+
+        new
+    }
+
     pub fn simulate(&self, input: Option<PlayerInputs>, dt_us: u32) -> Self {
         let mut new = self.clone();
         new.simulate_mut(input, dt_us);

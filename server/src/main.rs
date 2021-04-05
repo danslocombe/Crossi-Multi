@@ -75,9 +75,10 @@ impl Server {
     fn receive_updates(
         &mut self,
         tick_start: &Instant,
-    ) -> Result<(Vec<RemoteInput>, Vec<game::PlayerId>)> {
+    ) -> Result<(Vec<RemoteInput>, Vec<game::PlayerId>, Vec<game::PlayerId>)> {
         let mut client_updates = Vec::new();
         let mut new_players = Vec::new();
+        let mut dropped_players = Vec::new();
 
         loop {
             match crossy_receive(&mut self.socket) {
@@ -122,10 +123,6 @@ impl Server {
                             let client_time = t.time_us + client.offset_us;
                             client.last_tick_us = client_time;
 
-                            if t.input != game::Input::None {
-                                println!("Received input from {:?}", client.id);
-                            }
-
                             client_updates.push(RemoteInput {
                                 time_us: client_time,
                                 input: t.input,
@@ -140,18 +137,25 @@ impl Server {
                 },
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     // No more messages
-                    return Ok((client_updates, new_players));
+                    return Ok((client_updates, new_players, dropped_players));
                 }
                 // Connection closed, todo cleanup player
                 Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionAborted => {
                     println!("Connection aborted")
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => {
-                    //println!("Connection reset {:?}", &e);
-                    // tmp
-                    //return Err(e);
-                    //self.clients.retain(|x| x.addr != src);
-                    // Clear the client
+                    // One of the connections is invalid but we don't know which
+                    // Scan through for connections we havent heard from in a long time and prune
+                    let threshold = self.timeline.top_state().time_us - 1_000_000;
+                    self.clients.retain(|x| {
+                        if x.last_tick_us + x.offset_us < threshold {
+                            dropped_players.push(x.id);
+                            false
+                        } 
+                        else {
+                            true
+                        }
+                    });
                 }
                 Err(e) => return Err(e),
             }
@@ -182,7 +186,7 @@ impl Server {
     fn run(&mut self) -> Result<()> {
         loop {
             let tick_start = Instant::now();
-            let (client_updates, new_players) = self.receive_updates(&tick_start)?;
+            let (client_updates, new_players, dropped_players) = self.receive_updates(&tick_start)?;
 
             // Do simulations
             let simulation_time_start = Instant::now();
@@ -194,6 +198,10 @@ impl Server {
                 // We need to make sure this gets propagated properly
                 // Weird edge case bugs
                 self.timeline.add_player(new_player, game::Pos::new_coord(10, 10));
+            }
+
+            for dropped_player in dropped_players {
+                self.timeline.remove_player(dropped_player);
             }
 
             // Send responses
@@ -225,7 +233,7 @@ impl Server {
                 });
 
                 if top_state.frame_id as usize % 60 == 0 {
-                    println!("Sending tick {:?}", tick);
+                    //println!("Sending tick {:?}", tick);
                 }
 
                 crossy_send(&tick, &mut self.socket, &client.addr)?;

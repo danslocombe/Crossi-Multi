@@ -70,8 +70,14 @@ impl Timeline {
     pub fn add_player(&mut self, player_id: PlayerId, pos: Pos) {
         println!("Adding new player {:?}", player_id);
 
-        let state = self.states.get(0).unwrap();
-        let new = state.add_player(player_id, pos);
+        let new = self.top_state().add_player(player_id, pos);
+        self.push_state(new);
+    }
+
+    pub fn remove_player(&mut self, player_id: PlayerId) {
+        println!("Dropping player {:?}", player_id);
+
+        let new = self.top_state().remove_player(player_id);
         self.push_state(new);
     }
 
