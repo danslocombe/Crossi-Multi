@@ -87,11 +87,16 @@ pub unsafe fn get_player_movestate(id : f64) -> f64 {
         Some(MoveState::Stationary) => {
             0.
         },
-        Some(MoveState::Moving(_, Pos::Coord(_))) => {
-            1.
-        },
-        Some(MoveState::Moving(_, Pos::Log(_))) => {
-            2.
+        Some(MoveState::Moving(state)) => {
+            match state.target
+            {
+                Pos::Coord(_) => {
+                    1.
+                },
+                Pos::Log(_) => {
+                    2.
+                }
+            }
         },
         None => f64::NAN,
     }
@@ -100,8 +105,13 @@ pub unsafe fn get_player_movestate(id : f64) -> f64 {
 #[no_mangle]
 pub unsafe fn get_player_movestate_x(id : f64) -> f64 {
     match get_player(id).map(|x| &x.move_state) {
-        Some(MoveState::Moving(_, Pos::Coord(p))) => {
-            p.x as f64
+        Some(MoveState::Moving(state)) => {
+            if let Pos::Coord(p) = state.target {
+                p.x as f64
+            }
+            else {
+                f64::NAN
+            }
         },
         _ => f64::NAN,
     }
@@ -110,8 +120,13 @@ pub unsafe fn get_player_movestate_x(id : f64) -> f64 {
 #[no_mangle]
 pub unsafe fn get_player_movestate_y(id : f64) -> f64 {
     match get_player(id).map(|x| &x.move_state) {
-        Some(MoveState::Moving(_, Pos::Coord(p))) => {
-            p.y as f64
+        Some(MoveState::Moving(state)) => {
+            if let Pos::Coord(p) = state.target {
+                p.y as f64
+            }
+            else {
+                f64::NAN
+            }
         },
         _ => f64::NAN,
     }
@@ -120,8 +135,8 @@ pub unsafe fn get_player_movestate_y(id : f64) -> f64 {
 #[no_mangle]
 pub unsafe fn get_player_movestate_t(id : f64) -> f64 {
     match get_player(id).map(|x| &x.move_state) {
-        Some(MoveState::Moving(t, _)) => {
-            *t / game::MOVE_DUR
+        Some(MoveState::Moving(state)) => {
+            state.remaining_us as f64
         },
         _ => f64::NAN,
     }

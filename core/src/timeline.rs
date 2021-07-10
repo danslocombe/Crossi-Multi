@@ -185,20 +185,27 @@ impl Timeline {
         //
         // /////////////////////////////////////////////////////////////
 
+        let mut use_client_predictions = vec![local_player];
+
         if let Some(state) = client_latest_remote_state.as_ref() {
-            if let Some(index) = self.split_with_state(None, &state.states, state.time_us) {
+            if let Some(index) = self.split_with_state(&vec![], &state.states, state.time_us) {
                 while self.states.len() > index + 1 {
                     self.states.pop_back();
                 }
 
                 if (index > 0) {
                     self.simulate_up_to_date(index);
+
+                    use_client_predictions = self.players_to_use_client_predictions(index, local_player);
+                    if (use_client_predictions.len() > 1) {
+                        crate::debug_log(&format!("{:?}", use_client_predictions));
+                    }
                 }
             }
         }
 
         if let Some(index) = self.split_with_state(
-            Some(local_player),
+            &use_client_predictions,
             &latest_remote_state.states,
             latest_remote_state.time_us,
         ) {
@@ -210,8 +217,8 @@ impl Timeline {
 
     fn split_with_state(
         &mut self,
-        ignore_player_id: Option<PlayerId>,
-        states: &Vec<PlayerState>,
+        ignore_player_ids: &[PlayerId],
+        server_states: &[PlayerState],
         time_us: u32,
     ) -> Option<usize> {
         let before = self.get_index_before_us(time_us)?;
@@ -224,8 +231,8 @@ impl Timeline {
 
             let mut split_state = state_before.simulate(None, dt as u32);
 
-            for server_player_state in states {
-                if Some(server_player_state.id) != ignore_player_id {
+            for server_player_state in server_states {
+                if (!ignore_player_ids.contains(&server_player_state.id)) {
                     split_state
                         .set_player_state(server_player_state.id, server_player_state.clone());
                 }
@@ -237,6 +244,39 @@ impl Timeline {
             self.states.insert(before, split_state);
             Some(before)
         }
+    }
+
+    fn players_to_use_client_predictions(&self, index : usize, local_player : PlayerId) -> Vec<PlayerId> {
+        let mut player_ids = vec![local_player];
+
+        for i in (0..=index).rev() {
+            let state = &self.states[i];
+
+            for player in &state.get_valid_player_states() {
+                let mut to_add : Option<PlayerId> = None;
+                for pid in &player_ids {
+                    if player.is_being_pushed_by(*pid) {
+                        to_add = Some(player.id);
+                        break;
+                    }
+                }
+
+                // Bug
+                // Edge case where we dont add secondary push if on the last frame
+                // Think its fine to ignore
+
+                match to_add {
+                    Some(pid) => {
+                        if !player_ids.contains(&pid) {
+                            player_ids.push(pid);
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+
+        player_ids
     }
 
     pub fn current_state(&self) -> &GameState {
@@ -263,9 +303,6 @@ impl Timeline {
 
     pub fn get_index_before_eq_us(&self, time_us: u32) -> Option<usize> {
         // TODO binary search
-        //println!("first us {} searching for {}", self.states[0].time_us, time_us);
-        //println!("last us {}", self.states[self.states.len() - 1].time_us);
-        // self.states[0] is the latest with the highest time
         // go down states until we find one with time < target
         for i in 0..self.states.len() {
             let state = &self.states[i];
@@ -317,10 +354,15 @@ mod tests {
         assert_eq!(Input::Left, input);
 
         let state = &timeline.states[1].get_player(PlayerId(0)).unwrap();
-        assert_eq!(
-            MoveState::Moving(MOVE_DUR, Pos::new_coord(-1, 0)),
-            state.move_state
-        );
+        match (&state.move_state) {
+            MoveState::Moving(state) => {
+                assert_eq!(MOVE_DUR, state.remaining_us);
+                assert_eq!(Pos::new_coord(-1, 0), state.target);
+            },
+            _ => {
+                panic!("Expected to be moving");
+            },
+        }
     }
 
     #[test]
@@ -364,14 +406,15 @@ mod tests {
         timeline.add_player(PlayerId(1), Pos::new_coord(5, 5));
 
         timeline.tick_current_time(Some(PlayerInputs::default()), 50_000);
-        timeline.tick_current_time(Some(PlayerInputs::default()), 100_000);
-        timeline.tick_current_time(None, 150_000);
+        timeline.tick_current_time(Some(PlayerInputs::default()), 200_000);
+        timeline.tick_current_time(None, 300_000);
 
         let timed_input = RemoteInput {
             time_us: 65_000,
             input: Input::Left,
             player_id: PlayerId(0),
         };
+
 
         timeline.propagate_input(&timed_input);
 
@@ -401,11 +444,19 @@ mod tests {
 
         {
             // At state 2 should be in original position but moving to new pos
-            let state = &timeline.states[2]
+            let mv = &timeline.states[2]
                 .get_player(PlayerId(0))
                 .unwrap()
                 .move_state;
-            assert_eq!(MoveState::Moving(MOVE_DUR, Pos::new_coord(-1, 0)), *state);
+            match (mv) {
+                MoveState::Moving(state) => {
+                    assert_eq!(MOVE_DUR, state.remaining_us);
+                    assert_eq!(Pos::new_coord(-1, 0), state.target);
+                },
+                _ => {
+                    panic!("Expected to be moving");
+                },
+            }
         }
 
         for i in 2..5 {
@@ -450,10 +501,15 @@ mod tests {
         {
             let p0 = client_timeline.top_state().get_player(PlayerId(0)).unwrap();
             assert_eq!(Pos::new_coord(-2, 0), p0.pos);
-            assert_eq!(
-                MoveState::Moving(MOVE_DUR, Pos::new_coord(-3, 0)),
-                p0.move_state
-            );
+            match (&p0.move_state) {
+                MoveState::Moving(state) => {
+                    assert_eq!(MOVE_DUR, state.remaining_us);
+                    assert_eq!(Pos::new_coord(-3, 0), state.target);
+                },
+                _ => {
+                    panic!("Expected to be moving");
+                },
+            }
         }
 
         client_timeline.propagate_state(
@@ -475,10 +531,15 @@ mod tests {
         let p0 = s.get_player(PlayerId(0)).unwrap();
         let p1 = s.get_player(PlayerId(1)).unwrap();
         assert_eq!(Pos::new_coord(-2, 0), p0.pos);
-        assert_eq!(
-            MoveState::Moving(MOVE_DUR, Pos::new_coord(-3, 0)),
-            p0.move_state
-        );
+        match (&p0.move_state) {
+            MoveState::Moving(state) => {
+                assert_eq!(MOVE_DUR, state.remaining_us);
+                assert_eq!(Pos::new_coord(-3, 0), state.target);
+            },
+            _ => {
+                panic!("Expected to be moving");
+            },
+        }
         assert_eq!(Pos::new_coord(4, 5), p1.pos);
         assert_eq!(MoveState::Stationary, p1.move_state);
     }

@@ -2,47 +2,31 @@ use super::game;
 use super::interop::*;
 use super::timeline::Timeline;
 
-use std::cell::RefCell;
 use std::fs::File;
-use std::io::{Result, Write};
+use std::io::{Result};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 use std::time::Instant;
+use std::cell::RefCell;
+
+use crate::{DEBUG_LOGGER};
 
 use uuid::Uuid;
 
 const ENABLE_DEBUG_LOGGING: bool = false;
 
-struct DebugLogger {
-    file: Option<RefCell<File>>,
-}
+fn create_debug_logger(id: super::PlayerId) {
+    if ENABLE_DEBUG_LOGGING {
+        let uuid = Uuid::new_v4();
+        let file = File::create(
+            "C:\\users\\dan\\crossy_multi\\logs\\client_".to_owned()
+                + &uuid.to_string()
+                + "_"
+                + &id.0.to_string()
+                + ".log",
+        )
+        .unwrap();
 
-impl DebugLogger {
-    pub fn new(id: super::PlayerId) -> Self {
-        if ENABLE_DEBUG_LOGGING {
-            let uuid = Uuid::new_v4();
-            let file = File::create(
-                "C:\\users\\dan\\crossy_multi\\logs\\client_".to_owned()
-                    + &uuid.to_string()
-                    + "_"
-                    + &id.0.to_string()
-                    + ".log",
-            )
-            .unwrap();
-
-            DebugLogger {
-                file: Some(RefCell::new(file)),
-            }
-        } else {
-            DebugLogger { file: None }
-        }
-    }
-
-    pub fn log(&self, logline: &str) {
-        if let Some(rc) = self.file.as_ref() {
-            let mut f = rc.borrow_mut();
-            f.write(logline.as_bytes()).unwrap();
-            f.write(b"\n").unwrap();
-        }
+        unsafe { DEBUG_LOGGER.file = Some(RefCell::new(file)) };
     }
 }
 
@@ -53,7 +37,6 @@ pub struct Client {
     pub local_player_id: game::PlayerId,
     start: Instant,
     last_tick: u32,
-    debug_logger: DebugLogger,
 }
 
 fn estimate_offset(socket: &mut UdpSocket, ping_addr: &SocketAddr) -> Result<u32> {
@@ -142,8 +125,8 @@ impl Client {
             1,
         );
 
-        let debug_logger = DebugLogger::new(local_player_id);
-        debug_logger.log("Hello!");
+        create_debug_logger(local_player_id);
+        crate::debug_log(&format!("Hello! Player {:?}", local_player_id));
 
         Ok(Client {
             server,
@@ -152,7 +135,6 @@ impl Client {
             local_player_id,
             start: time_start,
             last_tick: server_tick.latest.time_us,
-            debug_logger: debug_logger,
         })
     }
 
@@ -175,14 +157,14 @@ impl Client {
         }
 
         server_tick.map(|x| {
-            self.debug_logger
-                .log(&format!("Client Last = {:?}", &x.last_client_sent));
+            //DEBUG_LOGGER
+                //.log(&format!("Client Last = {:?}", &x.last_client_sent));
 
             self.timeline
                 .propagate_state(&x.latest, &x.last_client_sent, self.local_player_id);
 
-            self.debug_logger
-                .log(&format!("Top: {:?}", &self.timeline.top_state()));
+            //DEBUG_LOGGER
+                //.log(&format!("Top: {:?}", &self.timeline.top_state()));
         });
 
         self.send(input, current_time.as_micros() as u32);

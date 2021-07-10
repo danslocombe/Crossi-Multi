@@ -167,7 +167,7 @@ impl GameState {
             id,
             pos,
             move_state: MoveState::Stationary,
-            move_cooldown: 0.0,
+            move_cooldown: 0,
         };
 
         new.set_player_state(id, state);
@@ -208,7 +208,7 @@ impl GameState {
                 let mut pushes = Vec::new();
                 let id = player_state.id;
                 let player_input = self.player_inputs.get(id);
-                let iterated = player_state.tick_iterate(self, player_input, dt_us as f64, &mut pushes);
+                let iterated = player_state.tick_iterate(self, player_input, dt_us, &mut pushes);
                 drop(player_state);
 
                 self.set_player_state(id, iterated);
@@ -232,9 +232,9 @@ impl GameState {
                 return true;
             }
             else {
-                match player.move_state {
-                    MoveState::Moving(_, target_pos) => {
-                        if target_pos == pos {
+                match &player.move_state {
+                    MoveState::Moving(moving_state) => {
+                        if moving_state.target == pos {
                             return true;
                         }
                     },
@@ -266,62 +266,104 @@ pub struct PlayerState {
     pub id: PlayerId,
 
     pub move_state: MoveState,
-    pub move_cooldown: f64,
+    pub move_cooldown: u32,
 
     pub pos: Pos,
+}
+
+// TODO a really good idea here
+// if a player being pushed recovers faster than the pusher then stunlock would be lessened
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Default)]
+pub struct PushInfo {
+    pub pushed_by : Option<PlayerId>,
+    pub pushing : Option<PlayerId>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+pub struct MovingState
+{
+    pub remaining_us : u32,
+    pub target : Pos,
+    pub push_info : PushInfo,
+}
+
+impl MovingState {
+    pub fn new(target : Pos) -> MovingState {
+        MovingState {
+            remaining_us : MOVE_DUR,
+            push_info : Default::default(),
+            target,
+        }
+    }
+
+    pub fn with_push(target : Pos, push_info : PushInfo) -> MovingState {
+        MovingState {
+            remaining_us : MOVE_DUR,
+            target,
+            push_info,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub enum MoveState {
     Stationary,
-
-    // 0-1 representing current interpolation
-    Moving(f64, Pos),
+    Moving(MovingState),
 }
 
 struct Push {
     pub id : PlayerId,
+    pub pushed_by : PlayerId,
     pub dir : Input,
 }
 
 // In us
-pub const MOVE_COOLDOWN_MAX: f64 = 150_000.0;
-pub const MOVE_DUR: f64 = 50_000.0;
+pub const MOVE_COOLDOWN_MAX: u32 = 150_000;
+pub const MOVE_DUR: u32 = 50_000;
 
 impl PlayerState {
     fn can_move(&self) -> bool {
         if let MoveState::Stationary = self.move_state {
-            self.move_cooldown <= 0.0
+            self.move_cooldown <= 0
         } else {
             false
         }
     }
 
-    fn tick_iterate(&self, state: &GameState, input: Input, dt_us: f64, pushes : &mut Vec<Push>) -> Self {
+    fn tick_iterate(&self, state: &GameState, input: Input, dt_us: u32, pushes : &mut Vec<Push>) -> Self {
         let mut new = self.clone();
         match new.move_state {
             MoveState::Stationary => {
-                new.move_cooldown = (new.move_cooldown - dt_us).max(0.0);
+                new.move_cooldown = new.move_cooldown.checked_sub(dt_us).unwrap_or(0);
             }
-            MoveState::Moving(x, target_pos) => {
-                let rem_ms = x - dt_us;
-                if rem_ms > 0.0 {
-                    new.move_state = MoveState::Moving(rem_ms, target_pos);
-                } else {
-                    // In new pos
-                    new.pos = target_pos;
-                    new.move_state = MoveState::Stationary;
+            MoveState::Moving(moving_state) => {
+                match moving_state.remaining_us.checked_sub(dt_us)
+                {
+                    Some(remaining_us) =>
+                    {
+                        let mut new_state = moving_state.clone();
+                        new_state.remaining_us = remaining_us;
+                        new.move_state = MoveState::Moving(new_state);
+                    },
+                    _ => {
+                        // Safe as we know dt_us >= remaining_us from previous
+                        // subtraction. 
+                        let leftover_us = dt_us - moving_state.remaining_us;
 
-                    // rem_ms <= 0 so we add it to the max cooldown
-                    new.move_cooldown = MOVE_COOLDOWN_MAX + rem_ms;
+                        // In new pos
+                        new.pos = moving_state.target;
+                        new.move_state = MoveState::Stationary;
+
+                        // rem_ms <= 0 so we add it to the max cooldown
+                        new.move_cooldown = MOVE_COOLDOWN_MAX.checked_sub(leftover_us).unwrap_or(0);
+                    },
                 }
             }
         }
 
         if new.can_move() && input != Input::None {
-            let new_pos = new.try_move(input, state, pushes);
-            if let Some(pos) = new_pos {
-                new.move_state = MoveState::Moving(MOVE_DUR, pos);
+            if let Some(moving_state) = new.try_move(input, state, pushes) {
+                new.move_state = MoveState::Moving(moving_state);
             }
         }
 
@@ -333,66 +375,100 @@ impl PlayerState {
         match new.pos {
             Pos::Coord(p) => {
                 let new_pos = p.apply_input(push.dir);
-                new.move_state = MoveState::Moving(MOVE_DUR, Pos::Coord(new_pos));
+                let mut push_info = PushInfo::default();
+                push_info.pushed_by = Some(push.pushed_by);
+                new.move_state = MoveState::Moving(MovingState::with_push(Pos::Coord(new_pos), push_info));
             }
             _ => {},
         }
         new
     }
 
-    fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>) -> Option<Pos> {
+    fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>) -> Option<MovingState> {
         let mut new_pos = None;
+        let mut push_info = PushInfo::default();
 
         match self.pos {
             Pos::Coord(pos) => {
                 let candidate_pos = Pos::Coord(pos.apply_input(input));
                 new_pos = Some(candidate_pos);
 
-                for player in state.player_states.iter()
+                for other_player in state.player_states.iter()
                     .flat_map(|x| x.as_ref())
                     .filter(|x| x.id != self.id) {
-                    if (!self.try_move_player(input, candidate_pos, player, state, pushes))
-                    {
-                        return None;
-                    }
+
+                    // Because only one player per spot
+                    // We can only push one person
+                    push_info = self.try_move_player(input, candidate_pos, other_player, state, pushes)?;
+                    break;
                 }
             },
             _ => {},
         }
 
-        new_pos
+        new_pos.map(|target| {
+            MovingState::with_push(target, push_info)
+        })
     }
 
-    fn try_move_player(&self, dir : Input, candidate_pos : Pos, other : &PlayerState, state: &GameState, pushes : &mut Vec<Push>) -> bool
+    fn try_move_player(&self, dir : Input, candidate_pos : Pos, other : &PlayerState, state: &GameState, pushes : &mut Vec<Push>) -> Option<PushInfo>
     {
         if other.pos == candidate_pos {
-            match other.move_state {
-                MoveState::Moving(_, _pos) => false,
+            // Try to move into some other player
+            match &other.move_state {
+                MoveState::Moving(_ms) => None,
                 MoveState::Stationary => {
-                    // TODO figure out whether the push is valid
-
                     if (state.can_push(other.id, dir)) {
                         pushes.push(Push {
                             id : other.id,
+                            pushed_by : self.id,
                             dir,
                         });
 
-                        true
+                        // Managed to push
+                        let mut push_info = PushInfo::default();
+                        push_info.pushing = Some(other.id);
+                        Some(push_info)
                     }
                     else {
-                        false
+                        None
                     }
                 }
             }
         }
         else {
-            match other.move_state {
-                MoveState::Moving(_, pos) => {
+            match &other.move_state {
+                MoveState::Moving(state) => {
                     // Only allow moevement if we are going to a different position to another frog
-                    pos != candidate_pos
+                    if (state.target != candidate_pos)
+                    {
+                        Some(PushInfo::default())
+                    }
+                    else
+                    {
+                        None
+                    }
                 },
-                _ => true,
+                _ => Some(PushInfo::default())
             }
+        }
+    }
+
+    pub fn is_being_pushed(&self) -> bool {
+        match (&self.move_state) {
+            MoveState::Moving(s) if s.push_info.pushed_by.is_some() => {
+                true
+            },
+            _ => false,
+        }
+    }
+
+    pub fn is_being_pushed_by(&self, player : PlayerId) -> bool {
+        match (&self.move_state) {
+            MoveState::Moving(s) if s.push_info.pushed_by == Some(player) => {
+                true
+            },
+            _ => false,
         }
     }
 }
@@ -427,7 +503,7 @@ mod tests {
             PlayerState {
                 id : PlayerId(0),
                 move_state : MoveState::Stationary,
-                move_cooldown : 0.,
+                move_cooldown : 0,
                 pos : Pos::new_coord(0, 0),
             }
         ];
@@ -439,10 +515,10 @@ mod tests {
         let new = world.simulate(Some(inputs), 100_000);
 
         let new_player = new.get_player(PlayerId(0)).unwrap();
-        match new_player.move_state {
-            MoveState::Moving(t, to) => {
-                assert_eq!(to, Pos::new_coord(0, 1));
-                assert_eq!(t, MOVE_DUR);
+        match &new_player.move_state {
+            MoveState::Moving(state) => {
+                assert_eq!(state.target, Pos::new_coord(0, 1));
+                assert_eq!(state.remaining_us, MOVE_DUR);
             }
             _ => panic!("Not moving"),
         }
@@ -455,13 +531,13 @@ mod tests {
             PlayerState {
                 id : PlayerId(0),
                 move_state : MoveState::Stationary,
-                move_cooldown : 0.,
+                move_cooldown : 0,
                 pos : Pos::new_coord(0, 0),
             },
             PlayerState {
                 id : PlayerId(1),
                 move_state : MoveState::Stationary,
-                move_cooldown : 0.,
+                move_cooldown : 0,
                 pos : Pos::new_coord(1, 0),
             },
         ];
@@ -473,10 +549,10 @@ mod tests {
         let new = world.simulate(Some(inputs), 100_000);
 
         let new_player = new.get_player(PlayerId(0)).unwrap();
-        match new_player.move_state {
-            MoveState::Moving(t, to) => {
-                assert_eq!(to, Pos::new_coord(0, 1));
-                assert_eq!(t, MOVE_DUR);
+        match &new_player.move_state {
+            MoveState::Moving(state) => {
+                assert_eq!(state.target, Pos::new_coord(0, 1));
+                assert_eq!(state.remaining_us, MOVE_DUR);
             }
             _ => panic!("Not moving"),
         }
@@ -489,13 +565,13 @@ mod tests {
             PlayerState {
                 id : PlayerId(0),
                 move_state : MoveState::Stationary,
-                move_cooldown : 0.,
+                move_cooldown : 0,
                 pos : Pos::new_coord(0, 0),
             },
             PlayerState {
                 id : PlayerId(1),
-                move_state : MoveState::Moving(0.5, Pos::new_coord(1, 1)),
-                move_cooldown : 0.,
+                move_state : MoveState::Moving(MovingState::new(Pos::new_coord(1, 1))),
+                move_cooldown : 0,
                 pos : Pos::new_coord(0, 1),
             },
         ];
@@ -508,7 +584,7 @@ mod tests {
 
         let new_player = new.get_player(PlayerId(0)).unwrap();
         match new_player.move_state {
-            MoveState::Moving(_, _) => {
+            MoveState::Moving(_) => {
                 panic!("Not expected to be moving")
             }
             _ => {},
@@ -522,13 +598,13 @@ mod tests {
             PlayerState {
                 id : PlayerId(0),
                 move_state : MoveState::Stationary,
-                move_cooldown : 0.,
+                move_cooldown : 0,
                 pos : Pos::new_coord(0, 0),
             },
             PlayerState {
                 id : PlayerId(1),
-                move_state : MoveState::Moving(0.5, Pos::new_coord(0, 1)),
-                move_cooldown : 0.,
+                move_state : MoveState::Moving(MovingState::new(Pos::new_coord(0, 1))),
+                move_cooldown : 0,
                 pos : Pos::new_coord(1, 1),
             },
         ];
@@ -537,11 +613,11 @@ mod tests {
         inputs.set(PlayerId(0), Input::Down);
 
         let world = make_gamestate(players);
-        let new = world.simulate(Some(inputs), 100_000);
+        let new = world.simulate(Some(inputs), 10_000);
 
         let new_player = new.get_player(PlayerId(0)).unwrap();
         match new_player.move_state {
-            MoveState::Moving(_, _) => {
+            MoveState::Moving(_) => {
                 panic!("Not expected to be moving")
             }
             _ => {},
