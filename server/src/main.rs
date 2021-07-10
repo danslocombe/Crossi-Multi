@@ -219,7 +219,7 @@ impl Server {
 
                 let client_last_tick_state = self.timeline.get_state_before_eq_us(client.last_tick_us).map(|x| {
                     RemoteTickState {
-                        time_us: client.last_tick_us - client.offset_us,
+                        time_us: x.time_us - client.offset_us,
                         states: x.get_valid_player_states(),
                     }
                 });
