@@ -10,16 +10,14 @@ use std::cell::RefCell;
 
 use crate::{DEBUG_LOGGER};
 
-use uuid::Uuid;
-
 const ENABLE_DEBUG_LOGGING: bool = false;
 
 fn create_debug_logger(id: super::PlayerId) {
     if ENABLE_DEBUG_LOGGING {
-        let uuid = Uuid::new_v4();
+        let now = std::time::Instant::now();
         let file = File::create(
             "C:\\users\\dan\\crossy_multi\\logs\\client_".to_owned()
-                + &uuid.to_string()
+                + &format!("{:?}", now)
                 + "_"
                 + &id.0.to_string()
                 + ".log",
