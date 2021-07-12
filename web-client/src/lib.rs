@@ -29,6 +29,8 @@ pub fn main_js() -> Result<(), JsValue> {
     // Your code goes here!
     console::log_1(&JsValue::from_str("Hello world!"));
 
+    Ok(())
+    /*
     let mut client = client::Client::try_create(8089).expect("Could not create client");
     let mut tick = 0;
     let mut cur_pos = game::Pos::Coord(game::CoordPos{x: 0, y:0});
@@ -72,4 +74,5 @@ pub fn main_js() -> Result<(), JsValue> {
 
         tick += 1
     }
+    */
 }

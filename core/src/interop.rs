@@ -10,6 +10,7 @@ pub enum CrossyMessage {
     ServerTick(ServerTick),
     OffsetPing(),
     OffsetPong(OffsetPong),
+    EmptyMessage(),
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
