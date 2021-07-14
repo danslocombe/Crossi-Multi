@@ -154,12 +154,14 @@ impl Client {
             server_tick = Some(tick);
         }
 
-        server_tick.map(|x| {
+        server_tick.map(|server_tick| {
             //DEBUG_LOGGER
                 //.log(&format!("Client Last = {:?}", &x.last_client_sent));
 
-            self.timeline
-                .propagate_state(&x.latest, &x.last_client_sent, self.local_player_id);
+            self.timeline.propagate_state(
+                &server_tick.latest,
+                server_tick.last_client_sent.get(self.local_player_id),
+                Some(self.local_player_id));
 
             //DEBUG_LOGGER
                 //.log(&format!("Top: {:?}", &self.timeline.top_state()));

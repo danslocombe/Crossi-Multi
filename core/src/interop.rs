@@ -30,7 +30,7 @@ pub struct InitServerResponse {
     pub server_version: u8,
     pub player_count: u8,
     pub seed: u32,
-    pub player_id: super::game::PlayerId,
+    pub player_id: crate::game::PlayerId,
 }
 
 pub const INIT_MESSAGE: [u8; 4] = ['h' as u8, 'e' as u8, 'l' as u8, 'o' as u8];
@@ -53,13 +53,51 @@ impl ClientHello {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ClientTick {
     pub time_us: u32,
-    pub input: super::game::Input,
+    pub input: crate::game::Input,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ServerTick {
-    pub latest : super::timeline::RemoteTickState,
-    pub last_client_sent : Option<super::timeline::RemoteTickState>,
+    pub latest : crate::timeline::RemoteTickState,
+    pub last_client_sent : LastClientSentTicks
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct LastClientSentTicks
+{
+    // Used by individual clients for interpolation / prediction
+    // Instead of sending each client their specific value we blanket send to all.
+    last_client_sent : Vec<Option<crate::timeline::RemoteTickState>>,
+}
+
+impl LastClientSentTicks {
+    pub fn new() -> Self {
+        LastClientSentTicks {
+            last_client_sent : Vec::with_capacity(8),
+        }
+    }
+
+    pub fn set(&mut self, id: crate::PlayerId, state: crate::timeline::RemoteTickState) {
+        let index = id.0 as usize;
+        if (index >= self.last_client_sent.len())
+        {
+            self.last_client_sent.resize(index + 1, None);
+        }
+
+        self.last_client_sent[index] = Some(state);
+    }
+
+    pub fn get(&self, id: crate::PlayerId) -> Option<&crate::timeline::RemoteTickState> {
+        let index = id.0 as usize;
+        if index < self.last_client_sent.len()
+        {
+            self.last_client_sent[index].as_ref()
+        }
+        else
+        {
+            None
+        }
+    }
 }
 
 pub fn crossy_send(

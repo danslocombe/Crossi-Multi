@@ -111,7 +111,7 @@ impl Timeline {
 
     fn simulate_up_to_date(&mut self, start_index: usize) {
         for i in (0..start_index).rev() {
-            let inputs = self.states[i].player_inputs;
+            let inputs = self.states[i].player_inputs.clone();
             let dt = self.states[i].time_us - self.states[i + 1].time_us;
             let replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32);
             self.states[i] = replacement_state;
@@ -158,8 +158,8 @@ impl Timeline {
     pub fn propagate_state(
         &mut self,
         latest_remote_state: &RemoteTickState,
-        client_latest_remote_state: &Option<RemoteTickState>,
-        local_player: PlayerId,
+        client_latest_remote_state: Option<&RemoteTickState>,
+        local_player: Option<PlayerId>,
     ) {
         // /////////////////////////////////////////////////////////////
         //    client_last     s_server
@@ -185,7 +185,7 @@ impl Timeline {
         //
         // /////////////////////////////////////////////////////////////
 
-        let mut use_client_predictions = vec![local_player];
+        let mut use_client_predictions : Vec<PlayerId> = local_player.into_iter().collect();
 
         if let Some(state) = client_latest_remote_state.as_ref() {
             if let Some(index) = self.split_with_state(&vec![], &state.states, state.time_us) {
@@ -196,10 +196,12 @@ impl Timeline {
                 if (index > 0) {
                     self.simulate_up_to_date(index);
 
-                    use_client_predictions = self.players_to_use_client_predictions(index, local_player);
-                    if (use_client_predictions.len() > 1) {
-                        crate::debug_log(&format!("{:?}", use_client_predictions));
-                    }
+                    local_player.map(|lp| {
+                        use_client_predictions = self.players_to_use_client_predictions(index, lp);
+                        if (use_client_predictions.len() > 1) {
+                            crate::debug_log(&format!("{:?}", use_client_predictions));
+                        }
+                    });
                 }
             }
         }
@@ -476,12 +478,12 @@ mod tests {
 
         let mut p0_left = PlayerInputs::default();
         p0_left.set(PlayerId(0), Input::Left);
-        client_timeline.tick_current_time(Some(p0_left), 500_000);
+        client_timeline.tick_current_time(Some(p0_left.clone()), 500_000);
 
         let mut server_timeline = client_timeline.clone();
 
-        client_timeline.tick_current_time(Some(p0_left), 1_000_000);
-        client_timeline.tick_current_time(Some(p0_left), 1_500_000);
+        client_timeline.tick_current_time(Some(p0_left.clone()), 1_000_000);
+        client_timeline.tick_current_time(Some(p0_left.clone()), 1_500_000);
 
         let mut p1_left = PlayerInputs::default();
         p1_left.set(PlayerId(1), Input::Left);
@@ -514,8 +516,8 @@ mod tests {
 
         client_timeline.propagate_state(
             &server_state_latest,
-            &Some(server_state_client),
-            PlayerId(0),
+            Some(&server_state_client),
+            Some(PlayerId(0)),
         );
 
         assert_eq!(
@@ -568,7 +570,7 @@ mod tests {
         };
 
         client_timeline.tick_current_time(None, 1_000_000);
-        client_timeline.propagate_state(&server_state_latest, &None, PlayerId(0));
+        client_timeline.propagate_state(&server_state_latest, None, Some(PlayerId(0)));
 
         assert_eq!(
             vec![1_000, 600, 400, 0, 0, 0],
@@ -628,8 +630,8 @@ mod tests {
 
         client_timeline.propagate_state(
             &server_state_latest,
-            &server_state_client_last,
-            PlayerId(0),
+            server_state_client_last.as_ref(),
+            Some(PlayerId(0)),
         );
 
         assert_eq!(
@@ -693,8 +695,8 @@ mod tests {
 
         client_timeline.propagate_state(
             &server_state_latest,
-            &server_state_client_last,
-            PlayerId(0),
+            server_state_client_last.as_ref(),
+            Some(PlayerId(0)),
         );
 
         assert_eq!(

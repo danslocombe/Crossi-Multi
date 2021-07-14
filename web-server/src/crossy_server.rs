@@ -123,6 +123,7 @@ impl Server {
 
             inner.timeline.tick(None, dt_simulation.as_micros() as u32);
             inner.timeline.propagate_inputs(client_updates);
+
             for new_player in new_players {
                 // We need to make sure this gets propagated properly
                 // Weird edge case bugs
@@ -136,43 +137,37 @@ impl Server {
             // Send responses
             let top_state = inner.timeline.top_state();
 
+            let mut last_client_sent = crossy_multi_core::interop::LastClientSentTicks::new();
             for client in &inner.clients {
-                if client.offset_us > top_state.time_us {
-                    panic!(
-                        "Client offset {} > top state offset {}",
-                        client.offset_us, top_state.time_us
-                    )
-                }
-
-                let client_last_tick_state = inner.timeline.get_state_before_eq_us(client.last_tick_us).map(|x| {
-                    RemoteTickState {
+                inner.timeline.get_state_before_eq_us(client.last_tick_us).map(|x| {
+                    last_client_sent.set(client.id, RemoteTickState {
                         time_us: x.time_us - client.offset_us,
                         states: x.get_valid_player_states(),
-                    }
+                    });
                 });
+            }
 
-                let tick = CrossyMessage::ServerTick(ServerTick {
-                    latest: RemoteTickState {
-                        time_us: top_state.time_us - client.offset_us,
-                        states: top_state.get_valid_player_states(),
-                    },
-                    last_client_sent: client_last_tick_state,
-                });
+            let tick = CrossyMessage::ServerTick(ServerTick {
+                latest: RemoteTickState {
+                    time_us: top_state.time_us,
+                    states: top_state.get_valid_player_states(),
+                },
+                last_client_sent,
+            });
 
-                if top_state.frame_id as usize % 300 == 0 {
-                    println!("Sending tick {:?}", tick);
+            if top_state.frame_id as usize % 300 == 0 {
+                println!("Sending tick {:?}", tick);
+            }
+
+            self.outbound_tx.send(tick).unwrap();
+
+            let now = Instant::now();
+            let elapsed_time = now.saturating_duration_since(tick_start);
+            match DESIRED_TICK_TIME.checked_sub(elapsed_time) {
+                Some(sleep_time) => {
+                    tokio::time::sleep(sleep_time).await;
                 }
-
-                self.outbound_tx.send(tick).unwrap();
-
-                let now = Instant::now();
-                let elapsed_time = now.saturating_duration_since(tick_start);
-                match DESIRED_TICK_TIME.checked_sub(elapsed_time) {
-                    Some(sleep_time) => {
-                        tokio::time::sleep(sleep_time).await;
-                    }
-                    None => {},
-                }
+                None => {},
             }
         }
     }

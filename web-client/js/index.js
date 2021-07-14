@@ -49,3 +49,30 @@ function connect_ws() {
         console.log("Connection is closed..."); 
     };
 }
+
+let canvas = document.getElementById('canvas');
+canvas.oncontextmenu = () => false;
+let ctx = canvas.getContext('2d', { alpha: false });
+ctx.imageSmoothingEnabled = false;
+
+const canvasStyle = 
+    "image-rendering: -moz-crisp-edges;" +
+    "image-rendering: pixelated;" +
+    "image-rendering: -webkit-crisp-edges;" +
+    "image-rendering: crisp-edges;" +
+    "bottom: 0px;" +
+    "left: 0px;" +
+    "width: 60%;";
+
+    canvas.style = canvasStyle;
+
+function tick()
+{
+    ctx.fillStyle = "#BAEAAA";
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = "#4060f0";
+    ctx.fillRect(8, 8, 8, 8);
+    window.requestAnimationFrame(tick)
+}
+
+tick();

@@ -61,32 +61,44 @@ pub enum Input {
     Down = 4,
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct PlayerInputs {
-    pub inputs: [Input; MAX_PLAYERS],
+    pub inputs: Vec<Input>,
 }
 
 impl Default for PlayerInputs {
     fn default() -> Self {
         PlayerInputs {
-            inputs: [Input::None; MAX_PLAYERS],
+            inputs: Vec::with_capacity(8),
         }
     }
 }
 
 impl PlayerInputs {
     pub fn new() -> Self {
-        PlayerInputs {
-            inputs: [Input::None; MAX_PLAYERS],
-        }
+        Self::default()
     }
 
     pub fn set(&mut self, id: PlayerId, input: Input) {
-        self.inputs[id.0 as usize] = input;
+        let index = id.0 as usize;
+        if (index >= self.inputs.len())
+        {
+            self.inputs.resize(index + 1, Input::None);
+        }
+
+        self.inputs[index] = input;
     }
 
     pub fn get(&self, id: PlayerId) -> Input {
-        self.inputs[id.0 as usize]
+        let index = id.0 as usize;
+        if index < self.inputs.len()
+        {
+            self.inputs[index]
+        }
+        else
+        {
+            Input::None
+        }
     }
 }
 
