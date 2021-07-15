@@ -18,6 +18,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 pub struct LocalPlayerInfo {
     player_id: game::PlayerId,
+    last_input : Input
 }
 
 pub struct Client {
@@ -42,6 +43,19 @@ impl Client {
         } 
     }
 
+    pub fn joined(&mut self, player_id : game::PlayerId) {
+        self.local_player_info = Some(LocalPlayerInfo {
+            player_id,
+            last_input : Input::None,
+        })
+    }
+
+    pub fn set_local_input(&mut self, input : Input) {
+        self.local_player_info.as_mut().map(|x| {
+            x.last_input = input;
+        });
+    }
+
     pub fn tick(&mut self) {
         let tick_start = Instant::now();
         let current_time = tick_start.saturating_duration_since(self.server_start);
@@ -50,12 +64,10 @@ impl Client {
         // Tick logic
         let mut player_inputs = self.timeline.get_last_player_inputs();
 
-        /*
         self.local_player_info.as_ref().map(|x|
         {
-            player_inputs.set(x.player_id, input);
+            player_inputs.set(x.player_id, x.last_input);
         });
-        */
 
         self.timeline
             .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
@@ -84,6 +96,15 @@ impl Client {
             server_tick.last_client_sent.get(self.local_player_id),
             self.local_player_id);
             */
+    }
+
+    pub fn get_client_message(&self) -> interop::CrossyMessage
+    {
+        let input = self.local_player_info.as_ref().map(|x| x.last_input).unwrap_or(Input::None);
+        interop::CrossyMessage::ClientTick(interop::ClientTick {
+            time_us: self.last_tick,
+            input: input,
+        })
     }
 
     pub fn get_players(&self) -> Vec<PlayerState>

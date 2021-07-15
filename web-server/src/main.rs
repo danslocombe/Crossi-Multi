@@ -134,8 +134,8 @@ async fn join_handler(options : JoinOptions, db: GameDb) -> Result<Response, Rej
     let dbinner = db.get(options.game_id).await?;
     // TMP TO HACK SOMETHGING WORKING
     let hello = interop::ClientHello::new(15_000);
-    let id = dbinner.game.join(&hello, crossy_server::SocketId(0)).await;
-    Ok(reply::json(&id).into_response())
+    let init_server_response = dbinner.game.join(&hello, crossy_server::SocketId(0)).await;
+    Ok(reply::json(&init_server_response).into_response())
 }
 
 async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> Result<Response, Rejection> {
