@@ -9,10 +9,10 @@ edition = "2018"
 [dependencies]
 crossy_multi_core = { path = "../core" }
 warp = { version = "0.3.1", features = ["tls", "compression"] }
-tokio = { version = "1.4", features = ["rt-multi-thread", "macros", "io-util", "sync"] }
-tokio-stream = "0.1.5"
+tokio = { version = "1.8.1", features = ["rt-multi-thread", "macros", "io-util", "sync"] }
+tokio-stream = "0.1.7"
 pretty_env_logger = "0.4.0"
-futures = "0.3"
+futures = "0.3.15"
 serde = "1.0"
 serde_derive = "1.0"
-rand = "0.8.3"
+rand = "0.8.4"
