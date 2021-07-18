@@ -3,6 +3,8 @@ import("../pkg/index.js").catch(console.error);
 var game_id = 1;
 var player_name = "Dan";
 
+var client = new Client(100, 0, 10*1000, [], 4);
+
 fetch('/new')
 .then(response => {console.log(response); return response})
 .then(response => response.json())
@@ -20,7 +22,6 @@ function join() {
             console.log("Game ID : " + game_id);
             console.log(response);
             //printWords();
-            //printState();
             connect_ws();
         });
 }
@@ -39,9 +40,8 @@ function connect_ws() {
 
     ws.onmessage = evt => {
         var received_msg = evt.data;
-        console.log("Message is received...");
+        //console.log("Message is received...");
         console.log(received_msg);
-        printState();
     };
 
     ws.onclose = () => {

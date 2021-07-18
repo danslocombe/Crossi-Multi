@@ -55,7 +55,7 @@ impl Server {
         }
     }
 
-    pub async fn queue_message(&mut self, message : CrossyMessage, player : SocketId) {
+    pub async fn queue_message(&self, message : CrossyMessage, player : SocketId) {
         let mut guard = self.queued_messages.lock().await;
         guard.push((message, player));
     }

@@ -9,8 +9,10 @@ use warp::http::StatusCode;
 use warp::reply::{Reply, Response, self};
 use warp::ws::{self, Message, WebSocket};
 use warp::reject::{self, Rejection};
-use serde_derive::{Deserialize};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+
+use serde::Deserialize;
+use std::error::Error;
 
 use tokio::sync::Mutex;
 use futures::{FutureExt, StreamExt};
@@ -140,19 +142,21 @@ async fn join_handler(options : JoinOptions, db: GameDb) -> Result<Response, Rej
 
 async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> Result<Response, Rejection> {
     println!("WS Handler");
+
     let game = db.get(options.game_id).await?;
-    let listener = game.game.get_listener();
 
     Ok(ws.on_upgrade(move |socket| {
-        websocket_main(socket, listener)
+        websocket_main(socket, game)
     }).into_response())
 }
 
-async fn websocket_main(ws: WebSocket, mut tick_listener: tokio::sync::watch::Receiver<interop::CrossyMessage>) {
+async fn websocket_main(ws: WebSocket, db : GameDbInner) {
     //let (client_ws_sender, mut client_ws_rcv) = ws.
     println!("Websocket conencted");
 
-    let (ws_tx, _ws_rx) = ws.split();
+    let mut tick_listener = db.game.get_listener();
+
+    let (ws_tx, mut ws_rx) = ws.split();
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let rx = UnboundedReceiverStream::new(rx);
 
@@ -162,23 +166,53 @@ async fn websocket_main(ws: WebSocket, mut tick_listener: tokio::sync::watch::Re
         }
     }));
 
-    loop {
-        match tick_listener.changed().await {
-            Ok(_) => {
-                let x : interop::CrossyMessage = (*tick_listener.borrow()).clone();
-                let formatted = format!("{:#?}", x);
-                match tx.send(Ok(Message::text(formatted))) {
-                    Ok(_) => {},
-                    Err(e) => {println!("{}", e)}
+    tokio::task::spawn(async move {
+        loop {
+            match tick_listener.changed().await {
+                Ok(_) => {
+                    let x : interop::CrossyMessage = (*tick_listener.borrow()).clone();
+                    let formatted = format!("{:#?}", x);
+                    match tx.send(Ok(Message::text(formatted))) {
+                        Ok(_) => {},
+                        Err(e) => {println!("{}", e)}
+                    }
+                },
+                // Handle dropped so game ended?
+                Err(e) => {
+                    println!("1 Connection dropped? {}", e)
                 }
-            },
-            // Handle dropped so game ended?
+            }
+        }
+    });
+
+    while let Some(result) = ws_rx.next().await {
+        match result {
+            Ok(msg) =>
+            {
+                match parse_client_message(&msg)
+                {
+                    Some(message) => {
+                        println!("{:?}", message);
+                        db.game.queue_message(message, crossy_server::SocketId(0)).await;
+                    }
+                    _ => {},
+                }
+            }
             Err(e) => {
-                println!("1 Connection dropped? {}", e)
+                println!("Client receive err {}", e);
+                break;
             }
         }
     }
 
+    println!("Client disconnected");
     //println!("Connection ended");
+}
+
+fn parse_client_message(ws_message : &warp::ws::Message) -> Option<interop::CrossyMessage>
+{
+    let bytes = ws_message.as_bytes();
+    let r = flexbuffers::Reader::get_root(bytes).map_err(|e| println!("{}", e)).ok()?;
+    interop::CrossyMessage::deserialize(r).map_err(|e| println!("{}", e)).ok()
 }
 

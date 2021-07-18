@@ -2,6 +2,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use std::time::{Instant, Duration};
+use serde::Serialize;
 
 const DESIRED_TICK_TIME : Duration = Duration::from_millis(15);
 
@@ -16,11 +17,14 @@ use crossy_multi_core::*;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+#[derive(Debug)]
 pub struct LocalPlayerInfo {
     player_id: game::PlayerId,
     last_input : Input
 }
 
+#[wasm_bindgen]
+#[derive(Debug)]
 pub struct Client {
     timeline: timeline::Timeline,
     server_start: Instant,
@@ -28,9 +32,10 @@ pub struct Client {
     local_player_info : Option<LocalPlayerInfo>,
 }
 
+#[wasm_bindgen]
 impl Client {
-    pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32, player_states : Vec<PlayerState>, player_count : u8) -> Self {
-        let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, player_states, player_count);
+    pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32, player_count : u8) -> Self {
+        let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], player_count);
 
         // Estimate server start
         let server_start = Instant::now() - Duration::from_micros((server_time_us + estimated_latency) as u64);
@@ -105,6 +110,13 @@ impl Client {
             time_us: self.last_tick,
             input: input,
         })
+    }
+
+    pub fn get_client_message_serialized(&self) -> Vec<u8>
+    {
+        let message = self.get_client_message();
+        flexbuffers::to_vec(message).unwrap()
+
     }
 
     pub fn get_players(&self) -> Vec<PlayerState>
