@@ -60,6 +60,8 @@ impl Into<PlayerState> for PlayerStateInterop
 
 #[wasm_bindgen]
 impl Client {
+
+    #[wasm_bindgen(constructor)]
     pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32, player_count : u8) -> Self {
         let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], player_count);
 

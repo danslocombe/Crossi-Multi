@@ -187,9 +187,11 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner) {
         loop {
             match tick_listener.changed().await {
                 Ok(_) => {
-                    let x : interop::CrossyMessage = (*tick_listener.borrow()).clone();
-                    let formatted = format!("{:#?}", x);
-                    match tx.send(Ok(Message::text(formatted))) {
+                    //let x : interop::CrossyMessage = (*tick_listener.borrow()).clone();
+                    //let formatted = format!("{:#?}", x);
+                    let serialized = flexbuffers::to_vec(&(*tick_listener.borrow())).unwrap();
+                    //match tx.send(Ok(Message::text(formatted))) {
+                    match tx.send(Ok(Message::binary(serialized))) {
                         Ok(_) => {},
                         Err(e) => {println!("{}", e)}
                     }
