@@ -1,9 +1,10 @@
+//const { Client } = require("../pkg/index.js");
 import("../pkg/index.js").catch(console.error);
 
 var game_id = 1;
 var player_name = "Dan";
 
-var client = new Client(100, 0, 10*1000, [], 4);
+var client = undefined; // new Client(100, 0, 10*1000, [], 4);
 
 fetch('/new')
 .then(response => {console.log(response); return response})
@@ -23,6 +24,8 @@ function join() {
             console.log(response);
             //printWords();
             connect_ws();
+
+            client = new wasm.Client(100, 0, 10*100, [], 4);
         });
 }
 
@@ -72,6 +75,14 @@ function tick()
     ctx.fillRect(0, 0, 256, 256);
     ctx.fillStyle = "#4060f0";
     ctx.fillRect(8, 8, 8, 8);
+
+
+    if (client)
+    {
+        let players = client.get_players_json();
+        console.log(players);
+    }
+
     window.requestAnimationFrame(tick)
 }
 

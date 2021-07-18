@@ -60,7 +60,15 @@ impl Server {
         guard.push((message, player));
     }
 
-    pub async fn join(&self, hello : &ClientHello, socket_id: SocketId) -> InitServerResponse
+    pub async fn join(&self) -> ServerDescription {
+        let mut inner = self.inner.lock().await;
+        ServerDescription {
+            server_version : SERVER_VERSION,
+            seed : inner.timeline.seed,
+        }
+    }
+
+    pub async fn play(&self, hello : &ClientHello, socket_id: SocketId) -> InitServerResponse
     {
         println!(
             "Player joined! {:?} {:?} looks ok: {}",

@@ -6,6 +6,7 @@ use std::net::{SocketAddr, UdpSocket};
 pub enum CrossyMessage {
     Hello(ClientHello),
     HelloResponse(InitServerResponse),
+    ServerDecription(ServerDescription),
     ClientTick(ClientTick),
     ServerTick(ServerTick),
     OffsetPing(),
@@ -31,6 +32,12 @@ pub struct InitServerResponse {
     pub player_count: u8,
     pub seed: u32,
     pub player_id: crate::game::PlayerId,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct ServerDescription {
+    pub server_version: u8,
+    pub seed: u32,
 }
 
 pub const INIT_MESSAGE: [u8; 4] = ['h' as u8, 'e' as u8, 'l' as u8, 'o' as u8];

@@ -2,17 +2,15 @@ use wasm_bindgen::prelude::*;
 use web_sys::console;
 
 use std::time::{Instant, Duration};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
+
+use serde_json::json;
 
 const DESIRED_TICK_TIME : Duration = Duration::from_millis(15);
 
 use crossy_multi_core::*;
+use crossy_multi_core::game::PlayerId;
 
-
-// When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
-// allocator.
-//
-// If you don't want to use `wee_alloc`, you can safely delete this.
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -32,6 +30,34 @@ pub struct Client {
     local_player_info : Option<LocalPlayerInfo>,
 }
 
+/*
+// Ugh dont want wasm-bindgen in the core package
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct PlayerIdInterop(u32);
+
+impl Into<PlayerId> for PlayerIdInterop
+{
+    fn into(self) -> PlayerId {
+        PlayerId(self.0 as u8)
+    }
+}
+
+#[wasm_bindgen]
+pub struct PlayerStateInterop {
+    player_state : PlayerState,
+}
+
+impl Into<PlayerState> for PlayerStateInterop
+{
+    fn into(self) -> PlayerState {
+        PlayerState {
+            
+        }
+    }
+}
+*/
+
 #[wasm_bindgen]
 impl Client {
     pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32, player_count : u8) -> Self {
@@ -48,14 +74,19 @@ impl Client {
         } 
     }
 
-    pub fn joined(&mut self, player_id : game::PlayerId) {
+    pub fn joined(&mut self, player_id : u32) {
         self.local_player_info = Some(LocalPlayerInfo {
-            player_id,
+            player_id : PlayerId(player_id as u8),
             last_input : Input::None,
         })
     }
 
-    pub fn set_local_input(&mut self, input : Input) {
+    pub fn set_local_input_json(&mut self, input_json : &str) {
+        let input = serde_json::from_str(input_json).unwrap();
+        self.set_local_input(input);
+    }
+
+    fn set_local_input(&mut self, input : Input) {
         self.local_player_info.as_mut().map(|x| {
             x.last_input = input;
         });
@@ -78,7 +109,14 @@ impl Client {
             .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
     }
 
-    pub fn recv(&mut self, server_tick : &interop::ServerTick)
+    pub fn recv(&mut self, server_tick : &[u8])
+    {
+        let reader = flexbuffers::Reader::get_root(server_tick).unwrap();
+        let tick = interop::ServerTick::deserialize(reader).unwrap();
+        self.recv_internal(&tick);
+    }
+
+    fn recv_internal(&mut self, server_tick : &interop::ServerTick)
     {
         match self.local_player_info.as_ref()
         {
@@ -103,7 +141,14 @@ impl Client {
             */
     }
 
-    pub fn get_client_message(&self) -> interop::CrossyMessage
+    pub fn get_client_message(&self) -> Vec<u8>
+    {
+        let message = self.get_client_message_internal();
+        flexbuffers::to_vec(message).unwrap()
+
+    }
+
+    fn get_client_message_internal(&self) -> interop::CrossyMessage
     {
         let input = self.local_player_info.as_ref().map(|x| x.last_input).unwrap_or(Input::None);
         interop::CrossyMessage::ClientTick(interop::ClientTick {
@@ -112,75 +157,14 @@ impl Client {
         })
     }
 
-    pub fn get_client_message_serialized(&self) -> Vec<u8>
+    pub fn get_players_json(&self) -> String
     {
-        let message = self.get_client_message();
-        flexbuffers::to_vec(message).unwrap()
-
+        let players = self.get_players();
+        serde_json::to_string(&players).unwrap()
     }
 
-    pub fn get_players(&self) -> Vec<PlayerState>
+    fn get_players(&self) -> Vec<PlayerState>
     {
         self.timeline.top_state().get_valid_player_states()
     }
-}
-
-// This is like the `main` function, except for JavaScript.
-#[wasm_bindgen(start)]
-pub fn main_js() -> Result<(), JsValue> {
-    // This provides better error messages in debug mode.
-    // It's disabled in release mode so it doesn't bloat up the file size.
-    #[cfg(debug_assertions)]
-    console_error_panic_hook::set_once();
-
-
-    // Your code goes here!
-    console::log_1(&JsValue::from_str("Hello world!"));
-
-    Ok(())
-    /*
-    let mut client = client::Client::try_create(8089).expect("Could not create client");
-    let mut tick = 0;
-    let mut cur_pos = game::Pos::Coord(game::CoordPos{x: 0, y:0});
-    let mut up = true;
-    loop {
-        let tick_start = Instant::now();
-
-        let input = if tick % 50 == 25 { 
-            up = !up;
-            if up {
-                game::Input::Up
-            }
-            else {
-                game::Input::Down
-            }
-        }
-        else {
-            game::Input::None
-        };
-
-        client.tick(input);
-
-        {
-            let top_state = client.timeline.top_state();
-            let pos = top_state.get_player(client.local_player_id).unwrap().pos;
-            if cur_pos != pos
-            {
-                cur_pos = pos;
-                console::log_1(&JsValue::from_str(&format!("T = {}", top_state.time_us)));
-                console::log_1(&JsValue::from_str(&format!("Pos = {:?}", &cur_pos)));
-            }
-        }
-
-        let now = Instant::now();
-        let elapsed_time = now.saturating_duration_since(tick_start);
-
-        if let Some(sleep_time) = DESIRED_TICK_TIME.checked_sub(elapsed_time)
-        {
-            std::thread::sleep(sleep_time);
-        }
-
-        tick += 1
-    }
-    */
 }
