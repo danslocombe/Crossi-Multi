@@ -11,7 +11,7 @@ use warp::ws::{self, Message, WebSocket};
 use warp::reject::{self, Rejection};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use std::error::Error;
 
 use tokio::sync::Mutex;
@@ -21,9 +21,12 @@ mod crossy_server;
 
 // https://github.com/seanmonstar/warp/blob/master/examples/todos.rs
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GameId(u64);
+
 #[derive(Clone)]
 struct GameDbInner {
-    id: u64,
+    id: GameId,
     game : Arc<crossy_server::Server>,
 }
 
@@ -39,12 +42,12 @@ impl GameDb {
         }
     }
 
-    async fn new_game(&self) -> u64 {
+    async fn new_game(&self) -> GameId {
         let mut games = self.games.lock().await;
-        let prev_max_id = games.iter().map(|x| x.id).max().unwrap_or(0);
-        let id = prev_max_id + 1;
+        let prev_max_id = games.iter().map(|x| x.id.0).max().unwrap_or(0);
+        let id = GameId(prev_max_id + 1);
 
-        let game = Arc::new(crossy_server::Server::new(id));
+        let game = Arc::new(crossy_server::Server::new(id.0));
         games.push(GameDbInner {
             id,
             game : game.clone(),
@@ -57,7 +60,7 @@ impl GameDb {
         id
     }
 
-    async fn get(&self, game_id : u64) -> Result<GameDbInner, Rejection> {
+    async fn get(&self, game_id : GameId) -> Result<GameDbInner, Rejection> {
         let games = self.games.lock().await;
         let m_game = games.iter().filter(|x| x.id == game_id).next();
         match m_game {
@@ -94,12 +97,14 @@ async fn main() {
         .and(with_db(games.clone()))
         .and_then(join_handler).boxed();
 
+    // GET /play?game_id=1&socket_id=1
     let get_play = warp::path!("play")
         .and(warp::get())
         .and(warp::query::<PlayOptions>())
         .and(with_db(games.clone()))
         .and_then(play_handler).boxed();
      
+    // WS /ws?game_id=1&socket_id=1
     let websocket =
     warp::path!("ws")
         .and(warp::ws())
@@ -109,6 +114,7 @@ async fn main() {
    
     let routes = get_new
         .or(get_join)
+        .or(get_play)
         .or(site)
         .or(websocket);
 
@@ -121,40 +127,65 @@ fn with_db(db: GameDb) -> impl Filter<Extract = (GameDb,), Error = std::convert:
     warp::any().map(move || db.clone())
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct NewGameResponse
+{
+    pub game_id : GameId,
+}
+
 async fn new_game_handler(db: GameDb) -> Result<Response, std::convert::Infallible>  {
-    let id = db.new_game().await;
-    Ok(warp::reply::json(&id).into_response())
+    let game_id = db.new_game().await;
+    //let response = serde_json::to_string(&id).unwrap();
+    let new_game_response = NewGameResponse { game_id };
+    let mut response = warp::reply::json(&new_game_response).into_response();
+    let _ = response.headers_mut().insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+    let _ = response.headers_mut().insert("Access-Control-Allow-Credentials", "true".parse().unwrap());
+    //println!("/new {:?}", &response_json);
+    println!("/new {:?}", &response);
+    Ok(response)
 }
 
 #[derive(Debug, Clone, Deserialize)]
 struct JoinOptions {
-    pub game_id : u64, 
+    pub game_id : GameId, 
     pub name : String, 
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct JoinResponse {
+    pub socket_id : crossy_server::SocketId,
+    pub server_description : interop::ServerDescription,
 }
 
 async fn join_handler(options : JoinOptions, db: GameDb) -> Result<Response, Rejection>  {
     let dbinner = db.get(options.game_id).await?;
-    let init_server_response = dbinner.game.join().await;
-    Ok(reply::json(&init_server_response).into_response())
+    let server_description = dbinner.game.get_server_description().await;
+    let socket_id = dbinner.game.join().await;
+    let response = JoinResponse {
+        socket_id,
+        server_description,
+    };
+
+    Ok(reply::json(&response).into_response())
 }
 
 #[derive(Debug, Clone, Deserialize)]
 struct PlayOptions {
-    pub game_id : u64, 
-    pub socket_id : u32,
+    pub game_id : GameId, 
+    pub socket_id : crossy_server::SocketId,
 }
 
 async fn play_handler(options: PlayOptions, db: GameDb) -> Result<Response, Rejection>  {
     let dbinner = db.get(options.game_id).await?;
     let hello = interop::ClientHello::new(15_000);
-    let init_server_response = dbinner.game.play(&hello, crossy_server::SocketId(0)).await;
+    let init_server_response = dbinner.game.play(&hello, options.socket_id).await;
     Ok(reply::json(&init_server_response).into_response())
 }
 
 #[derive(Debug, Clone, Deserialize)]
 struct WebSocketJoinOptions {
-    pub game_id : u64, 
-    pub player_id : u64, 
+    pub game_id : GameId, 
+    pub socket_id : crossy_server::SocketId, 
 }
 
 async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> Result<Response, Rejection> {
@@ -163,11 +194,11 @@ async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> 
     let game = db.get(options.game_id).await?;
 
     Ok(ws.on_upgrade(move |socket| {
-        websocket_main(socket, game)
+        websocket_main(socket, game, options.socket_id)
     }).into_response())
 }
 
-async fn websocket_main(ws: WebSocket, db : GameDbInner) {
+async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_server::SocketId) {
     //let (client_ws_sender, mut client_ws_rcv) = ws.
     println!("Websocket conencted");
 
@@ -212,7 +243,7 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner) {
                 {
                     Some(message) => {
                         println!("{:?}", message);
-                        db.game.queue_message(message, crossy_server::SocketId(0)).await;
+                        db.game.queue_message(message, socket_id).await;
                     }
                     _ => {},
                 }

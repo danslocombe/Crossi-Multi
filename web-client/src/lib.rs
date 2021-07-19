@@ -1,7 +1,10 @@
+mod wasm_instant;
+
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use std::time::{Instant, Duration};
+use wasm_instant::WasmInstant;
+use std::time::Duration;
 use serde::{Serialize, Deserialize};
 
 use serde_json::json;
@@ -10,6 +13,12 @@ const DESIRED_TICK_TIME : Duration = Duration::from_millis(15);
 
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
+
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -21,11 +30,12 @@ pub struct LocalPlayerInfo {
     last_input : Input
 }
 
+
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Client {
     timeline: timeline::Timeline,
-    server_start: Instant,
+    server_start: WasmInstant,
     last_tick: u32,
     local_player_info : Option<LocalPlayerInfo>,
 }
@@ -66,7 +76,7 @@ impl Client {
         let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], player_count);
 
         // Estimate server start
-        let server_start = Instant::now() - Duration::from_micros((server_time_us + estimated_latency) as u64);
+        let server_start = WasmInstant::now() - Duration::from_micros((server_time_us + estimated_latency) as u64);
         
         Client {
             timeline,
@@ -95,7 +105,7 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
-        let tick_start = Instant::now();
+        let tick_start = WasmInstant::now();
         let current_time = tick_start.saturating_duration_since(self.server_start);
         self.last_tick = current_time.as_micros() as u32;
 
@@ -113,8 +123,11 @@ impl Client {
 
     pub fn recv(&mut self, server_tick : &[u8])
     {
+        log!("Recv start 0");
         let reader = flexbuffers::Reader::get_root(server_tick).unwrap();
-        let tick = interop::ServerTick::deserialize(reader).unwrap();
+        log!("Recv start 1");
+        let tick = interop::ServerTick::deserialize(reader).expect("Deserializing tick failed");
+        log!("Received {:?}", tick);
         self.recv_internal(&tick);
     }
 
@@ -123,12 +136,14 @@ impl Client {
         match self.local_player_info.as_ref()
         {
             Some(lpi) => {
+                log!("Hello");
                 self.timeline.propagate_state(
                     &server_tick.latest,
                     server_tick.last_client_sent.get(lpi.player_id),
                     Some(lpi.player_id));
             }
             _ => {
+                log!("Nope");
                 self.timeline.propagate_state(
                     &server_tick.latest,
                     None,

@@ -4,18 +4,24 @@ use crossy_multi_core::interop::*;
 
 use std::time::{Duration, Instant};
 
+use serde::{Serialize, Deserialize};
+
 use tokio::sync::Mutex;
 
 const SERVER_VERSION: u8 = 1;
 const DESIRED_TICK_TIME: Duration = Duration::from_millis(14);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SocketId(pub u32);
 
-struct Client {
+struct PlayerClient {
     id: game::PlayerId,
     offset_us: u32,
     last_tick_us : u32,
+}
+
+struct Client {
+    player_client : Option<PlayerClient>,
     socket_id : SocketId,
 }
 
@@ -33,6 +39,7 @@ pub struct ServerInner {
     prev_tick: Instant,
     clients: Vec<Client>,
     timeline: Timeline,
+    next_socket_id : SocketId,
 }
 
 impl Server {
@@ -51,6 +58,7 @@ impl Server {
                 timeline: Timeline::new(),
                 prev_tick: start,
                 start: start,
+                next_socket_id : SocketId(0),
             }),
         }
     }
@@ -60,18 +68,24 @@ impl Server {
         guard.push((message, player));
     }
 
-    pub async fn join(&self) -> ServerDescription {
-        let mut inner = self.inner.lock().await;
+    pub async fn get_server_description(&self) -> ServerDescription {
+        let inner = self.inner.lock().await;
         ServerDescription {
             server_version : SERVER_VERSION,
             seed : inner.timeline.seed,
         }
     }
 
-    pub async fn play(&self, hello : &ClientHello, socket_id: SocketId) -> InitServerResponse
+    pub async fn join(&self) -> SocketId {
+        println!("/join");
+        let mut inner = self.inner.lock().await;
+        inner.add_client()
+    }
+
+    pub async fn play(&self, hello : &ClientHello, socket_id: SocketId) -> Option<InitServerResponse>
     {
         println!(
-            "Player joined! {:?} {:?} looks ok: {}",
+            "/play {:?} {:?} looks ok: {}",
             socket_id,
             &hello,
             hello.check(1)
@@ -83,28 +97,27 @@ impl Server {
         inner.new_players.push(client_id);
 
         // TODO do we care about sub-frame time here?
-        let now = Instant::now();
-        let client_offset_us =
-            now.saturating_duration_since(inner.start).as_micros() as u32
-                - hello.latency_us;
-        println!("Client offset us {}", client_offset_us);
+        //let now = Instant::now();
+        //let client_offset_us =
+            //now.saturating_duration_since(inner.start).as_micros() as u32
+                //- hello.latency_us;
+        //println!("Client offset us {}", client_offset_us);
 
-        let client = Client {
-            socket_id,
+        // Fails if socket_id not found
+        // ie client tried to /play without calling /join
+        let mut client = inner.get_client_mut_by_addr(socket_id)?;
+        client.player_client = Some(PlayerClient {
             id: client_id,
-            // TODO ping the client and add that.
-            offset_us: client_offset_us,
+            offset_us: 0,
             last_tick_us : 0,
-        };
+        });
 
-        inner.clients.push(client);
-
-        InitServerResponse {
+        Some(InitServerResponse {
             server_version: SERVER_VERSION,
             player_count: inner.timeline.player_count,
             seed: inner.timeline.seed,
             player_id: client_id,
-        }
+        })
     }
 
     pub fn get_listener(&self) -> tokio::sync::watch::Receiver<CrossyMessage> {
@@ -146,7 +159,7 @@ impl Server {
             let top_state = inner.timeline.top_state();
 
             let mut last_client_sent = crossy_multi_core::interop::LastClientSentTicks::new();
-            for client in &inner.clients {
+            for client in (&inner.clients).iter().filter_map(|x| x.player_client.as_ref()) {
                 inner.timeline.get_state_before_eq_us(client.last_tick_us).map(|x| {
                     last_client_sent.set(client.id, RemoteTickState {
                         time_us: x.time_us - client.offset_us,
@@ -198,14 +211,20 @@ impl Server {
 
                 CrossyMessage::ClientTick(t) => match inner.get_client_mut_by_addr(socket_id) {
                     Some(client) => {
-                        let client_time = t.time_us + client.offset_us;
-                        client.last_tick_us = client_time;
+                        if let Some(player_client) = client.player_client.as_mut()
+                        {
+                            let client_time = t.time_us + player_client.offset_us;
+                            player_client.last_tick_us = client_time;
 
-                        client_updates.push(RemoteInput {
-                            time_us: client_time,
-                            input: t.input,
-                            player_id: client.id,
-                        });
+                            client_updates.push(RemoteInput {
+                                time_us: client_time,
+                                input: t.input,
+                                player_id: player_client.id,
+                            });
+                        }
+                        else {
+                            println!("Received client update from client who has not called /play");
+                        }
                     }
                     None => {
                         println!("Did not recognise addr {:?}", &socket_id);
@@ -242,6 +261,17 @@ fn get_client_by_addr<'a>(guard : &'a tokio::sync::MutexGuard<Vec<Client>>, id: 
 */
 
 impl ServerInner {
+    fn add_client(&mut self) -> SocketId {
+        let socket_id = self.next_socket_id;
+        self.next_socket_id = SocketId(socket_id.0 + 1);
+        self.clients.push(Client {
+            player_client : None,
+            socket_id,
+        });
+
+        socket_id
+    }
+
     fn get_client_mut_by_addr(&mut self, id: SocketId) -> Option<&mut Client> {
         for client in &mut self.clients {
             if client.socket_id == id {
