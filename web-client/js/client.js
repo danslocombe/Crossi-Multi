@@ -7,6 +7,7 @@ var player_name = "Dan";
 var socket_id = 0;
 
 var client = undefined;
+var ws = undefined;
 
 var endpoint = "";
 if (DEBUG)
@@ -71,7 +72,7 @@ function play() {
 
 function connect_ws() {
     const player_id = 1;
-    const ws = new WebSocket("ws://localhost:8080/ws?game_id=" + game_id + '&socket_id=' + socket_id);
+    ws = new WebSocket("ws://localhost:8080/ws?game_id=" + game_id + '&socket_id=' + socket_id);
     ws.binaryType = "arraybuffer";
     //var ws = new WebSocket("ws://localhost:8080/ws?game_id=" + game_id);
     console.log("Opening ws");
@@ -114,18 +115,60 @@ function tick()
 {
     ctx.fillStyle = "#BAEAAA";
     ctx.fillRect(0, 0, 256, 256);
-    ctx.fillStyle = "#4060f0";
-    ctx.fillRect(8, 8, 8, 8);
 
 
     if (client)
     {
+        client.set_local_input_json('"' + current_input + '"');
+        current_input = "None";
+
         client.tick();
-        const players = client.get_players_json();
+
+        // If ws in ready state
+        // https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/readyState
+        if (ws.readyState == 1)
+        {
+            const client_tick = client.get_client_message();
+            ws.send(client_tick);
+        }
+
+        const players_json = client.get_players_json();
         //console.log(players);
+
+        const players = JSON.parse(players_json);
+
+        for (const player of players) {
+            const scale = 8;
+
+            if (player.pos.Coord)
+            {
+                let x = player.pos.Coord.x;
+                let y = player.pos.Coord.y;
+                //if (x && y)
+                {
+                    ctx.fillStyle = "#4060f0";
+                    ctx.fillRect(scale * x, scale*y, scale, scale);
+                }
+            }
+        }
+
     }
 
     window.requestAnimationFrame(tick)
 }
 
 tick();
+
+var current_input = "None";
+
+function check(e) {
+    var code = e.keyCode;
+    switch (code) {
+        case 37: current_input = "Left"; break;
+        case 38: current_input = "Up"; break;
+        case 39: current_input = "Right"; break;
+        case 40: current_input = "Down"; break;
+        default: break;
+    }
+}
+window.addEventListener('keydown',check,false);

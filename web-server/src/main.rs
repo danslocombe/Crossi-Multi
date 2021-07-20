@@ -247,7 +247,7 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                 match parse_client_message(&msg)
                 {
                     Some(message) => {
-                        println!("{:?}", message);
+                        //println!("{:?}", message);
                         db.game.queue_message(message, socket_id).await;
                     }
                     _ => {},

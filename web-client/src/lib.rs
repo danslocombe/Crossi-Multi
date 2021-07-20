@@ -99,7 +99,7 @@ impl Client {
     }
 
     pub fn set_local_input_json(&mut self, input_json : &str) {
-        let input = serde_json::from_str(input_json).unwrap();
+        let input = serde_json::from_str(input_json).map_err(|e| log!("{} {:?}", input_json, e)).unwrap_or(Input::None);
         self.set_local_input(input);
     }
 
