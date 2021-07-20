@@ -1,7 +1,7 @@
 // std::time::Instant not supported in wasm
 // Use js performance.now() instead
 //
-// We copy the implementation from here 
+// We base the implementation on this
 // https://github.com/rust-lang/rust/issues/48564#issuecomment-698712971
 
 use wasm_bindgen::prelude::*;
@@ -18,13 +18,29 @@ extern "C" {
     fn performance_now() -> f64;
 }
 
+// We want to be able to represent times from before the start of pageload
+// So store the number of nanoseconds as an i128 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct WasmInstant(u64);
+pub struct WasmInstant(i128);
+
+const NS_TO_US : f64 = 1000.0;
 
 impl WasmInstant {
-    pub fn now() -> Self { Self((performance_now() * 1000.0) as u64) }
-    pub fn duration_since(&self, earlier: WasmInstant) -> Duration { Duration::from_micros(self.0 - earlier.0) }
-    pub fn elapsed(&self) -> Duration { Self::now().duration_since(*self) }
+    pub fn now() -> Self
+    {
+        Self((performance_now() * NS_TO_US) as i128)
+    }
+
+    pub fn duration_since(&self, earlier: WasmInstant) -> Duration
+    { 
+        Duration::from_micros((self.0 - earlier.0) as u64)
+    }
+
+    pub fn elapsed(&self) -> Duration
+    {
+        Self::now().duration_since(*self)
+    }
+
     pub fn checked_add(&self, duration: Duration) -> Option<Self> {
         match duration.as_micros().try_into() {
             Ok(duration) => self.0.checked_add(duration).map(|i| Self(i)),
@@ -39,7 +55,7 @@ impl WasmInstant {
     }
 
     pub fn saturating_duration_since(&self, earlier: WasmInstant) -> Duration { 
-        Duration::from_micros(self.0.saturating_sub(earlier.0))
+        Duration::from_micros(self.0.saturating_sub(earlier.0) as u64)
     }
 }
 

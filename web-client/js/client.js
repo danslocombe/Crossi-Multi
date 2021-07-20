@@ -1,8 +1,13 @@
+"use strict";
+
 const DEBUG = true;
 //const { Client } = require("../pkg/index.js");
 import { Client } from "../pkg/index.js"
 
-var game_id = 1;
+const query_string = window.location.search;
+const url_params = new URLSearchParams(query_string);
+var game_id = url_params.get('game_id');
+
 var player_name = "Dan";
 var socket_id = 0;
 
@@ -12,6 +17,9 @@ var ws = undefined;
 var endpoint = "";
 if (DEBUG)
 {
+    // Fetch from specific localhost / port in order to allow better debugging
+    // (we host debug build from localhost:8081)
+    // NOTE HAVE TO RUN CHROME WITH NO CORS
     endpoint = 'http://localhost:8080'
 }
 
@@ -22,17 +30,22 @@ function dan_fetch(url) {
     });
 }
 
-// Fetch from specific localhost / port in order to allow better debugging
-// (we host debug build from localhost:8081)
-// NOTE HAVE TO RUN CHROME WITH NO CORS
-dan_fetch('/new')
-.then(response => response.json())
-.then(x => {
-    console.log("Created game ");
-    console.log(x);
-	game_id = x.game_id;
-	join();
-});
+if (game_id)
+{
+    console.log("Joining game " + game_id);
+    join();
+}
+else
+{
+    dan_fetch('/new')
+    .then(response => response.json())
+    .then(x => {
+        console.log("Created game ");
+        console.log(x);
+        game_id = x.game_id;
+        join();
+    });
+}
 
 function join() {
     dan_fetch('/join?game_id=' + game_id + '&name=' + player_name)

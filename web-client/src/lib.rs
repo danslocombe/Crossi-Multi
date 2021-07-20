@@ -110,8 +110,9 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
-        let tick_start = WasmInstant::now();
-        let current_time = tick_start.saturating_duration_since(self.server_start);
+        //let tick_start = WasmInstant::now();
+        //let current_time = tick_start.saturating_duration_since(self.server_start);
+        let current_time = self.server_start.elapsed();
         self.last_tick = current_time.as_micros() as u32;
 
         // Tick logic
