@@ -1,3 +1,4 @@
+const DEBUG = true;
 //const { Client } = require("../pkg/index.js");
 import { Client } from "../pkg/index.js"
 
@@ -5,12 +6,17 @@ var game_id = 1;
 var player_name = "Dan";
 var socket_id = 0;
 
-var client = undefined; // new Client(100, 0, 10*1000, [], 4);
+var client = undefined;
+
+var endpoint = "";
+if (DEBUG)
+{
+    endpoint = 'http://localhost:8080'
+}
 
 function dan_fetch(url) {
-    return fetch(url, {
-        //headers: {  'Content-Type': 'application/json' },
-        headers: {  'Accept': 'application/json', 'Access-Control-Allow-Origin' : '*' },
+    return fetch(endpoint + url, {
+        headers: {  'Accept': 'application/json' },
         //mode : "no-cors"
     });
 }
@@ -18,7 +24,7 @@ function dan_fetch(url) {
 // Fetch from specific localhost / port in order to allow better debugging
 // (we host debug build from localhost:8081)
 // NOTE HAVE TO RUN CHROME WITH NO CORS
-dan_fetch('http://localhost:8080/new')
+dan_fetch('/new')
 .then(response => response.json())
 .then(x => {
     console.log("Created game ");
@@ -28,7 +34,7 @@ dan_fetch('http://localhost:8080/new')
 });
 
 function join() {
-    dan_fetch('http://localhost:8080/join?game_id=' + game_id + '&name=' + player_name)
+    dan_fetch('/join?game_id=' + game_id + '&name=' + player_name)
         .then(response => response.json())
         .then(response => {
             //init = true;
@@ -37,11 +43,15 @@ function join() {
             socket_id = response.socket_id;
 
             //printWords();
-            play();
-            connect_ws();
 
             console.log("Creating client");
-            client = new Client(100, 0, 10*100, 4);
+            const estimated_latency = 25 * 1000;
+            const seed = 0;
+            const num_players = 4;
+            client = new Client(seed, response.server_time_us, estimated_latency, num_players);
+
+            play();
+            connect_ws();
         });
 }
 
@@ -52,6 +62,10 @@ function play() {
             console.log("/play response");
             console.log(response);
             // No op
+            if (client)
+            {
+                client.join(response.player_id);
+            }
         });
 }
 
@@ -106,8 +120,9 @@ function tick()
 
     if (client)
     {
+        client.tick();
         const players = client.get_players_json();
-        console.log(players);
+        //console.log(players);
     }
 
     window.requestAnimationFrame(tick)

@@ -155,15 +155,18 @@ struct JoinOptions {
 struct JoinResponse {
     pub socket_id : crossy_server::SocketId,
     pub server_description : interop::ServerDescription,
+    pub server_time_us : u32,
 }
 
 async fn join_handler(options : JoinOptions, db: GameDb) -> Result<Response, Rejection>  {
     let dbinner = db.get(options.game_id).await?;
     let server_description = dbinner.game.get_server_description().await;
+    let last_frame_time_us = dbinner.game.get_last_frame_time_us().await;
     let socket_id = dbinner.game.join().await;
     let response = JoinResponse {
         socket_id,
         server_description,
+        server_time_us : last_frame_time_us,
     };
 
     Ok(reply::json(&response).into_response())
@@ -176,6 +179,7 @@ struct PlayOptions {
 }
 
 async fn play_handler(options: PlayOptions, db: GameDb) -> Result<Response, Rejection>  {
+    println!("Play with options {:?}", options);
     let dbinner = db.get(options.game_id).await?;
     let hello = interop::ClientHello::new(15_000);
     let init_server_response = dbinner.game.play(&hello, options.socket_id).await;
@@ -224,12 +228,13 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                     //match tx.send(Ok(Message::text(formatted))) {
                     match tx.send(Ok(Message::binary(serialized))) {
                         Ok(_) => {},
-                        Err(e) => {println!("{}", e)}
+                        Err(e) => {println!("send error {}", e); break;}
                     }
                 },
                 // Handle dropped so game ended?
                 Err(e) => {
-                    println!("1 Connection dropped? {}", e)
+                    println!("1 Connection dropped? {}", e);
+                    break;
                 }
             }
         }

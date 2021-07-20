@@ -31,6 +31,11 @@ pub struct LocalPlayerInfo {
 }
 
 
+// TODO 
+// Do we need a lock on client?
+// websocket callbacks should be single threaded so ok.
+// no web workers yet
+
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Client {
@@ -86,7 +91,7 @@ impl Client {
         } 
     }
 
-    pub fn joined(&mut self, player_id : u32) {
+    pub fn join(&mut self, player_id : u32) {
         self.local_player_info = Some(LocalPlayerInfo {
             player_id : PlayerId(player_id as u8),
             last_input : Input::None,
@@ -119,16 +124,19 @@ impl Client {
 
         self.timeline
             .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
+
+        if (self.timeline.top_state().frame_id.floor() as u32 % 60) == 0
+        {
+            log!("{:?}", self.timeline.top_state());
+        }
     }
 
     pub fn recv(&mut self, server_tick : &[u8])
     {
-        log!("Recv start 0");
-        let reader = flexbuffers::Reader::get_root(server_tick).unwrap();
-        log!("Recv start 1");
-        let tick = interop::ServerTick::deserialize(reader).expect("Deserializing tick failed");
-        log!("Received {:?}", tick);
-        self.recv_internal(&tick);
+        if let Some(deserialized) = try_deserialize_server_tick(server_tick)
+        {
+            self.recv_internal(&deserialized);
+        }
     }
 
     fn recv_internal(&mut self, server_tick : &interop::ServerTick)
@@ -136,14 +144,27 @@ impl Client {
         match self.local_player_info.as_ref()
         {
             Some(lpi) => {
-                log!("Hello");
-                self.timeline.propagate_state(
-                    &server_tick.latest,
-                    server_tick.last_client_sent.get(lpi.player_id),
-                    Some(lpi.player_id));
+                if (self.timeline.top_state().get_player(lpi.player_id)).is_none()
+                {
+                    log!("Top state time {}", self.timeline.top_state().time_us);
+                    log!("Remote state time {}", server_tick.latest.time_us);
+                    // Edge case
+                    // First tick with the player
+                    // we need to take state from server
+                    self.timeline.propagate_state(
+                        &server_tick.latest,
+                        Some(&server_tick.latest),
+                        None);
+                }
+                else
+                {
+                    self.timeline.propagate_state(
+                        &server_tick.latest,
+                        server_tick.last_client_sent.get(lpi.player_id),
+                        Some(lpi.player_id));
+                }
             }
             _ => {
-                log!("Nope");
                 self.timeline.propagate_state(
                     &server_tick.latest,
                     None,
@@ -183,5 +204,15 @@ impl Client {
     fn get_players(&self) -> Vec<PlayerState>
     {
         self.timeline.top_state().get_valid_player_states()
+    }
+}
+
+fn try_deserialize_server_tick(buffer : &[u8]) -> Option<interop::ServerTick>
+{
+    let reader = flexbuffers::Reader::get_root(buffer).map_err(|e| log!("{:?}", e)).ok()?;
+    let message = interop::CrossyMessage::deserialize(reader).map_err(|e| log!("{:?}", e)).ok()?;
+    match message {
+        interop::CrossyMessage::ServerTick(tick) => Some(tick),
+        _ => None
     }
 }

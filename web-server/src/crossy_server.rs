@@ -124,6 +124,11 @@ impl Server {
         self.outbound_rx.clone()
     }
 
+    pub async fn get_last_frame_time_us(&self) -> u32 {
+        let inner = self.inner.lock().await;
+        inner.timeline.top_state().time_us
+    }
+
     pub async fn run(&self) {
         // Still have client listeners
         while !self.outbound_tx.is_closed() {

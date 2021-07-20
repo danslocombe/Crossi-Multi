@@ -198,9 +198,9 @@ impl Timeline {
 
                     local_player.map(|lp| {
                         use_client_predictions = self.players_to_use_client_predictions(index, lp);
-                        if (use_client_predictions.len() > 1) {
-                            crate::debug_log(&format!("{:?}", use_client_predictions));
-                        }
+                        //if (use_client_predictions.len() > 1) {
+                            //crate::debug_log(&format!("{:?}", use_client_predictions));
+                        //}
                     });
                 }
             }
