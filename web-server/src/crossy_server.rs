@@ -96,13 +96,6 @@ impl Server {
         let client_id = game::PlayerId(inner.clients.len() as u8);
         inner.new_players.push(client_id);
 
-        // TODO do we care about sub-frame time here?
-        //let now = Instant::now();
-        //let client_offset_us =
-            //now.saturating_duration_since(inner.start).as_micros() as u32
-                //- hello.latency_us;
-        //println!("Client offset us {}", client_offset_us);
-
         // Fails if socket_id not found
         // ie client tried to /play without calling /join
         let mut client = inner.get_client_mut_by_addr(socket_id)?;
@@ -134,7 +127,7 @@ impl Server {
         while !self.outbound_tx.is_closed() {
 
             let tick_start = Instant::now();
-            let (client_updates, dropped_players) = self.receive_updates(&tick_start).await;
+            let (client_updates, dropped_players) = self.receive_updates().await;
 
             let mut inner = self.inner.lock().await;
 
@@ -198,7 +191,7 @@ impl Server {
         }
     }
 
-    async fn receive_updates(&self, tick_start: &Instant) -> (Vec<RemoteInput>, Vec<game::PlayerId>) {
+    async fn receive_updates(&self) -> (Vec<RemoteInput>, Vec<game::PlayerId>) {
         let mut queued_messages = Vec::with_capacity(8);
 
         let mut guard = self.queued_messages.lock().await;
@@ -206,14 +199,12 @@ impl Server {
         drop(guard);
 
         let mut client_updates = Vec::new();
-        let mut dropped_players = Vec::new();
 
         let mut inner = self.inner.lock().await;
 
         while let Some((message, socket_id)) = queued_messages.pop()
         {
             match message {
-
                 CrossyMessage::ClientTick(t) => match inner.get_client_mut_by_addr(socket_id) {
                     Some(client) => {
                         if let Some(player_client) = client.player_client.as_mut()
@@ -239,31 +230,11 @@ impl Server {
             }
         }
 
+        // TODO dropped players
+        let dropped_players = vec![];
         (client_updates, dropped_players)
     }
 }
-
-/*
-fn get_client_mut_by_addr<'a>(guard : &'a mut tokio::sync::MutexGuard<Vec<Client>>, id: SocketId) -> Option<&'a mut Client> {
-    for client in &mut (**guard) {
-        if client.socket_id == id {
-            return Some(client);
-        }
-    }
-
-    None
-}
-
-fn get_client_by_addr<'a>(guard : &'a tokio::sync::MutexGuard<Vec<Client>>, id: SocketId) -> Option<&'a Client> {
-    for client in &(**guard) {
-        if client.socket_id == id {
-            return Some(client);
-        }
-    }
-
-    None
-}
-*/
 
 impl ServerInner {
     fn add_client(&mut self) -> SocketId {

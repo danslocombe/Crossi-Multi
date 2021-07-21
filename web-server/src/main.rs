@@ -5,21 +5,16 @@ use crossy_multi_core::*;
 use std::sync::Arc;
 
 use warp::Filter;
-use warp::http::StatusCode;
 use warp::reply::{Reply, Response, self};
 use warp::ws::{self, Message, WebSocket};
 use warp::reject::{self, Rejection};
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use serde::{Serialize, Deserialize};
-use std::error::Error;
 
 use tokio::sync::Mutex;
-use futures::{FutureExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 
 mod crossy_server;
-
-// https://github.com/seanmonstar/warp/blob/master/examples/todos.rs
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameId(u64);
@@ -105,18 +100,23 @@ async fn main() {
         .and_then(play_handler).boxed();
      
     // WS /ws?game_id=1&socket_id=1
-    let websocket =
-    warp::path!("ws")
+    let websocket = warp::path!("ws")
         .and(warp::ws())
         .and(warp::query::<WebSocketJoinOptions>())
         .and(with_db(games.clone()))
         .and_then(ws_handler).boxed();
+
+    // WS /ping
+    let ping = warp::path!("ping")
+        .and(warp::ws())
+        .and_then(ping_handler).boxed();
    
     let routes = get_new
         .or(get_join)
         .or(get_play)
         .or(site)
-        .or(websocket);
+        .or(websocket)
+        .or(ping);
 
     warp::serve(routes)
         .run(([127, 0, 0, 1], 8080))
@@ -135,12 +135,8 @@ pub struct NewGameResponse
 
 async fn new_game_handler(db: GameDb) -> Result<Response, std::convert::Infallible>  {
     let game_id = db.new_game().await;
-    //let response = serde_json::to_string(&id).unwrap();
     let new_game_response = NewGameResponse { game_id };
-    let mut response = warp::reply::json(&new_game_response).into_response();
-    let _ = response.headers_mut().insert("Access-Control-Allow-Origin", "*".parse().unwrap());
-    let _ = response.headers_mut().insert("Access-Control-Allow-Credentials", "true".parse().unwrap());
-    //println!("/new {:?}", &response_json);
+    let response = warp::reply::json(&new_game_response).into_response();
     println!("/new {:?}", &response);
     Ok(response)
 }
@@ -203,37 +199,26 @@ async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> 
 }
 
 async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_server::SocketId) {
-    //let (client_ws_sender, mut client_ws_rcv) = ws.
     println!("Websocket conencted");
 
     let mut tick_listener = db.game.get_listener();
+    let (mut ws_tx, mut ws_rx) = ws.split();
 
-    let (ws_tx, mut ws_rx) = ws.split();
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let rx = UnboundedReceiverStream::new(rx);
-
-    tokio::task::spawn(rx.forward(ws_tx).map(|result| {
-        if let Err(e) = result {
-            eprintln!("websocket send error: {}", e);
-        }
-    }));
 
     tokio::task::spawn(async move {
         loop {
             match tick_listener.changed().await {
                 Ok(_) => {
-                    //let x : interop::CrossyMessage = (*tick_listener.borrow()).clone();
-                    //let formatted = format!("{:#?}", x);
                     let serialized = flexbuffers::to_vec(&(*tick_listener.borrow())).unwrap();
-                    //match tx.send(Ok(Message::text(formatted))) {
-                    match tx.send(Ok(Message::binary(serialized))) {
+                    match ws_tx.send(Message::binary(serialized)).await
+                    {
                         Ok(_) => {},
-                        Err(e) => {println!("send error {}", e); break;}
+                        Err(e) => {println!("Websocket send error {}", e); break;}
                     }
                 },
                 // Handle dropped so game ended?
                 Err(e) => {
-                    println!("1 Connection dropped? {}", e);
+                    println!("Tick listener dropped {}", e);
                     break;
                 }
             }
@@ -247,7 +232,6 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                 match parse_client_message(&msg)
                 {
                     Some(message) => {
-                        //println!("{:?}", message);
                         db.game.queue_message(message, socket_id).await;
                     }
                     _ => {},
@@ -261,7 +245,6 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
     }
 
     println!("Client disconnected");
-    //println!("Connection ended");
 }
 
 fn parse_client_message(ws_message : &warp::ws::Message) -> Option<interop::CrossyMessage>
@@ -271,3 +254,29 @@ fn parse_client_message(ws_message : &warp::ws::Message) -> Option<interop::Cros
     interop::CrossyMessage::deserialize(r).map_err(|e| println!("{}", e)).ok()
 }
 
+async fn ping_handler(ws : ws::Ws) -> Result<Response, Rejection> {
+    println!("Ping Handler");
+
+    Ok(ws.on_upgrade(move |socket| {
+        ping_main(socket)
+    }).into_response())
+}
+
+async fn ping_main(ws: WebSocket) {
+
+    let (mut tx, mut rx) = ws.split();
+
+    while let Some(body) = rx.next().await {
+        match body {
+            Ok(msg) => {
+                tx.send(msg).await.unwrap();
+            }
+            Err(e) => {
+                println!("Error reading print packet: {}", e);
+                break;
+            }
+        };
+    }
+
+    println!("Ping client disconnected")
+}

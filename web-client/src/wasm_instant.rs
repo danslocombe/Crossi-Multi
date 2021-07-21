@@ -1,4 +1,4 @@
-// std::time::Instant not supported in wasm
+// std::time::Instant is not supported in wasm
 // Use js performance.now() instead
 //
 // We base the implementation on this
@@ -18,17 +18,18 @@ extern "C" {
     fn performance_now() -> f64;
 }
 
-// We want to be able to represent times from before the start of pageload
-// So store the number of nanoseconds as an i128 
+// performance.now returns the number of ms since pageload.
+// But we want to be able to represent times from before the start of pageload
+// So store the number of microseconds as an i128.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WasmInstant(i128);
 
-const NS_TO_US : f64 = 1000.0;
+const MS_TO_US : f64 = 1000.0;
 
 impl WasmInstant {
     pub fn now() -> Self
     {
-        Self((performance_now() * NS_TO_US) as i128)
+        Self((performance_now() * MS_TO_US) as i128)
     }
 
     pub fn duration_since(&self, earlier: WasmInstant) -> Duration

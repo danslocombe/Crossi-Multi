@@ -82,6 +82,8 @@ impl Client {
 
         // Estimate server start
         let server_start = WasmInstant::now() - Duration::from_micros((server_time_us + estimated_latency) as u64);
+
+        log!("CONSTRUCTING : Estamated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency);
         
         Client {
             timeline,
@@ -142,6 +144,9 @@ impl Client {
 
     fn recv_internal(&mut self, server_tick : &interop::ServerTick)
     {
+        //log!("Top state time {}", self.timeline.top_state().time_us);
+        //log!("Remote state time {}", server_tick.latest.time_us);
+        //log!("CURRENT TIME {:?} ESTIMATED START TIME {:?}", WasmInstant::now(), self.server_start);
         match self.local_player_info.as_ref()
         {
             Some(lpi) => {
@@ -149,6 +154,8 @@ impl Client {
                 {
                     log!("Top state time {}", self.timeline.top_state().time_us);
                     log!("Remote state time {}", server_tick.latest.time_us);
+                    log!("CURRENT TIME {:?} ESTIMATED START TIME {:?}", WasmInstant::now(), self.server_start);
+
                     // Edge case
                     // First tick with the player
                     // we need to take state from server

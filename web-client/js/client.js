@@ -1,7 +1,6 @@
 "use strict";
 
 const DEBUG = true;
-//const { Client } = require("../pkg/index.js");
 import { Client } from "../pkg/index.js"
 
 const query_string = window.location.search;
@@ -13,6 +12,7 @@ var socket_id = 0;
 
 var client = undefined;
 var ws = undefined;
+var estimated_latency_us = 0;
 
 var endpoint = "";
 if (DEBUG)
@@ -26,43 +26,88 @@ if (DEBUG)
 function dan_fetch(url) {
     return fetch(endpoint + url, {
         headers: {  'Accept': 'application/json' },
-        //mode : "no-cors"
     });
 }
 
-if (game_id)
-{
-    console.log("Joining game " + game_id);
-    join();
+/////////////////////////////////////////////////////////////////////////////////////
+
+console.log("Starting pinging");
+var ping_ws = new WebSocket("ws://localhost:8080/ping");
+ping_ws.onopen = evt => ping(false);
+ping_ws.onmessage = evt => ping(true)
+ping_ws.onclose = evt => {}
+var ping_responses = [];
+var remaining_pings = 5;
+
+// t0 - time to send ping
+// t1 - time server receives ping
+// t2 - time server sends pong
+// t3 - time client receives pong
+// Assume zero time on the server for simplicity, so t2-t1 = 0
+var ping_t0 = undefined;
+
+function ping(initial_ping) {
+    if (initial_ping) {
+        const ping_t3 = performance.now();
+        const latency_ms = (ping_t3 - ping_t0) / 2.0;
+        console.log("Ping with offset " + latency_ms + "ms");
+        ping_responses.push(latency_ms);
+        remaining_pings--;
+    }
+
+    if (remaining_pings > 0) {
+        ping_t0 = performance.now();
+        ping_ws.send("ping");
+    }
+    else {
+        ping_finish();
+    }
 }
-else
-{
-    dan_fetch('/new')
-    .then(response => response.json())
-    .then(x => {
-        console.log("Created game ");
-        console.log(x);
-        game_id = x.game_id;
+
+function ping_finish() {
+    ping_ws.close();
+    ping_responses.sort();
+    console.log(ping_responses);
+    const estimated_latency_ms = ping_responses[Math.floor(ping_responses.length / 2)];
+    estimated_latency_us = estimated_latency_ms * 1000.0;
+    console.log("Estimated Offset " + estimated_latency_us + "us");
+    start_game();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+function start_game() {
+    if (game_id)
+    {
+        console.log("Joining game " + game_id);
         join();
-    });
+    }
+    else
+    {
+        dan_fetch('/new')
+        .then(response => response.json())
+        .then(x => {
+            console.log("Created game ");
+            console.log(x);
+            game_id = x.game_id;
+            join();
+        });
+    }
 }
+
 
 function join() {
     dan_fetch('/join?game_id=' + game_id + '&name=' + player_name)
         .then(response => response.json())
         .then(response => {
-            //init = true;
             console.log("/join response");
             console.log(response);
             socket_id = response.socket_id;
 
-            //printWords();
-
             console.log("Creating client");
-            const estimated_latency = 25 * 1000;
             const seed = 0;
             const num_players = 4;
-            client = new Client(seed, response.server_time_us, estimated_latency, num_players);
+            client = new Client(seed, response.server_time_us, estimated_latency_us, num_players);
 
             play();
             connect_ws();
@@ -75,7 +120,6 @@ function play() {
         .then(response => {
             console.log("/play response");
             console.log(response);
-            // No op
             if (client)
             {
                 client.join(response.player_id);
@@ -84,10 +128,8 @@ function play() {
 }
 
 function connect_ws() {
-    const player_id = 1;
     ws = new WebSocket("ws://localhost:8080/ws?game_id=" + game_id + '&socket_id=' + socket_id);
     ws.binaryType = "arraybuffer";
-    //var ws = new WebSocket("ws://localhost:8080/ws?game_id=" + game_id);
     console.log("Opening ws");
 
     ws.onopen = () => {
@@ -103,7 +145,6 @@ function connect_ws() {
     };
 
     ws.onclose = () => {
-        // websocket is closed.
         console.log("WS closed");
     };
 }
@@ -129,7 +170,6 @@ function tick()
     ctx.fillStyle = "#BAEAAA";
     ctx.fillRect(0, 0, 256, 256);
 
-
     if (client)
     {
         client.set_local_input_json('"' + current_input + '"');
@@ -146,8 +186,6 @@ function tick()
         }
 
         const players_json = client.get_players_json();
-        //console.log(players);
-
         const players = JSON.parse(players_json);
 
         for (const player of players) {
