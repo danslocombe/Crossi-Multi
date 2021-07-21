@@ -409,10 +409,13 @@ impl PlayerState {
                     .flat_map(|x| x.as_ref())
                     .filter(|x| x.id != self.id) {
 
-                    // Because only one player per spot
-                    // We can only push one person
-                    push_info = self.try_move_player(input, candidate_pos, other_player, state, pushes)?;
-                    break;
+                    let possible_push_info = self.try_move_player(input, candidate_pos, other_player, state, pushes)?;
+                    if (possible_push_info.pushing.is_some()) {
+                        // Because only one player per spot
+                        // We can only push one person
+                        push_info = possible_push_info;
+                        break;
+                    }
                 }
             },
             _ => {},
@@ -451,7 +454,7 @@ impl PlayerState {
         else {
             match &other.move_state {
                 MoveState::Moving(state) => {
-                    // Only allow moevement if we are going to a different position to another frog
+                    // Only allow movement if we are going to a different position to another frog
                     if (state.target != candidate_pos)
                     {
                         Some(PushInfo::default())
