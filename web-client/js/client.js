@@ -1,7 +1,8 @@
 "use strict";
 
-const DEBUG = true;
 import { Client } from "../pkg/index.js"
+
+const DEBUG = true;
 
 const query_string = window.location.search;
 const url_params = new URLSearchParams(query_string);
@@ -13,14 +14,18 @@ var socket_id = 0;
 var client = undefined;
 var ws = undefined;
 var estimated_latency_us = 0;
+var current_input = "None";
 
 var endpoint = "";
+var ws_endpoint = "";
+
 if (DEBUG)
 {
     // Fetch from specific localhost / port in order to allow better debugging
     // (we host debug build from localhost:8081)
     // NOTE HAVE TO RUN CHROME WITH NO CORS
     endpoint = 'http://localhost:8080'
+    ws_endpoint = 'ws://localhost:8080'
 }
 
 function dan_fetch(url) {
@@ -31,10 +36,11 @@ function dan_fetch(url) {
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+// Ping server to estimate latency before we start
 console.log("Starting pinging");
-var ping_ws = new WebSocket("ws://localhost:8080/ping");
-ping_ws.onopen = evt => ping(false);
-ping_ws.onmessage = evt => ping(true)
+var ping_ws = new WebSocket(ws_endpoint + "/ping");
+ping_ws.onopen = evt => ping(true);
+ping_ws.onmessage = evt => ping(false)
 ping_ws.onclose = evt => {}
 var ping_responses = [];
 var remaining_pings = 5;
@@ -47,7 +53,7 @@ var remaining_pings = 5;
 var ping_t0 = undefined;
 
 function ping(initial_ping) {
-    if (initial_ping) {
+    if (!initial_ping) {
         const ping_t3 = performance.now();
         const latency_ms = (ping_t3 - ping_t0) / 2.0;
         console.log("Ping with offset " + latency_ms + "ms");
@@ -60,18 +66,16 @@ function ping(initial_ping) {
         ping_ws.send("ping");
     }
     else {
-        ping_finish();
-    }
-}
+        ping_ws.close();
+        
+        ping_responses.sort();
+        console.log(ping_responses);
+        const estimated_latency_ms = ping_responses[Math.floor(ping_responses.length / 2)];
+        estimated_latency_us = estimated_latency_ms * 1000.0;
 
-function ping_finish() {
-    ping_ws.close();
-    ping_responses.sort();
-    console.log(ping_responses);
-    const estimated_latency_ms = ping_responses[Math.floor(ping_responses.length / 2)];
-    estimated_latency_us = estimated_latency_ms * 1000.0;
-    console.log("Estimated Offset " + estimated_latency_us + "us");
-    start_game();
+        console.log("Estimated Offset " + estimated_latency_us + "us");
+        start_game();
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -128,7 +132,7 @@ function play() {
 }
 
 function connect_ws() {
-    ws = new WebSocket("ws://localhost:8080/ws?game_id=" + game_id + '&socket_id=' + socket_id);
+    ws = new WebSocket(ws_endpoint + "/ws?game_id=" + game_id + '&socket_id=' + socket_id);
     ws.binaryType = "arraybuffer";
     console.log("Opening ws");
 
@@ -149,6 +153,23 @@ function connect_ws() {
     };
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+
+function check(e) {
+    var code = e.keyCode;
+    switch (code) {
+        case 37: current_input = "Left"; break;
+        case 38: current_input = "Up"; break;
+        case 39: current_input = "Right"; break;
+        case 40: current_input = "Down"; break;
+        default: break;
+    }
+}
+
+window.addEventListener('keydown',check,false);
+
+/////////////////////////////////////////////////////////////////////////////////////
+
 let canvas = document.getElementById('canvas');
 canvas.oncontextmenu = () => false;
 let ctx = canvas.getContext('2d', { alpha: false });
@@ -163,7 +184,9 @@ const canvasStyle =
     "left: 0px;" +
     "width: 60%;";
 
-    canvas.style = canvasStyle;
+canvas.style = canvasStyle;
+
+/////////////////////////////////////////////////////////////////////////////////////
 
 function tick()
 {
@@ -177,9 +200,11 @@ function tick()
 
         client.tick();
 
-        // If ws in ready state
+        // Check if ws in ready state
         // https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/readyState
-        if (ws.readyState == 1)
+        const ws_ready = ws.readyState == 1
+
+        if (ws_ready)
         {
             const client_tick = client.get_client_message();
             ws.send(client_tick);
@@ -195,31 +220,13 @@ function tick()
             {
                 let x = player.pos.Coord.x;
                 let y = player.pos.Coord.y;
-                //if (x && y)
-                {
-                    ctx.fillStyle = "#4060f0";
-                    ctx.fillRect(scale * x, scale*y, scale, scale);
-                }
+                ctx.fillStyle = "#4060f0";
+                ctx.fillRect(scale * x, scale*y, scale, scale);
             }
         }
-
     }
 
     window.requestAnimationFrame(tick)
 }
 
 tick();
-
-var current_input = "None";
-
-function check(e) {
-    var code = e.keyCode;
-    switch (code) {
-        case 37: current_input = "Left"; break;
-        case 38: current_input = "Up"; break;
-        case 39: current_input = "Right"; break;
-        case 40: current_input = "Down"; break;
-        default: break;
-    }
-}
-window.addEventListener('keydown',check,false);

@@ -1,15 +1,10 @@
 mod wasm_instant;
 
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 use wasm_instant::WasmInstant;
 use std::time::Duration;
-use serde::{Serialize, Deserialize};
-
-use serde_json::json;
-
-const DESIRED_TICK_TIME : Duration = Duration::from_millis(15);
+use serde::Deserialize;
 
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
@@ -30,12 +25,6 @@ pub struct LocalPlayerInfo {
     last_input : Input
 }
 
-
-// TODO 
-// Do we need a lock on client?
-// websocket callbacks should be single threaded so ok.
-// no web workers yet
-
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Client {
@@ -44,34 +33,6 @@ pub struct Client {
     last_tick: u32,
     local_player_info : Option<LocalPlayerInfo>,
 }
-
-/*
-// Ugh dont want wasm-bindgen in the core package
-#[wasm_bindgen]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct PlayerIdInterop(u32);
-
-impl Into<PlayerId> for PlayerIdInterop
-{
-    fn into(self) -> PlayerId {
-        PlayerId(self.0 as u8)
-    }
-}
-
-#[wasm_bindgen]
-pub struct PlayerStateInterop {
-    player_state : PlayerState,
-}
-
-impl Into<PlayerState> for PlayerStateInterop
-{
-    fn into(self) -> PlayerState {
-        PlayerState {
-            
-        }
-    }
-}
-*/
 
 #[wasm_bindgen]
 impl Client {
@@ -112,8 +73,6 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
-        //let tick_start = WasmInstant::now();
-        //let current_time = tick_start.saturating_duration_since(self.server_start);
         let current_time = self.server_start.elapsed();
         self.last_tick = current_time.as_micros() as u32;
 
@@ -144,18 +103,12 @@ impl Client {
 
     fn recv_internal(&mut self, server_tick : &interop::ServerTick)
     {
-        //log!("Top state time {}", self.timeline.top_state().time_us);
-        //log!("Remote state time {}", server_tick.latest.time_us);
-        //log!("CURRENT TIME {:?} ESTIMATED START TIME {:?}", WasmInstant::now(), self.server_start);
+
         match self.local_player_info.as_ref()
         {
             Some(lpi) => {
                 if (self.timeline.top_state().get_player(lpi.player_id)).is_none()
                 {
-                    log!("Top state time {}", self.timeline.top_state().time_us);
-                    log!("Remote state time {}", server_tick.latest.time_us);
-                    log!("CURRENT TIME {:?} ESTIMATED START TIME {:?}", WasmInstant::now(), self.server_start);
-
                     // Edge case
                     // First tick with the player
                     // we need to take state from server
@@ -179,12 +132,6 @@ impl Client {
                     None);
             }
         }
-        /*
-        self.timeline.propagate_state(
-            &server_tick.latest,
-            server_tick.last_client_sent.get(self.local_player_id),
-            self.local_player_id);
-            */
     }
 
     pub fn get_client_message(&self) -> Vec<u8>
