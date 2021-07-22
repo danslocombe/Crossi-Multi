@@ -1,5 +1,7 @@
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
+use crate::player_id_map::PlayerIdMap;
+use crate::crossy_ruleset::CrossyRulesetFST;
 
 pub const MAX_PLAYERS: usize = 8;
 
@@ -108,8 +110,8 @@ pub struct GameState {
     // Should be fine
     // Only worry is drift from summing, going to matter?
     pub time_us: u32,
-
-    player_states: Vec<Option<PlayerState>>,
+    player_states: PlayerIdMap<PlayerState>,
+    ruleset_state : CrossyRulesetFST,
     pub player_inputs: PlayerInputs,
     pub log_states: Vec<LogState>,
     pub frame_id: f64,
@@ -119,18 +121,21 @@ impl GameState {
     pub fn new() -> Self {
         GameState {
             time_us: 0,
-            player_states: vec![],
+            player_states: PlayerIdMap::new(),
             player_inputs: PlayerInputs::new(),
+            ruleset_state: CrossyRulesetFST::start(),
             log_states: vec![],
             frame_id: 0.0,
         }
     }
 
-    pub fn from_server_parts(_seed: u32, time_us: u32, player_states: Vec<PlayerState>) -> Self {
+    pub fn from_server_parts(_seed: u32, time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
+        let player_states = PlayerIdMap::from_definition(player_states_def.into_iter().map(|x| (x.id, x)).collect());
         GameState {
             time_us: time_us,
-            player_states: player_states.into_iter().map(|x| Some(x)).collect(),
+            player_states,
             player_inputs: PlayerInputs::new(),
+            ruleset_state,
             log_states: vec![],
             //TODO
             frame_id: 0.0,
@@ -138,38 +143,27 @@ impl GameState {
     }
 
     pub fn get_player(&self, id: PlayerId) -> Option<&PlayerState> {
-        let index = id.0 as usize;
-        if (index < self.player_states.len()) {
-            self.player_states[index].as_ref()
-        } else {
-            None
-        }
+        self.player_states.get(id)
     }
 
     pub fn get_player_mut(&mut self, id: PlayerId) -> Option<&mut PlayerState> {
-        let idx = id.0 as usize;
-        if idx >= self.player_states.len() {
-            None
-        } else {
-            self.player_states[idx].as_mut()
-        }
+        self.player_states.get_mut(id)
     }
 
     pub fn set_player_state(&mut self, id: PlayerId, state: PlayerState) {
-        let idx = id.0 as usize;
-        if idx >= self.player_states.len() {
-            self.player_states.resize(idx + 1, None);
-        }
-
-        self.player_states[idx] = Some(state);
+        self.player_states.set(id, state);
     }
 
     pub fn get_player_count(&self) -> usize {
-        self.player_states.iter().flatten().count()
+        self.player_states.count_populated()
     }
 
     pub fn get_valid_player_states(&self) -> Vec<PlayerState> {
-        self.player_states.iter().flatten().cloned().collect()
+        self.player_states.get_populated()
+    }
+
+    pub fn get_rule_state(&self) -> &CrossyRulesetFST {
+        &self.ruleset_state
     }
 
     pub fn add_player(&self, id: PlayerId, pos: Pos) -> Self {
@@ -186,16 +180,21 @@ impl GameState {
         new
     }
 
+    pub fn set_player_ready(&self, id : PlayerId, ready : bool) -> Self {
+        let mut new = self.clone();
+        match &mut new.ruleset_state {
+            CrossyRulesetFST::Lobby(state) => {
+                state.ready_states.set(id, ready);
+            },
+            _ => {},
+        };
+
+        new
+    }
+
     pub fn remove_player(&self, id: PlayerId) -> Self {
         let mut new = self.clone();
-        let idx = id.0 as usize;
-        if idx >= new.player_states.len() {
-            // Nothing to do
-        }
-        else {
-            new.player_states[idx] = None;
-        }
-
+        new.player_states.remove(id);
         new
     }
 
@@ -215,31 +214,31 @@ impl GameState {
             // TODO
         }
 
-        for i in 0..self.player_states.len() {
-            if let Some(player_state) = self.player_states[i].as_ref() {
-                let mut pushes = Vec::new();
-                let id = player_state.id;
-                let player_input = self.player_inputs.get(id);
-                let iterated = player_state.tick_iterate(self, player_input, dt_us, &mut pushes);
+        for id in self.player_states.valid_ids() {
+            let mut pushes = Vec::new();
+            let player_input = self.player_inputs.get(id);
+
+            // We can safely unwrap as we are iterating over valid_ids()
+            let player_state = self.player_states.get(id).unwrap();
+
+            let iterated = player_state.tick_iterate(self, player_input, dt_us, &mut pushes);
+            drop(player_state);
+
+            self.set_player_state(id, iterated);
+
+            if let Some(push) = pushes.first() {
+                let player_state = self.get_player(push.id).unwrap();
+                let pushed = player_state.push(push);
                 drop(player_state);
-
-                self.set_player_state(id, iterated);
-
-                if let Some(push) = pushes.first() {
-                    let player_state = self.get_player(push.id).unwrap();
-                    let pushed = player_state.push(push);
-                    drop(player_state);
-                    self.set_player_state(push.id, pushed);
-                }
+                self.set_player_state(push.id, pushed);
             }
         }
+
+        self.ruleset_state.tick(dt_us, &self.player_states);
     }
 
     fn space_occupied_with_player(&self, pos : Pos, ignore_id : PlayerId) -> bool {
-        for player in self.player_states.iter()
-            .flat_map(|x| x.as_ref())
-            .filter(|x| x.id != ignore_id) {
-
+        for (_, player) in self.player_states.iter().filter(|(id, _)| *id != ignore_id) {
             if player.pos == pos {
                 return true;
             }
@@ -405,9 +404,7 @@ impl PlayerState {
                 let candidate_pos = Pos::Coord(pos.apply_input(input));
                 new_pos = Some(candidate_pos);
 
-                for other_player in state.player_states.iter()
-                    .flat_map(|x| x.as_ref())
-                    .filter(|x| x.id != self.id) {
+                for (_, other_player) in state.player_states.iter().filter(|(id, _)| *id != self.id) {
 
                     let possible_push_info = self.try_move_player(input, candidate_pos, other_player, state, pushes)?;
                     if (possible_push_info.pushing.is_some()) {
@@ -502,11 +499,13 @@ mod tests {
     use super::*;
 
     fn make_gamestate(states : Vec<PlayerState>) -> GameState {
+        let player_states = PlayerIdMap::from_definition(states.into_iter().map(|x| (x.id, x)).collect());
         GameState {
             time_us : 0,
             frame_id : 0.,
-            player_states: states.into_iter().map(|x| Some(x)).collect(),
+            player_states,
             player_inputs: PlayerInputs::default(),
+            ruleset_state : CrossyRulesetFST::start(),
             log_states : vec![],
         }
     }

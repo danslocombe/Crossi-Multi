@@ -120,7 +120,7 @@ impl Client {
             seed,
             server_tick.latest.time_us,
             server_tick.latest.states,
-            1,
+            crate::crossy_ruleset::CrossyRulesetFST::start(),
         );
 
         create_debug_logger(local_player_id);
@@ -184,8 +184,9 @@ impl Client {
 
     fn send(&mut self, input: game::Input, time_us: u32) {
         let client_update = CrossyMessage::ClientTick(ClientTick {
-            time_us: time_us,
-            input: input,
+            time_us,
+            input,
+            lobby_ready : false,
         });
 
         crossy_send(&client_update, &mut self.socket, &self.server).unwrap();

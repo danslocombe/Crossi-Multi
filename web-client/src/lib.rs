@@ -31,15 +31,18 @@ pub struct Client {
     timeline: timeline::Timeline,
     server_start: WasmInstant,
     last_tick: u32,
+    // The last server tick we received
+    last_server_tick: Option<u32>,
     local_player_info : Option<LocalPlayerInfo>,
+    ready_state : bool,
 }
 
 #[wasm_bindgen]
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32, player_count : u8) -> Self {
-        let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], player_count);
+    pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32) -> Self {
+        let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
 
         // Estimate server start
         let server_start = WasmInstant::now() - Duration::from_micros((server_time_us + estimated_latency) as u64);
@@ -49,8 +52,10 @@ impl Client {
         Client {
             timeline,
             last_tick : server_time_us,
+            last_server_tick : None,
             server_start,
             local_player_info : None,
+            ready_state : false,
         } 
     }
 
@@ -59,6 +64,10 @@ impl Client {
             player_id : PlayerId(player_id as u8),
             last_input : Input::None,
         })
+    }
+
+    pub fn set_ready_state(&mut self, state : bool) {
+        self.ready_state = state;
     }
 
     pub fn set_local_input_json(&mut self, input_json : &str) {
@@ -132,6 +141,8 @@ impl Client {
                     None);
             }
         }
+
+        self.last_server_tick = Some(server_tick.latest.time_us);
     }
 
     pub fn get_client_message(&self) -> Vec<u8>
@@ -147,6 +158,7 @@ impl Client {
         interop::CrossyMessage::ClientTick(interop::ClientTick {
             time_us: self.last_tick,
             input: input,
+            lobby_ready : self.ready_state,
         })
     }
 
@@ -159,6 +171,23 @@ impl Client {
     fn get_players(&self) -> Vec<PlayerState>
     {
         self.timeline.top_state().get_valid_player_states()
+    }
+
+    pub fn get_rule_state_json(&self) -> String {
+        match self.get_latest_server_rule_state() {
+            Some(x) => {
+                serde_json::to_string(x).unwrap()
+            }
+            _ => {
+                "".to_owned()
+            }
+        }
+    }
+
+    fn get_latest_server_rule_state(&self) -> Option<&crossy_ruleset::CrossyRulesetFST> {
+        let us = self.last_server_tick?;
+        let state_before = self.timeline.get_state_before_eq_us(us)?;
+        Some(state_before.get_rule_state())
     }
 }
 

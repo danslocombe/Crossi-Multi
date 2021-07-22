@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use crate::crossy_ruleset::CrossyRulesetFST;
 
 use super::game::*;
 
@@ -20,7 +21,6 @@ pub struct RemoteTickState {
 
 #[derive(Debug, Clone)]
 pub struct Timeline {
-    pub player_count: u8,
     pub seed: u32,
     states: VecDeque<GameState>,
 }
@@ -30,7 +30,6 @@ impl Timeline {
         let mut states = VecDeque::new();
         states.push_front(GameState::new());
         Timeline {
-            player_count: 0,
             seed: 0,
             states,
         }
@@ -40,12 +39,11 @@ impl Timeline {
         seed: u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
-        player_count: u8,
+        ruleset_state : CrossyRulesetFST
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(seed, time_us, player_states));
+        states.push_front(GameState::from_server_parts(seed, time_us, player_states, ruleset_state));
         Timeline {
-            player_count,
             seed,
             states,
         }
@@ -83,6 +81,11 @@ impl Timeline {
 
     pub fn top_state(&self) -> &GameState {
         self.states.get(0).unwrap()
+    }
+
+    pub fn set_player_ready(&mut self, player_id : PlayerId, ready_state : bool) {
+        let new = self.top_state().set_player_ready(player_id, ready_state);
+        self.push_state(new);
     }
 
     pub fn propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) {
@@ -390,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_split_out_range() {
-        let mut timeline = Timeline::from_server_parts(0, 10_000, Vec::new(), 0);
+        let mut timeline = Timeline::from_server_parts(0, 10_000, Vec::new(), CrossyRulesetFST::start());
         timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
         timeline.tick_current_time(Some(PlayerInputs::default()), 15_000);
         assert_eq!(3, timeline.states.len());

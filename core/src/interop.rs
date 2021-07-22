@@ -2,6 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::net::{SocketAddr, UdpSocket};
 
+use crate::game::Input;
+use crate::timeline::RemoteTickState;
+use crate::player_id_map::PlayerIdMap;
+use crate::crossy_ruleset::CrossyRulesetFST;
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub enum CrossyMessage {
     Hello(ClientHello),
@@ -60,51 +65,16 @@ impl ClientHello {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ClientTick {
     pub time_us: u32,
-    pub input: crate::game::Input,
+    pub input: Input,
+    // TODO probably shouldnt be here?
+    pub lobby_ready : bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ServerTick {
-    pub latest : crate::timeline::RemoteTickState,
-    pub last_client_sent : LastClientSentTicks
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct LastClientSentTicks
-{
-    // Used by individual clients for interpolation / prediction
-    // Instead of sending each client their specific value we blanket send to all.
-    last_client_sent : Vec<Option<crate::timeline::RemoteTickState>>,
-}
-
-impl LastClientSentTicks {
-    pub fn new() -> Self {
-        LastClientSentTicks {
-            last_client_sent : Vec::with_capacity(8),
-        }
-    }
-
-    pub fn set(&mut self, id: crate::PlayerId, state: crate::timeline::RemoteTickState) {
-        let index = id.0 as usize;
-        if (index >= self.last_client_sent.len())
-        {
-            self.last_client_sent.resize(index + 1, None);
-        }
-
-        self.last_client_sent[index] = Some(state);
-    }
-
-    pub fn get(&self, id: crate::PlayerId) -> Option<&crate::timeline::RemoteTickState> {
-        let index = id.0 as usize;
-        if index < self.last_client_sent.len()
-        {
-            self.last_client_sent[index].as_ref()
-        }
-        else
-        {
-            None
-        }
-    }
+    pub latest : RemoteTickState,
+    pub last_client_sent : PlayerIdMap<RemoteTickState>,
+    pub rule_state : CrossyRulesetFST,
 }
 
 pub fn crossy_send(

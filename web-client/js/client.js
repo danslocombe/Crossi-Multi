@@ -224,6 +224,9 @@ function tick()
                 ctx.fillRect(scale * x, scale*y, scale, scale);
             }
         }
+
+        const rule_state = client.get_rule_state_json()
+        document.getElementById("state").innerHTML = rule_state;
     }
 
     window.requestAnimationFrame(tick)

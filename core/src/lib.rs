@@ -4,9 +4,11 @@
 extern crate num_derive;
 
 pub mod game;
+pub mod player_id_map;
 pub mod interop;
 pub mod client;
 pub mod timeline;
+pub mod crossy_ruleset;
 
 pub use game::*;
 

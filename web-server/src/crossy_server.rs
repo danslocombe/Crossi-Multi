@@ -1,12 +1,12 @@
+use std::time::{Duration, Instant};
+use serde::{Serialize, Deserialize};
+use tokio::sync::Mutex;
+
 use crossy_multi_core::game;
 use crossy_multi_core::timeline::{Timeline, RemoteInput, RemoteTickState};
 use crossy_multi_core::interop::*;
+use crossy_multi_core::player_id_map::PlayerIdMap;
 
-use std::time::{Duration, Instant};
-
-use serde::{Serialize, Deserialize};
-
-use tokio::sync::Mutex;
 
 const SERVER_VERSION: u8 = 1;
 const DESIRED_TICK_TIME: Duration = Duration::from_millis(14);
@@ -107,7 +107,9 @@ impl Server {
 
         Some(InitServerResponse {
             server_version: SERVER_VERSION,
-            player_count: inner.timeline.player_count,
+            //player_count: inner.timeline.player_count,
+            // unused I think, clean up
+            player_count: 0,
             seed: inner.timeline.seed,
             player_id: client_id,
         })
@@ -127,7 +129,7 @@ impl Server {
         while !self.outbound_tx.is_closed() {
 
             let tick_start = Instant::now();
-            let (client_updates, dropped_players) = self.receive_updates().await;
+            let (client_updates, dropped_players, ready_players) = self.receive_updates().await;
 
             let mut inner = self.inner.lock().await;
 
@@ -153,10 +155,14 @@ impl Server {
                 inner.timeline.remove_player(dropped_player);
             }
 
+            for (ready_player, ready) in ready_players {
+                inner.timeline.set_player_ready(ready_player, ready);
+            }
+
             // Send responses
             let top_state = inner.timeline.top_state();
 
-            let mut last_client_sent = crossy_multi_core::interop::LastClientSentTicks::new();
+            let mut last_client_sent = PlayerIdMap::new();
             for client in (&inner.clients).iter().filter_map(|x| x.player_client.as_ref()) {
                 inner.timeline.get_state_before_eq_us(client.last_tick_us).map(|x| {
                     last_client_sent.set(client.id, RemoteTickState {
@@ -172,6 +178,11 @@ impl Server {
                     states: top_state.get_valid_player_states(),
                 },
                 last_client_sent,
+
+                // If an input comes in late that affects state change then this ignores it
+                // Do we care?
+                // Do we need some lookback period here? 
+                rule_state : top_state.get_rule_state().clone(),
             });
 
             if top_state.frame_id as usize % 300 == 0 {
@@ -191,7 +202,7 @@ impl Server {
         }
     }
 
-    async fn receive_updates(&self) -> (Vec<RemoteInput>, Vec<game::PlayerId>) {
+    async fn receive_updates(&self) -> (Vec<RemoteInput>, Vec<game::PlayerId>, Vec<(game::PlayerId, bool)>) {
         let mut queued_messages = Vec::with_capacity(8);
 
         let mut guard = self.queued_messages.lock().await;
@@ -199,6 +210,7 @@ impl Server {
         drop(guard);
 
         let mut client_updates = Vec::new();
+        let mut ready_players = Vec::new();
 
         let mut inner = self.inner.lock().await;
 
@@ -211,6 +223,8 @@ impl Server {
                         {
                             let client_time = t.time_us + player_client.offset_us;
                             player_client.last_tick_us = client_time;
+
+                            ready_players.push((player_client.id, t.lobby_ready));
 
                             client_updates.push(RemoteInput {
                                 time_us: client_time,
@@ -232,7 +246,7 @@ impl Server {
 
         // TODO dropped players
         let dropped_players = vec![];
-        (client_updates, dropped_players)
+        (client_updates, dropped_players, ready_players)
     }
 }
 
