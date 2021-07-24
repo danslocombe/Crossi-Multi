@@ -1,4 +1,4 @@
-import { create_player_local } from "./player_def";
+import { create_player_remote, create_player_local } from "./player_def";
 //import "/components/player_def";
 
 const SCALE = 8;
@@ -72,10 +72,11 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                             if (current_player_state.id === local_player_id) {
                                 console.log("creating local player");
                                 // Create local player
-                                players[local_player_id] = create_player_local(this.client, this.key_event_source);
+                                players[current_player_state.id] = create_player_local(this.client, this.key_event_source);
                             }
                             else {
                                 // Create remote player
+                                players[current_player_state.id] = create_player_remote(current_player_state.id);
                             }
                         }
 
