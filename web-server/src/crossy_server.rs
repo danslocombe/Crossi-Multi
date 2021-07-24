@@ -72,7 +72,7 @@ impl Server {
         let inner = self.inner.lock().await;
         ServerDescription {
             server_version : SERVER_VERSION,
-            seed : inner.timeline.seed,
+            seed : inner.timeline.map.get_seed(),
         }
     }
 
@@ -110,7 +110,7 @@ impl Server {
             //player_count: inner.timeline.player_count,
             // unused I think, clean up
             player_count: 0,
-            seed: inner.timeline.seed,
+            seed: inner.timeline.map.get_seed(),
             player_id: client_id,
         })
     }

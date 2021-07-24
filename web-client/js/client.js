@@ -164,6 +164,18 @@ function check(e) {
         case 40: current_input = "Down"; break;
         default: break;
     }
+
+    if (client) {
+        const local_player_id = client.get_local_player_id();
+        if (local_player_id > 0) {
+            if (current_input == "Left") {
+                player_info.set(local_player_id, "x_flip", -1);
+            }
+            if (current_input == "Right") {
+                player_info.set(local_player_id, "x_flip", 1);
+            }
+        }
+    }
 }
 
 window.addEventListener('keydown',check,false);
@@ -182,11 +194,67 @@ const canvasStyle =
     "image-rendering: crisp-edges;" +
     "bottom: 0px;" +
     "left: 0px;" +
-    "width: 60%;";
+    "width: 40%;";
 
 canvas.style = canvasStyle;
 
 /////////////////////////////////////////////////////////////////////////////////////
+
+const scale = 8;
+
+let spr_frog = new Image(8,8);
+spr_frog.src = "/sprites/spr_frog.png";
+
+let spr_frog_flipped = new Image(8,8);
+spr_frog_flipped.src = "/sprites/spr_frog_flipped.png";
+
+var snd_frog_move = new Audio('/sounds/snd_move1.wav');
+snd_frog_move.volume = 0.15;
+
+let player_info = {
+    set : function(id, k, v) {
+        if (!this[id]) {
+            this[id] = {};
+        }
+
+        this[id][k] = v
+    },
+    get : function(id, k) {
+        if (this[id]) {
+            return this[id][k];
+        }
+
+        return undefined;
+    }
+};
+
+let spr_dust = new Image(8,8);
+spr_dust.src = "/sprites/spr_dust.png";
+const spr_smoke_count = 4;
+
+function create_dust(x, y) {
+    return {
+        frame_id : Math.floor(Math.random() * spr_smoke_count),
+        scale : 0.5 + Math.random() * 0.6,
+        x : x,
+        y : y,
+        tick : function() {
+            this.scale -= 0.025;
+        },
+
+        alive: function() {
+            return this.scale > 0;
+        },
+
+        draw : function() {
+            const x = scale*(this.x + 0.25) + (1-this.scale);
+            const y = scale*(this.y + 0.25) + (1-this.scale);
+            ctx.drawImage(spr_dust, scale*this.frame_id, 0, scale, scale, x, y, scale*this.scale, scale*this.scale);
+        }
+    }
+}
+
+let simple_entities = [];
 
 function tick()
 {
@@ -195,7 +263,7 @@ function tick()
 
     if (client)
     {
-        client.set_local_input_json('"' + current_input + '"');
+        client.buffer_input_json('"' + current_input + '"');
         current_input = "None";
 
         client.tick();
@@ -210,18 +278,93 @@ function tick()
             ws.send(client_tick);
         }
 
+        const rows = JSON.parse(client.get_rows_json());
+        for (const row of rows) {
+            let y = row.y;
+            if (row.row_type.River) {
+                ctx.fillStyle = "#BAEAAA";
+            }
+            else {
+                ctx.fillStyle = "#BAE666";
+            }
+            //ctx.fillStyle = "#4060f0";
+            ctx.fillRect(0, 256 - scale*y, 256, scale);
+        }
+
+        let simple_entities_new = [];//new Array(simple_entities.length);
+        for (let entity of simple_entities) {
+            entity.tick(); 
+            entity.draw();
+            if (entity.alive()) {
+                simple_entities_new.push(entity);
+            }
+        }
+
+        simple_entities = simple_entities_new;
+
+
         const players_json = client.get_players_json();
         const players = JSON.parse(players_json);
 
         for (const player of players) {
-            const scale = 8;
 
             if (player.pos.Coord)
             {
-                let x = player.pos.Coord.x;
-                let y = player.pos.Coord.y;
-                ctx.fillStyle = "#4060f0";
-                ctx.fillRect(scale * x, scale*y, scale, scale);
+                const x0 = player.pos.Coord.x;
+                const y0 = player.pos.Coord.y;
+
+                // frog has duplicate frame for some reason
+                //const frame_count = 6;
+                const frame_count = 5;
+                let frame_id = 0;
+                let x,y;
+
+                if (player.move_state != "Stationary") {
+                    const moving = player.move_state.Moving;
+                    // TODO don't replicate this constant
+                    console.log();
+                    const MOVE_T = 7 * (1000 * 1000 / 60);
+                    const lerp_t = (1 - moving.remaining_us / MOVE_T);
+
+                    let x1 = x0;
+                    let y1 = y0;
+                    if (moving.target.Coord) {
+                        x1 = moving.target.Coord.x;
+                        y1 = moving.target.Coord.y;
+                    }
+
+                    x = x0 + lerp_t * (x1 - x0);
+                    y = y0 + lerp_t * (y1 - y0);
+                    frame_id = Math.floor(lerp_t * (frame_count - 1));
+
+                    if (player_info.get(player.id, "stationary")) {
+                        // Make dust
+                        for (let i = 0; i < 2; i++) {
+                            const dust_off = Math.random() * (3 / 8);
+                            const dust_dir = Math.random() * 2 * 3.141;
+                            const dust_x = x + dust_off * Math.cos(dust_dir);
+                            const dust_y = y + dust_off * Math.sin(dust_dir);
+                            simple_entities.push(create_dust(dust_x, dust_y));
+                        }
+
+                        snd_frog_move.play();
+                    }
+                    player_info.set(player.id, "stationary", false);
+                }
+                else {
+                    x = x0;
+                    y = y0;
+
+                    player_info.set(player.id, "stationary", true);
+                }
+
+                //ctx.fillStyle = "#4060f0";
+                //ctx.fillRect(scale * x, scale*y, scale, scale);
+                let sprite = spr_frog;
+                if (player_info.get(player.id, "x_flip") == -1) {
+                    sprite = spr_frog_flipped;
+                }
+                ctx.drawImage(sprite, scale*frame_id, 0, scale, scale, scale*x, scale*y, scale, scale);
             }
         }
 

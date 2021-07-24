@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use crate::crossy_ruleset::CrossyRulesetFST;
+use crate::map::Map;
 
 use super::game::*;
 
@@ -19,10 +20,10 @@ pub struct RemoteTickState {
     pub states: Vec<PlayerState>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Timeline {
-    pub seed: u32,
     states: VecDeque<GameState>,
+    pub map : Map,
 }
 
 impl Timeline {
@@ -30,8 +31,8 @@ impl Timeline {
         let mut states = VecDeque::new();
         states.push_front(GameState::new());
         Timeline {
-            seed: 0,
             states,
+            map : Map::new(0),
         }
     }
 
@@ -44,8 +45,8 @@ impl Timeline {
         let mut states = VecDeque::new();
         states.push_front(GameState::from_server_parts(seed, time_us, player_states, ruleset_state));
         Timeline {
-            seed,
             states,
+            map: Map::new(seed),
         }
     }
 
@@ -335,6 +336,14 @@ impl Timeline {
 mod tests {
     use super::*;
 
+    // We dont want to actually expose this
+    fn clone_timeline(timeline : &Timeline) -> Timeline {
+        Timeline {
+            map : Map::new(timeline.map.get_seed()),
+            states : timeline.states.clone(),
+        }
+    }
+
     #[test]
     fn test_split() {
         let mut timeline = Timeline::new();
@@ -483,7 +492,7 @@ mod tests {
         p0_left.set(PlayerId(0), Input::Left);
         client_timeline.tick_current_time(Some(p0_left.clone()), 500_000);
 
-        let mut server_timeline = client_timeline.clone();
+        let mut server_timeline = clone_timeline(&client_timeline);
 
         client_timeline.tick_current_time(Some(p0_left.clone()), 1_000_000);
         client_timeline.tick_current_time(Some(p0_left.clone()), 1_500_000);
@@ -557,7 +566,7 @@ mod tests {
         client_timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
         client_timeline.add_player(PlayerId(1), Pos::new_coord(5, 5));
 
-        let mut server_timeline = client_timeline.clone();
+        let mut server_timeline = clone_timeline(&client_timeline);
 
         let mut p0_left = PlayerInputs::default();
         p0_left.set(PlayerId(0), Input::Left);

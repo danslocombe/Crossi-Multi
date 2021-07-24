@@ -329,11 +329,14 @@ struct Push {
 }
 
 // In us
-pub const MOVE_COOLDOWN_MAX: u32 = 150_000;
-pub const MOVE_DUR: u32 = 50_000;
+// In original game move cd is 7 frames
+//pub const MOVE_COOLDOWN_MAX: u32 = 150_000;
+//pub const MOVE_COOLDOWN_MAX: u32 = 7 * (1_000_000 / 60);
+pub const MOVE_COOLDOWN_MAX: u32 = 1;
+pub const MOVE_DUR: u32 = 7 * (1_000_000 / 60);
 
 impl PlayerState {
-    fn can_move(&self) -> bool {
+    pub fn can_move(&self) -> bool {
         if let MoveState::Stationary = self.move_state {
             self.move_cooldown <= 0
         } else {

@@ -9,6 +9,7 @@ pub mod interop;
 pub mod client;
 pub mod timeline;
 pub mod crossy_ruleset;
+pub mod map;
 
 pub use game::*;
 
