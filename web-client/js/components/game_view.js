@@ -39,15 +39,35 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 const rows = JSON.parse(this.client.get_rows_json());
                 for (const row of rows) {
                     let y = row[0];
+
+                    let col0, col1;
+
                     if (row[1].row_type.River) {
-                        this.ctx.fillStyle = "#ADD8E6";
+                        //col0 = "#ADD8E6";
+                        col0 = "#6c6ce2";
+                        col1 = "#5b5be7";
+                    }
+                    else if (row[1].row_type.Road) {
+                        col0 = '#59595d';
+                        col1 = '#646469';
                     }
                     else {
-                        this.ctx.fillStyle = "#BAE666";
+                        col0 = "#c4e6b5";
+                        col1 = "#d1bfdb";
                     }
-                    //ctx.fillStyle = "#4060f0";
-                    //this.ctx.fillRect(0, 256 - SCALE*y, 256, SCALE);
-                    this.ctx.fillRect(0, SCALE*y, 160, SCALE);
+
+                    for (let i = 0; i < 160 / 8; i++) {
+                        let x = i * 8;
+
+                        if ((i + row[1].row_id) % 2 == 0) {
+                            this.ctx.fillStyle = col0
+                        }
+                        else {
+                            this.ctx.fillStyle = col1
+                        }
+
+                        this.ctx.fillRect(x, SCALE*y, x + 8, SCALE);
+                    }
                 }
 
                 let simple_entities_new = [];//new Array(simple_entities.length);

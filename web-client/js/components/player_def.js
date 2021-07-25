@@ -15,6 +15,9 @@ function load_sprites(name) {
     }
 }
 
+let spr_shadow = new Image(SCALE, SCALE);
+spr_shadow.src = '/sprites/spr_shadow.png';
+
 let sprites_list = [
     load_sprites('frog'),
     load_sprites('mouse'),
@@ -269,6 +272,11 @@ function create_player_def(sprites, move_sound, source) {
             const x = this.source.x;
             const y = this.source.y;
             const frame_id = this.source.frame_id;
+
+            // TODO make transparent
+            // do in sprite
+            ctx.drawImage(spr_shadow, SCALE*x, SCALE*y + 2);
+
             ctx.drawImage(sprite, SCALE*frame_id, 0, SCALE, SCALE, SCALE*x, SCALE*y, SCALE, SCALE);
         },
     }
