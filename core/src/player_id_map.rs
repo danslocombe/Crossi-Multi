@@ -97,9 +97,7 @@ impl<T> PlayerIdMap<T> where T : Clone {
     pub fn get_populated(&self) -> Vec<T> {
         self.inner.iter().flatten().cloned().collect()
     }
-}
 
-impl<T> PlayerIdMap<T> where T : Clone {
     // Create a new map, using the keys from another and a default value
     pub fn seed_from<U>(other : &PlayerIdMap<U>, x : T) -> PlayerIdMap<T> {
         let mut inner = Vec::with_capacity(other.inner.len());
@@ -125,6 +123,20 @@ impl<T> PlayerIdMap<T> where T : Clone {
             if !self.contains(id) {
                 self.set(id, x.clone());
             }
+        }
+    }
+}
+
+impl<T> PlayerIdMap<T> where T : Copy {
+    pub fn get_copy(&self, id: crate::PlayerId) -> Option<T> {
+        let index = id.0 as usize;
+        if index < self.inner.len()
+        {
+            self.inner[index]
+        }
+        else
+        {
+            None
         }
     }
 }

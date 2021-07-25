@@ -55,7 +55,8 @@ impl Client {
             last_server_tick : None,
             server_start,
             local_player_info : None,
-            ready_state : false,
+            // TODO proper ready state
+            ready_state : true,
         } 
     }
 
@@ -144,6 +145,7 @@ impl Client {
                     // we need to take state from server
                     self.timeline.propagate_state(
                         &server_tick.latest,
+                        Some(&server_tick.rule_state),
                         Some(&server_tick.latest),
                         None);
                 }
@@ -151,6 +153,7 @@ impl Client {
                 {
                     self.timeline.propagate_state(
                         &server_tick.latest,
+                        Some(&server_tick.rule_state),
                         server_tick.last_client_sent.get(lpi.player_id),
                         Some(lpi.player_id));
                 }
@@ -158,6 +161,7 @@ impl Client {
             _ => {
                 self.timeline.propagate_state(
                     &server_tick.latest,
+                    Some(&server_tick.rule_state),
                     None,
                     None);
             }
@@ -222,12 +226,24 @@ impl Client {
         serde_json::to_string(&self.get_rows()).unwrap()
     }
 
-    fn get_rows(&mut self) -> Vec<map::Row> {
+    fn get_rows(&mut self) -> Vec<(i32, map::Row)> {
         let mut vec = Vec::with_capacity(32);
-        for i in 0..32 {
-            vec.push(self.timeline.map.get_row(i).clone());
+        for i in 0..(160/8) {
+            let y = i;
+            vec.push((y as i32, self.timeline.map.get_row(y).clone()));
         }
         vec
+    }
+
+    pub fn player_alive(&self, player_id : u32) -> bool {
+        // We have to be careful here.
+        // We dont want to tell the client a player is dead if they could possibly "come back alive".
+        // For remote players we want to wait for confirmation from the server.
+        // For local player we can probably make this decision earlier. (Weird edge case where player pushing you in gets interrupted before they can?)
+
+        self.get_latest_server_rule_state().map(|x| {
+            x.get_player_alive(PlayerId(player_id as u8))
+        }).unwrap_or(false)
     }
 }
 

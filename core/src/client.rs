@@ -160,6 +160,7 @@ impl Client {
 
             self.timeline.propagate_state(
                 &server_tick.latest,
+                None,
                 server_tick.last_client_sent.get(self.local_player_id),
                 Some(self.local_player_id));
 

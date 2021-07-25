@@ -38,15 +38,16 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 const rows = JSON.parse(this.client.get_rows_json());
                 for (const row of rows) {
-                    let y = row.y;
-                    if (row.row_type.River) {
-                        this.ctx.fillStyle = "#BAEAAA";
+                    let y = row[0];
+                    if (row[1].row_type.River) {
+                        this.ctx.fillStyle = "#ADD8E6";
                     }
                     else {
                         this.ctx.fillStyle = "#BAE666";
                     }
                     //ctx.fillStyle = "#4060f0";
-                    this.ctx.fillRect(0, 256 - SCALE*y, 256, SCALE);
+                    //this.ctx.fillRect(0, 256 - SCALE*y, 256, SCALE);
+                    this.ctx.fillRect(0, SCALE*y, 160, SCALE);
                 }
 
                 let simple_entities_new = [];//new Array(simple_entities.length);
@@ -76,7 +77,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                             }
                             else {
                                 // Create remote player
-                                players[current_player_state.id] = create_player_remote(current_player_state.id);
+                                players[current_player_state.id] = create_player_remote(this.client, current_player_state.id);
                             }
                         }
 

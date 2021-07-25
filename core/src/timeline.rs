@@ -52,13 +52,13 @@ impl Timeline {
 
     pub fn tick(&mut self, input: Option<PlayerInputs>, dt_us: u32) {
         let state = self.states.get(0).unwrap();
-        let new = state.simulate(input, dt_us);
+        let new = state.simulate(input, dt_us, &self.map);
         self.push_state(new);
     }
 
     pub fn tick_current_time(&mut self, input: Option<PlayerInputs>, time_us: u32) {
         let state = self.states.get(0).unwrap();
-        let new = state.simulate(input, time_us - state.time_us);
+        let new = state.simulate(input, time_us - state.time_us, &self.map);
         self.push_state(new);
     }
 
@@ -117,7 +117,7 @@ impl Timeline {
         for i in (0..start_index).rev() {
             let inputs = self.states[i].player_inputs.clone();
             let dt = self.states[i].time_us - self.states[i + 1].time_us;
-            let replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32);
+            let replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32, &self.map);
             self.states[i] = replacement_state;
         }
     }
@@ -150,7 +150,7 @@ impl Timeline {
 
             let mut inputs = self.states[after].player_inputs.clone();
             inputs.set(player_id, input);
-            let mut split_state = state_before.simulate(Some(inputs), dt as u32);
+            let mut split_state = state_before.simulate(Some(inputs), dt as u32, &self.map);
             split_state.frame_id -= 0.5;
             drop(state_before);
 
@@ -162,6 +162,7 @@ impl Timeline {
     pub fn propagate_state(
         &mut self,
         latest_remote_state: &RemoteTickState,
+        rule_state : Option<&CrossyRulesetFST>,
         client_latest_remote_state: Option<&RemoteTickState>,
         local_player: Option<PlayerId>,
     ) {
@@ -192,7 +193,7 @@ impl Timeline {
         let mut use_client_predictions : Vec<PlayerId> = local_player.into_iter().collect();
 
         if let Some(state) = client_latest_remote_state.as_ref() {
-            if let Some(index) = self.split_with_state(&vec![], &state.states, state.time_us) {
+            if let Some(index) = self.split_with_state(&vec![], &state.states, None, state.time_us) {
                 while self.states.len() > index + 1 {
                     self.states.pop_back();
                 }
@@ -213,6 +214,7 @@ impl Timeline {
         if let Some(index) = self.split_with_state(
             &use_client_predictions,
             &latest_remote_state.states,
+            rule_state,
             latest_remote_state.time_us,
         ) {
             if (index > 0) {
@@ -225,6 +227,7 @@ impl Timeline {
         &mut self,
         ignore_player_ids: &[PlayerId],
         server_states: &[PlayerState],
+        maybe_server_rule_state : Option<&CrossyRulesetFST>,
         time_us: u32,
     ) -> Option<usize> {
         let before = self.get_index_before_us(time_us)?;
@@ -235,13 +238,17 @@ impl Timeline {
             let state_before = &self.states[before];
             let dt = time_us - state_before.time_us;
 
-            let mut split_state = state_before.simulate(None, dt as u32);
+            let mut split_state = state_before.simulate(None, dt as u32, &self.map);
 
             for server_player_state in server_states {
                 if (!ignore_player_ids.contains(&server_player_state.id)) {
                     split_state
                         .set_player_state(server_player_state.id, server_player_state.clone());
                 }
+            }
+
+            if let Some(server_rule_state) = maybe_server_rule_state {
+                split_state.ruleset_state = server_rule_state.clone();
             }
 
             split_state.frame_id -= 0.5;
@@ -528,6 +535,7 @@ mod tests {
 
         client_timeline.propagate_state(
             &server_state_latest,
+            None,
             Some(&server_state_client),
             Some(PlayerId(0)),
         );
@@ -582,7 +590,7 @@ mod tests {
         };
 
         client_timeline.tick_current_time(None, 1_000_000);
-        client_timeline.propagate_state(&server_state_latest, None, Some(PlayerId(0)));
+        client_timeline.propagate_state(&server_state_latest, None, None, Some(PlayerId(0)));
 
         assert_eq!(
             vec![1_000, 600, 400, 0, 0, 0],
@@ -642,6 +650,7 @@ mod tests {
 
         client_timeline.propagate_state(
             &server_state_latest,
+            None,
             server_state_client_last.as_ref(),
             Some(PlayerId(0)),
         );
@@ -707,6 +716,7 @@ mod tests {
 
         client_timeline.propagate_state(
             &server_state_latest,
+            None,
             server_state_client_last.as_ref(),
             Some(PlayerId(0)),
         );

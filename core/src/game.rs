@@ -2,6 +2,7 @@ use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use crate::player_id_map::PlayerIdMap;
 use crate::crossy_ruleset::CrossyRulesetFST;
+use crate::map::Map;
 
 pub const MAX_PLAYERS: usize = 8;
 
@@ -111,7 +112,7 @@ pub struct GameState {
     // Only worry is drift from summing, going to matter?
     pub time_us: u32,
     player_states: PlayerIdMap<PlayerState>,
-    ruleset_state : CrossyRulesetFST,
+    pub ruleset_state : CrossyRulesetFST,
     pub player_inputs: PlayerInputs,
     pub log_states: Vec<LogState>,
     pub frame_id: f64,
@@ -198,13 +199,13 @@ impl GameState {
         new
     }
 
-    pub fn simulate(&self, input: Option<PlayerInputs>, dt_us: u32) -> Self {
+    pub fn simulate(&self, input: Option<PlayerInputs>, dt_us: u32, map : &crate::map::Map) -> Self {
         let mut new = self.clone();
-        new.simulate_mut(input, dt_us);
+        new.simulate_mut(input, dt_us, map);
         new
     }
 
-    fn simulate_mut(&mut self, player_inputs: Option<PlayerInputs>, dt_us: u32) {
+    fn simulate_mut(&mut self, player_inputs: Option<PlayerInputs>, dt_us: u32, map : &crate::map::Map) {
         self.time_us += dt_us;
         self.frame_id += 1.0;
 
@@ -234,7 +235,7 @@ impl GameState {
             }
         }
 
-        self.ruleset_state.tick(dt_us, &self.player_states);
+        self.ruleset_state = self.ruleset_state.tick(dt_us, &mut self.player_states, map);
     }
 
     fn space_occupied_with_player(&self, pos : Pos, ignore_id : PlayerId) -> bool {
@@ -529,7 +530,8 @@ mod tests {
         inputs.set(PlayerId(0), Input::Down);
 
         let world = make_gamestate(players);
-        let new = world.simulate(Some(inputs), 100_000);
+        let map = Map::new(0);
+        let new = world.simulate(Some(inputs), 100_000, &map);
 
         let new_player = new.get_player(PlayerId(0)).unwrap();
         match &new_player.move_state {
@@ -563,7 +565,8 @@ mod tests {
         inputs.set(PlayerId(0), Input::Down);
 
         let world = make_gamestate(players);
-        let new = world.simulate(Some(inputs), 100_000);
+        let map = Map::new(0);
+        let new = world.simulate(Some(inputs), 100_000, &map);
 
         let new_player = new.get_player(PlayerId(0)).unwrap();
         match &new_player.move_state {
@@ -597,7 +600,8 @@ mod tests {
         inputs.set(PlayerId(0), Input::Down);
 
         let world = make_gamestate(players);
-        let new = world.simulate(Some(inputs), 100_000);
+        let map = Map::new(0);
+        let new = world.simulate(Some(inputs), 100_000, &map);
 
         let new_player = new.get_player(PlayerId(0)).unwrap();
         match new_player.move_state {
@@ -630,7 +634,8 @@ mod tests {
         inputs.set(PlayerId(0), Input::Down);
 
         let world = make_gamestate(players);
-        let new = world.simulate(Some(inputs), 10_000);
+        let map = Map::new(0);
+        let new = world.simulate(Some(inputs), 10_000, &map);
 
         let new_player = new.get_player(PlayerId(0)).unwrap();
         match new_player.move_state {

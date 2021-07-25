@@ -1,13 +1,37 @@
 const SCALE = 8;
 
-let spr_frog = new Image(SCALE,SCALE);
-spr_frog.src = "/sprites/spr_frog.png";
+function load_sprites(name) {
+    let spr = new Image(SCALE, SCALE);
+    spr.src = '/sprites/spr_' + name + ".png";
+    let spr_flipped = new Image(SCALE, SCALE);
+    spr_flipped.src = '/sprites/spr_' + name + "_flipped.png";
+    let spr_dead = new Image(SCALE, SCALE);
+    spr_dead.src = '/sprites/spr_' + name + "_dead.png";
 
-let spr_frog_flipped = new Image(SCALE,SCALE);
-spr_frog_flipped.src = "/sprites/spr_frog_flipped.png";
+    return {
+        spr : spr,
+        spr_flipped : spr_flipped,
+        spr_dead : spr_dead,
+    }
+}
 
-var snd_frog_move = new Audio('/sounds/snd_move1.wav');
-snd_frog_move.volume = 0.15;
+let sprites_list = [
+    load_sprites('frog'),
+    load_sprites('mouse'),
+    load_sprites('bird'),
+    load_sprites('snake'),
+]
+
+let sounds_list = [
+    new Audio('/sounds/snd_move1.wav'),
+    new Audio('/sounds/snd_move2.wav'),
+    new Audio('/sounds/snd_move3.wav'),
+    new Audio('/sounds/snd_move4.wav'),
+]
+
+for (let sound of sounds_list) {
+    sound.volume = 0.15;
+}
 
 let spr_dust = new Image(SCALE,SCALE);
 spr_dust.src = "/sprites/spr_dust.png";
@@ -47,8 +71,9 @@ function diff(x, y) {
 //const frame_count = 6;
 const player_frame_count = 5;
 
-export function create_player_remote(player_id) {
+export function create_player_remote(client, player_id) {
     let source = {
+        client : client,
         player_id : player_id,
         x : 0,
         y : 0,
@@ -57,12 +82,13 @@ export function create_player_remote(player_id) {
         x_flip : 1,
         frame_id : 0,
 
-        tick : function(player_state, simple_entities) {
+        tick : function(player_state, simple_entities, player_def) {
             this.states.push(player_state);
 
             // dumb implementation
             // basically inverse kinomatics, play back animations to match movement
             // Lerp to current pos
+            // TODO if local player is pushing then we should be much tighter on this
             const k = 4;
 
             let x1 = player_state.pos.Coord.x;
@@ -118,7 +144,7 @@ export function create_player_remote(player_id) {
                             simple_entities.push(create_dust(dust_x, dust_y));
                         }
 
-                        snd_frog_move.play();
+                        player_def.move_sound.play();
             }
 
             this.moving = moving;
@@ -142,7 +168,7 @@ export function create_player_local(client, key_event_source) {
         x_flip : 1,
         frame_id : 0,
 
-        tick : function(player_state, simple_entities) {
+        tick : function(player_state, simple_entities, player_def) {
             if (player_state.pos.Coord)
             {
                 let x,y;
@@ -150,8 +176,8 @@ export function create_player_local(client, key_event_source) {
                 const y0 = player_state.pos.Coord.y;
 
                 const moving = player_state.move_state != "Stationary";
+                const pushed = false;
                 if (moving) {
-                    console.log("Local Lerping " + player_state.id);
                     const moving_state = player_state.move_state.Moving;
                     // TODO don't replicate this constant
                     const MOVE_T = 7 * (1000 * 1000 / 60);
@@ -187,7 +213,7 @@ export function create_player_local(client, key_event_source) {
                         simple_entities.push(create_dust(dust_x, dust_y));
                     }
 
-                    snd_frog_move.play();
+                    player_def.move_sound.play();
                 }
                 this.x = x;
                 this.y = y;
@@ -210,22 +236,35 @@ export function create_player_local(client, key_event_source) {
 }
 
 function player_def_from_player_id(id, source) {
-    return create_player_def(spr_frog, spr_frog_flipped, snd_frog_move, source)
+    // player ids start from 1
+    let sprites = sprites_list[id - 1];
+    let move_sound = sounds_list[id - 1];
+    return create_player_def(sprites, move_sound, source)
 }
 
-function create_player_def(spr, spr_mirrored, move_sound, source) {
+function create_player_def(sprites, move_sound, source) {
     return {
-        sprite : spr,
-        sprite_mirrored : spr_mirrored,
+        sprite : sprites.spr,
+        sprite_flipped : sprites.spr_flipped,
+        sprite_dead : sprites.spr_dead,
         move_sound : move_sound,
         source : source,
         tick : function(state, simple_entities) {
-            this.source.tick(state, simple_entities);
+            // hackkyyyy
+            if (!this.source.client.player_alive(this.source.player_id)) {
+                return;
+            }
+            this.source.tick(state, simple_entities, this);
         },
         draw : function(ctx) {
+            // hackyyy
+            if (!this.source.client.player_alive(this.source.player_id)) {
+                return;
+            }
+
             let sprite = this.sprite;
             if (this.source.x_flip == -1) {
-                sprite = this.sprite_mirrored;
+                sprite = this.sprite_flipped;
             }
             const x = this.source.x;
             const y = this.source.y;
