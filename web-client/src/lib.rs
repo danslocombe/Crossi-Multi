@@ -235,6 +235,11 @@ impl Client {
         vec
     }
 
+    pub fn get_cars_json(&self) -> String {
+        let cars = self.timeline.map.get_cars(self.timeline.top_state().time_us);
+        serde_json::to_string(&cars).unwrap()
+    }
+
     pub fn player_alive(&self, player_id : u32) -> bool {
         // We have to be careful here.
         // We dont want to tell the client a player is dead if they could possibly "come back alive".

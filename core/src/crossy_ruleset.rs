@@ -73,11 +73,14 @@ impl CrossyRulesetFST
                 let all_ready = new_lobby.ready_states.iter().all(|(_, x)| *x);
 
                 if (enough_players && all_ready) {
+
                     println!("Starting Game! ...");
+
                     // Initialize to all zero
-                    let in_game = PlayerIdMap::seed_from(player_states, true);
                     let win_counts = PlayerIdMap::seed_from(player_states, 0);
+                    let in_game = PlayerIdMap::seed_from(player_states, true);
                     reset_positions(player_states);
+
                     RoundWarmup(WarmupState {
                         win_counts,
                         in_game,

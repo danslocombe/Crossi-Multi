@@ -3,6 +3,11 @@ import { create_player_remote, create_player_local } from "./player_def";
 
 const SCALE = 8;
 
+const spr_car_width = 24;
+const spr_car_height = 16;
+let spr_car = new Image(spr_car_width, spr_car_height);
+spr_car.src = '/sprites/spr_car_flipped.png';
+
 let players = {};
 
 export function create_game_view(ctx, client, ws, key_event_source) {
@@ -80,6 +85,16 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 }
 
                 this.simple_entities = simple_entities_new;
+
+
+                const cars = JSON.parse(this.client.get_cars_json());
+                //console.log(cars);
+                for (const car of cars) {
+                    const x = car[0] * SCALE - spr_car_width / 2;
+                    const y = car[1] * SCALE - spr_car_height / 2;
+                    const frame_id = 0;
+                    ctx.drawImage(spr_car, spr_car_width*frame_id, 0, spr_car_width, spr_car_height, x, y, spr_car_width, spr_car_height);
+                }
 
                 const players_json = this.client.get_players_json();
                 const current_player_states = JSON.parse(players_json);
