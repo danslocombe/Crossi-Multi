@@ -72,7 +72,7 @@ impl Road {
         }
 
         for car in &self.get_cars_onscreen(time_us) {
-            if (frog_pos.x as f64 - self.realise_car(car).abs() < CAR_WIDTH) {
+            if (frog_pos.x as f64 - self.realise_car(car)).abs() < CAR_WIDTH {
                 return true;
             }
         }
