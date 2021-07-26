@@ -134,7 +134,6 @@ impl Client {
 
     fn recv_internal(&mut self, server_tick : &interop::ServerTick)
     {
-
         match self.local_player_info.as_ref()
         {
             Some(lpi) => {
@@ -208,6 +207,7 @@ impl Client {
     pub fn get_rule_state_json(&self) -> String {
         match self.get_latest_server_rule_state() {
             Some(x) => {
+                log!("{:?}", &x);
                 serde_json::to_string(x).unwrap()
             }
             _ => {
@@ -217,7 +217,7 @@ impl Client {
     }
 
     fn get_latest_server_rule_state(&self) -> Option<&crossy_ruleset::CrossyRulesetFST> {
-        let us = self.last_server_tick?;
+        let us = self.last_server_tick? + 1;
         let state_before = self.timeline.get_state_before_eq_us(us)?;
         Some(state_before.get_rule_state())
     }

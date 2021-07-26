@@ -80,10 +80,15 @@ function ping(initial_ping) {
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+function write_game_id(game_id) {
+    document.getElementById("game_id").innerHTML = "GameId: " + game_id.toString();
+}
+
 function start_game() {
     if (game_id)
     {
         console.log("Joining game " + game_id);
+        write_game_id(game_id);
         join();
     }
     else
@@ -94,6 +99,7 @@ function start_game() {
             console.log("Created game ");
             console.log(x);
             game_id = x.game_id;
+            write_game_id(game_id);
             join();
         });
     }
