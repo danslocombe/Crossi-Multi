@@ -77,6 +77,17 @@ impl Map {
         let guard = self.inner.lock().unwrap();
         guard.get_cars(time_us)
     }
+
+    pub fn collides_car(&self, time_us : u32, pos : crate::game::CoordPos) -> bool {
+        let guard = self.inner.lock().unwrap();
+        for (_y, road) in &guard.roads {
+            if (road.collides_car(time_us, pos)) {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 impl MapInner {
@@ -129,10 +140,12 @@ impl MapInner {
                 else if mod_val == 3 {
                     let seed = 0;
                     let y = row_id.to_y();
-                    self.roads.push((y, Road::from_seed(seed, y)));
+                    let inverted = row_id.0 % 2 == 0;
+                    self.roads.push((y, Road::from_seed(seed, y, inverted)));
 
                     RowType::Road(RoadDescr {
                         seed,
+                        inverted,
                     })
                 }
                 else {

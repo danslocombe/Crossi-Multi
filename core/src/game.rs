@@ -235,7 +235,7 @@ impl GameState {
             }
         }
 
-        self.ruleset_state = self.ruleset_state.tick(dt_us, &mut self.player_states, map);
+        self.ruleset_state = self.ruleset_state.tick(dt_us, self.time_us, &mut self.player_states, map);
     }
 
     fn space_occupied_with_player(&self, pos : Pos, ignore_id : PlayerId) -> bool {

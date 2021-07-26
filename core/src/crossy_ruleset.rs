@@ -61,7 +61,7 @@ impl CrossyRulesetFST
         })
     }
 
-    pub fn tick(&self, dt : u32, player_states : &mut PlayerIdMap<PlayerState>, map : &Map) -> Self {
+    pub fn tick(&self, dt : u32, time_us : u32, player_states : &mut PlayerIdMap<PlayerState>, map : &Map) -> Self {
         match self {
             Lobby(state) => {
                 let mut new_lobby = state.clone();
@@ -114,7 +114,7 @@ impl CrossyRulesetFST
                 let mut new_round = state.clone();
                 // New player joined?
                 new_round.alive_players.seed_missing(player_states, false);
-                kill_players(&mut new_round.alive_players, map, player_states);
+                kill_players(time_us, &mut new_round.alive_players, map, player_states);
 
                 // TODO update screen_y
                 let alive_player_count = new_round.alive_players.iter().filter(|(_, x)| **x).count();
@@ -132,7 +132,7 @@ impl CrossyRulesetFST
             },
             RoundCooldown(state) => {
                 let mut alive_players = state.alive_players.clone();
-                kill_players(&mut alive_players, map, player_states);
+                kill_players(time_us, &mut alive_players, map, player_states);
 
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
@@ -205,7 +205,7 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {
     }
 }
 
-fn kill_players(alive_players : &mut PlayerIdMap<bool>, map : &Map, player_states : &PlayerIdMap<PlayerState>) {
+fn kill_players(time_us : u32, alive_players : &mut PlayerIdMap<bool>, map : &Map, player_states : &PlayerIdMap<PlayerState>) {
     for (id, player_state) in player_states {
         let alive = alive_players.get_copy(id).unwrap_or(false);
         if (!alive) {
@@ -215,15 +215,20 @@ fn kill_players(alive_players : &mut PlayerIdMap<bool>, map : &Map, player_state
         let mut kill = false;
         //if let Stationary = player_state.move_state {
             match player_state.pos {
-                Pos::Coord(CoordPos{x : _x, y}) => {
+                Pos::Coord(coord_pos) => {
+                    let CoordPos{x : _x, y} = coord_pos;
                     let row = map.get_row(y);
                     if let RowType::River(_) = row.row_type {
+                        kill = true;
+                    }
+                    else if map.collides_car(time_us, coord_pos) {
                         kill = true;
                     }
                 },
                 _ => {},
             }
         //}
+
 
 
         if (kill) {

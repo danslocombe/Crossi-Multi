@@ -6,13 +6,14 @@ use crate::rng::FroggyRng;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoadDescr {
     pub seed : u32,
+    pub inverted : bool,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Car(f64);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct CarPublic(f64, i32);
+pub struct CarPublic(f64, i32, bool);
 
 // Describe cars as a closed function
 // Get a random generated velocity, constant for all cars on the road
@@ -29,23 +30,30 @@ pub struct Road {
     r0 : f64, 
     r1 : f64,
     time_scale : f64,
+    inverted : bool,
 }
 
-const CAR_WIDTH : f64 = 1.25;
+const CAR_WIDTH : f64 = 24.0 / 8.0;
 
 impl Road {
-    pub fn from_seed(seed : u32, y : i32) -> Self {
+    pub fn from_seed(seed : u32, y : i32, inverted : bool) -> Self {
         let mut rng = FroggyRng::new(seed);
-        let car_count = 8;
 
         const R_WIDTH_MIN : f64 = 0.2;
         const R_WIDTH_MAX : f64 = 0.25;
         let r_width = rng.next_range(R_WIDTH_MIN, R_WIDTH_MAX);
 
-        let mut cars0 = Vec::with_capacity(car_count);
-        for i in 0..car_count {
-            // todo
-            cars0.push(Car(i as f64 / car_count as f64));
+        const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 1.25;
+        const MAX_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 16.;
+
+        let min_car_spacing = r_width * MIN_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
+        let max_car_spacing = r_width * MAX_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
+
+        let mut cars0 = Vec::with_capacity(16);
+        let mut cur = 0.0;
+        while (cur < 1.0) {
+            cur += rng.next_range(min_car_spacing, max_car_spacing);
+            cars0.push(Car(cur));
         }
 
         Road {
@@ -53,7 +61,8 @@ impl Road {
             cars0,
             r0 : 0.5 - r_width,
             r1 : 0.5 + r_width,
-            time_scale : 1.0 / 5_000_000.0, 
+            time_scale : 1.0 / 8_000_000.0, 
+            inverted,
         }
     }
 
@@ -72,12 +81,19 @@ impl Road {
     }
 
     fn realise_car(&self, car : &Car) -> f64 {
-        let x_over = car.0 - self.r0;
+        let pos = if (self.inverted) {
+            1.0 - car.0
+        }
+        else {
+            car.0
+        };
+
+        let x_over = pos - self.r0;
         ((x_over * super::SCREEN_SIZE as f64) / (self.r1 - self.r0))
     }
 
     fn transform_car(&self, car : &Car) -> CarPublic {
-        CarPublic(self.realise_car(car), self.y)
+        CarPublic(self.realise_car(car), self.y, self.inverted)
     }
 
     pub fn get_cars_public(&self, time_us : u32) -> Vec<CarPublic> {
@@ -106,7 +122,6 @@ impl Car {
     }
 
     fn on_screen(&self) -> bool {
-        // OAFIJWOIFJAWOFJAWOFj
         self.0 > -CAR_WIDTH || self.0 < super::SCREEN_SIZE as f64 + CAR_WIDTH
     }
 }
