@@ -213,6 +213,7 @@ function setup_view() {
 
     let tick = () => {
         view.tick();
+        view.draw();
         window.requestAnimationFrame(tick);
     }
 

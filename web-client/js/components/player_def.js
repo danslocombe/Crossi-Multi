@@ -1,4 +1,4 @@
-const SCALE = 8;
+import { SCALE} from "./constants.js";
 
 function load_sprites(name) {
     let spr = new Image(SCALE, SCALE);
@@ -44,6 +44,7 @@ function create_dust(x, y) {
     return {
         frame_id : Math.floor(Math.random() * spr_smoke_count),
         scale : 0.5 + Math.random() * 0.6,
+        static_depth : 100,
         x : x,
         y : y,
         tick : function() {
@@ -54,10 +55,12 @@ function create_dust(x, y) {
             return this.scale > 0;
         },
 
-        draw : function(ctx) {
-            const x = SCALE*(this.x + 0.25) + (1-this.scale);
-            const y = SCALE*(this.y + 0.25) + (1-this.scale);
-            ctx.drawImage(spr_dust, SCALE*this.frame_id, 0, SCALE, SCALE, x, y, SCALE*this.scale, SCALE*this.scale);
+        draw : function(froggy_draw_ctx) {
+            //const x = this.x + 0 + (1-this.scale)*4 + froggy_draw_ctx.x_off;
+            //const y = this.y + 0 + (1-this.scale)*4 + froggy_draw_ctx.y_off;
+            const x = SCALE*(this.x + 0.25) + (1-this.scale) + froggy_draw_ctx.x_off;
+            const y = SCALE*(this.y + 0.25) + (1-this.scale) + froggy_draw_ctx.y_off;
+            froggy_draw_ctx.ctx.drawImage(spr_dust, SCALE*this.frame_id, 0, SCALE, SCALE, x, y, SCALE*this.scale, SCALE*this.scale);
         }
     }
 }
@@ -80,6 +83,7 @@ export function create_player_remote(client, player_id) {
         player_id : player_id,
         x : 0,
         y : 0,
+        dynamic_depth : 0,
         moving : false,
         states : [],
         x_flip : 1,
@@ -136,18 +140,16 @@ export function create_player_remote(client, player_id) {
             }
 
             if (moving && !this.moving) {
+                // Make dust
+                for (let i = 0; i < 2; i++) {
+                    const dust_off = Math.random() * (3 / SCALE);
+                    const dust_dir = Math.random() * 2 * 3.141;
+                    const dust_x = x + dust_off * Math.cos(dust_dir);
+                    const dust_y = y + dust_off * Math.sin(dust_dir);
+                    simple_entities.push(create_dust(dust_x, dust_y));
+                }
 
-                // Make function
-                        // Make dust
-                        for (let i = 0; i < 2; i++) {
-                            const dust_off = Math.random() * (3 / SCALE);
-                            const dust_dir = Math.random() * 2 * 3.141;
-                            const dust_x = x + dust_off * Math.cos(dust_dir);
-                            const dust_y = y + dust_off * Math.sin(dust_dir);
-                            simple_entities.push(create_dust(dust_x, dust_y));
-                        }
-
-                        player_def.move_sound.play();
+                player_def.move_sound.play();
             }
 
             this.moving = moving;
@@ -252,14 +254,21 @@ function create_player_def(sprites, move_sound, source) {
         sprite_dead : sprites.spr_dead,
         move_sound : move_sound,
         source : source,
+        x : 0,
+        y : 0,
+        dynamic_depth : 0,
         tick : function(state, simple_entities) {
             // hackkyyyy
             if (!this.source.client.player_alive(this.source.player_id)) {
                 return;
             }
             this.source.tick(state, simple_entities, this);
+
+            this.x = this.source.x * SCALE;
+            this.y = this.source.y * SCALE;
+            this.dynamic_depth = this.y;
         },
-        draw : function(ctx) {
+        draw : function(crossy_draw_ctx) {
             // hackyyy
             if (!this.source.client.player_alive(this.source.player_id)) {
                 return;
@@ -269,15 +278,16 @@ function create_player_def(sprites, move_sound, source) {
             if (this.source.x_flip == -1) {
                 sprite = this.sprite_flipped;
             }
-            const x = this.source.x;
-            const y = this.source.y;
+
+            const x = this.x + crossy_draw_ctx.x_off;
+            const y = this.y + crossy_draw_ctx.y_off - 1;
             const frame_id = this.source.frame_id;
 
             // TODO make transparent
             // do in sprite
-            ctx.drawImage(spr_shadow, SCALE*x, SCALE*y + 2);
+            crossy_draw_ctx.ctx.drawImage(spr_shadow, x, y + 2);
 
-            ctx.drawImage(sprite, SCALE*frame_id, 0, SCALE, SCALE, SCALE*x, SCALE*y, SCALE, SCALE);
+            crossy_draw_ctx.ctx.drawImage(sprite, SCALE*frame_id, 0, SCALE, SCALE, x, y, SCALE, SCALE);
         },
     }
 }
