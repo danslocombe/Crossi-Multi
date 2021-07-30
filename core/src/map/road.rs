@@ -76,7 +76,7 @@ impl Road {
         for car in &self.get_cars_onscreen(time_us) {
             // Be a little kind
             const MARGIN : f64 = CAR_WIDTH / 2.25;
-            if (frog_pos.x as f64 - self.realise_car(car)).abs() < MARGIN {
+            if (frog_centre - self.realise_car(car)).abs() < MARGIN {
                 return true;
             }
         }

@@ -1,6 +1,8 @@
+import { SCALE} from "./constants"
 import { create_player_remote, create_player_local } from "./player_def";
 import { draw_background } from "./background";
 import { make_car } from "./car";
+import { create_camera } from "./camera";
 //import "/components/player_def";
 
 export function create_game_view(ctx, client, ws, key_event_source) {
@@ -14,6 +16,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         simple_entities : [],
         rule_state : undefined,
         players : [],
+        camera : create_camera(),
 
         tick : function()
         {
@@ -90,6 +93,10 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 }
 
                 this.simple_entities = simple_entities_new;
+
+                this.camera.tick(this.rule_state);
+                this.froggy_draw_ctx.x_off = Math.round(-SCALE * this.camera.x);
+                this.froggy_draw_ctx.y_off = Math.round(-SCALE * this.camera.y);
             }
         },
 
@@ -107,7 +114,6 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 //if (!in_lobby)
                 {
                     const cars = JSON.parse(this.client.get_cars_json());
-                    //console.log(cars);
                     for (const car of cars) {
                         draw_with_depth.push(make_car(car));
                     }

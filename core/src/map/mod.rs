@@ -63,6 +63,9 @@ impl Map {
     }
 
     pub fn update_min_y(&mut self, min_y : i32) {
+        if min_y > SCREEN_SIZE {
+            panic!("Tried to generate from below the map");
+        }
         let screen_bottom_row_id = RowId::from_y(min_y + SCREEN_SIZE);
         let mut guard = self.inner.lock().unwrap();
         guard.update_min_row_id(screen_bottom_row_id);
@@ -133,9 +136,15 @@ impl MapInner {
             let row_type = if (row_id.0 > 6) {
                 let mod_val = (row_id.0 / 2) % 6;
                 if mod_val == 1 {
+
+                    RowType::Path(PathDescr {
+                        wall_width: 1,
+                    })
+                    /*
                     RowType::River(RiverDescr{
                         seed : 0,
                     })
+                    */
                 }
                 else if mod_val == 3 {
                     let seed = 0;

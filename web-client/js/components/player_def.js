@@ -1,4 +1,5 @@
 import { SCALE} from "./constants.js";
+import { dan_lerp, diff} from "./utils.js";
 
 function load_sprites(name) {
     let spr = new Image(SCALE, SCALE);
@@ -87,14 +88,6 @@ function create_corpse(x, y, spr_dead) {
                 SCALE);
         }
     }
-}
-
-function dan_lerp(x0, x, k) {
-    return (x0 * (k-1) + x) / k;
-}
-
-function diff(x, y) {
-    return Math.abs(x - y);
 }
 
 // frog has duplicate frame for some reason

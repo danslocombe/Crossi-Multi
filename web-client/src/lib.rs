@@ -38,6 +38,7 @@ pub struct Client {
 
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
+    screen_y : i32,
 }
 
 #[wasm_bindgen]
@@ -61,6 +62,7 @@ impl Client {
             // TODO proper ready state
             ready_state : true,
             trusted_rule_state: None,
+            screen_y : 0,
         } 
     }
 
@@ -172,6 +174,10 @@ impl Client {
 
         self.last_server_tick = Some(server_tick.latest.time_us);
         self.trusted_rule_state = Some(server_tick.rule_state.clone());
+
+        if let crossy_ruleset::CrossyRulesetFST::Round(rs) = &server_tick.rule_state {
+            self.screen_y = rs.screen_y;
+        }
     }
 
     pub fn get_client_message(&self) -> Vec<u8>
@@ -235,7 +241,10 @@ impl Client {
 
     fn get_rows(&mut self) -> Vec<(i32, map::Row)> {
         let mut vec = Vec::with_capacity(32);
-        for i in 0..(160/8) {
+        let range_min = self.screen_y;
+        let range_max = (self.screen_y + 160/8 + 6).min(160/8);
+        for i in range_min..range_max {
+            log!("Fetching {}", i);
             let y = i;
             vec.push((y as i32, self.timeline.map.get_row(y).clone()));
         }

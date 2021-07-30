@@ -19,7 +19,7 @@ pub struct WarmupState {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RoundState {
-    pub screen_y : u32,
+    pub screen_y : i32,
     pub alive_players : PlayerIdMap<bool>,
     pub win_counts : PlayerIdMap<u8>,
 }
@@ -116,7 +116,12 @@ impl CrossyRulesetFST
                 new_round.alive_players.seed_missing(player_states, false);
                 kill_players(time_us, &mut new_round.alive_players, map, player_states);
 
-                // TODO update screen_y
+                const SCREEN_Y_BUFFER : i32 = 6;
+                for (_, player) in player_states.iter() {
+                    if let Pos::Coord(pos) = player.pos {
+                        new_round.screen_y = new_round.screen_y.min(pos.y - SCREEN_Y_BUFFER);
+                    }
+                }
                 let alive_player_count = new_round.alive_players.iter().filter(|(_, x)| **x).count();
 
                 if (alive_player_count <= 1) {
