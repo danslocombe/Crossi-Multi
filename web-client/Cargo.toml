@@ -33,6 +33,7 @@ crossy_multi_core = { path = "../core" }
 serde = "1.0"
 serde_json = "1.0"
 flexbuffers = "2.0"
+console_error_panic_hook = "0.1.6"
 
 # The `web-sys` crate allows you to interact with the various browser APIs,
 # like the DOM.

@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 pub mod road;
 
 use road::{RoadDescr, Road, CarPublic};
+use crate::rng::FroggyRng;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash)]
 pub struct RowId(u32);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,18 +31,20 @@ pub struct RiverDescr {
 pub struct PathDescr {
     wall_width : u32,
 }
-
-
 #[derive(Debug)]
-pub struct GeneratorState {
-    rand : rand_xorshift::XorShiftRng,
+struct MapRound {
+    seed : u32,
+    round_id : u8,
+    gen_state_wall_width : i32,
+    roads : Vec<(i32, Road)>,
+    rows : VecDeque<Row>,
 }
 
 #[derive(Debug)]
 pub struct MapInner {
     // todo better structure
-    roads : Vec<(i32, Road)>,
-    rows : VecDeque<Row>,
+    seed : u32,
+    rounds : Vec<MapRound>,
 }
 
 #[derive(Debug)]
@@ -62,6 +65,8 @@ impl Map {
         self.seed
     }
 
+    /*
+    Premature optimisation, add back in if we need
     pub fn update_min_y(&mut self, min_y : i32) {
         if min_y > SCREEN_SIZE {
             panic!("Tried to generate from below the map");
@@ -70,20 +75,22 @@ impl Map {
         let mut guard = self.inner.lock().unwrap();
         guard.update_min_row_id(screen_bottom_row_id);
     }
+    */
 
-    pub fn get_row(&self, y : i32) -> Row {
+    pub fn get_row(&self, round : u8, y : i32) -> Row {
         let mut guard = self.inner.lock().unwrap();
-        guard.get_row(RowId::from_y(y))
+        guard.get_mut(round).get_row(RowId::from_y(y))
     }
 
-    pub fn get_cars(&self, time_us : u32) -> Vec<CarPublic> {
-        let guard = self.inner.lock().unwrap();
-        guard.get_cars(time_us)
+    pub fn get_cars(&self, round : u8, time_us : u32) -> Vec<CarPublic> {
+        let mut guard = self.inner.lock().unwrap();
+        guard.get(round).get_cars(time_us)
     }
 
-    pub fn collides_car(&self, time_us : u32, pos : crate::game::CoordPos) -> bool {
-        let guard = self.inner.lock().unwrap();
-        for (_y, road) in &guard.roads {
+    pub fn collides_car(&self, time_us : u32, round : u8, pos : crate::game::CoordPos) -> bool {
+        let mut guard = self.inner.lock().unwrap();
+        guard.get_mut(round).generate_to_y(RowId::from_y(pos.y));
+        for (_y, road) in &guard.get(round).roads {
             if (road.collides_car(time_us, pos)) {
                 return true;
             }
@@ -95,12 +102,54 @@ impl Map {
 
 impl MapInner {
     fn new(seed : u32) -> Self {
-        MapInner {
-            roads : Vec::with_capacity(24),
-            rows : VecDeque::with_capacity(64),
+        Self {
+            seed,
+            rounds : Vec::with_capacity(8),
         }
     }
 
+    fn gen_to(&mut self, i : usize) {
+        while i >= self.rounds.len() {
+            let rid = self.rounds.len() as u8;
+            self.rounds.push(MapRound::new(self.seed, rid));
+        }
+    }
+
+    fn get(&mut self, round_id : u8) -> &MapRound {
+        let i = round_id as usize;
+        self.gen_to(i);
+        &self.rounds[round_id as usize]
+    }
+
+    fn get_mut(&mut self, round_id : u8) -> &mut MapRound {
+        let i = round_id as usize;
+        self.gen_to(i);
+        &mut self.rounds[round_id as usize]
+    }
+}
+
+impl MapRound {
+    fn new(seed : u32, round_id : u8) -> Self {
+        let mut rows = VecDeque::with_capacity(64);
+        for i in 0..12 {
+            rows.push_front(Row {
+                row_id : RowId(i),
+                row_type : RowType::Path(PathDescr {
+                    wall_width : 0,
+                }),
+            });
+        }
+
+        Self {
+            seed,
+            round_id,
+            gen_state_wall_width : 0,
+            roads : Vec::with_capacity(24),
+            rows,
+        }
+    }
+
+    /*
     fn update_min_row_id(&mut self, row_id : RowId) {
         while let Some(row) = self.rows.back() {
             if row.row_id.0 < row_id.0 {
@@ -111,6 +160,7 @@ impl MapInner {
             }
         }
     }
+    */
 
     fn get_row(&mut self, row_id : RowId) -> Row {
         let need_to_generate = self.rows.front().map(|row| row_id.0 > row.row_id.0).unwrap_or(true);
@@ -129,6 +179,59 @@ impl MapInner {
     }
 
     fn generate_to_y(&mut self, row_id_target : RowId) {
+        while self.rows.front().map(|row| row_id_target.0 > row.row_id.0).unwrap_or(true) {
+            let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
+            println!("{} {} {:?}", self.seed, self.round_id, row_id);
+            let rng = FroggyRng::from_hash((self.seed, self.round_id, row_id));
+            println!("generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
+
+            if (rng.gen("gen_feature") % 5 == 0) {
+                //if (rng.gen("feature_type") % 2 == 0) {
+                    let lanes = *rng.choose("road_lanes", &[1, 2, 3, 4, 5]);
+                    let initial_direction = *rng.choose("initial_direction", &[true, false]);
+
+                    println!("generating road at {:?}, y={}, lanes {}", row_id, row_id.to_y(), lanes);
+                    for i in 0..lanes {
+                        let rid = RowId(row_id.0 + i);
+                        let y = rid.to_y();
+                        self.roads.push((y, Road::new(self.seed, self.round_id, y, initial_direction)));
+                        self.rows.push_front(Row {
+                            row_id: rid,
+                            row_type: RowType::Road(RoadDescr {
+                                seed: self.seed,
+                                inverted: initial_direction,
+                        })});
+                    }
+                    for i in 0..lanes {
+                        let rid = RowId(row_id.0 + lanes + i);
+                        let y = rid.to_y();
+                        self.roads.push((y, Road::new(self.seed, self.round_id, y, !initial_direction)));
+                        self.rows.push_front(Row {
+                            row_id: rid,
+                            row_type: RowType::Road(RoadDescr {
+                                seed: self.seed,
+                                inverted: !initial_direction,
+                        })});
+                    }
+                //}
+            }
+            else {
+                const WALL_WIDTH_MAX : i32 = 4;
+                const WALL_WIDTH_MIN : i32 = 1;
+                let new_wall_width = self.gen_state_wall_width + rng.choose("wall_width", &[-1, 0, 0, 1]);
+                self.gen_state_wall_width = new_wall_width.min(WALL_WIDTH_MAX).max(WALL_WIDTH_MIN);
+
+                self.rows.push_front(Row {
+                    row_id,
+                    row_type: RowType::Path(PathDescr {
+                        wall_width : self.gen_state_wall_width as u32,
+                    }),
+                });
+            }
+        }
+    }
+
+    fn generate_to_y_old(&mut self, row_id_target : RowId) {
         // Tmp dumb impl
         while self.rows.front().map(|row| row_id_target.0 > row.row_id.0).unwrap_or(true) {
             let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
@@ -147,13 +250,12 @@ impl MapInner {
                     */
                 }
                 else if mod_val == 3 {
-                    let seed = 0;
                     let y = row_id.to_y();
                     let inverted = row_id.0 % 2 == 0;
-                    self.roads.push((y, Road::from_seed(seed, y, inverted)));
+                    self.roads.push((y, Road::new(self.seed, self.round_id, y, inverted)));
 
                     RowType::Road(RoadDescr {
-                        seed,
+                        seed : 0,
                         inverted,
                     })
                 }

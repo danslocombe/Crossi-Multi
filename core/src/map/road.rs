@@ -15,14 +15,14 @@ pub struct Car(f64);
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct CarPublic(f64, i32, bool);
 
-// Describe cars as a closed function
-// Get a random generated velocity, constant for all cars on the road
-// Cars are a randomly spaced by the seed
-// They can then be described by (x0 + t * v) % width
-// This way they feel random but not collide with each other
-//
-// We take a view into an interval say [r0, r1] where 0 < r0 < r1 < width.
-// We can simplify by normalising v=1 and varying size of the view.
+/// Describe cars as a closed function
+/// Get a random generated velocity, constant for all cars on the road
+/// Cars are a randomly spaced by the seed
+/// They can then be described by (x0 + t * v) % width
+/// This way they feel random but not collide with each other
+///
+/// We take a view into an interval say [r0, r1] where 0 < r0 < r1 < width.
+/// We can simplify by normalising v=1 and varying size of the view.
 #[derive(Debug, Clone)]
 pub struct Road {
     cars0 : Vec<Car>,
@@ -36,23 +36,31 @@ pub struct Road {
 const CAR_WIDTH : f64 = 24.0 / 8.0;
 
 impl Road {
-    pub fn from_seed(seed : u32, y : i32, inverted : bool) -> Self {
-        let mut rng = FroggyRng::new(seed);
+    pub fn new(seed : u32, round : u8, y : i32, inverted : bool) -> Self {
+        let rng = FroggyRng::from_hash((seed, round, y));
+        println!("Create road rng {:?}", rng);
 
         const R_WIDTH_MIN : f64 = 0.2;
         const R_WIDTH_MAX : f64 = 0.25;
-        let r_width = rng.next_range(R_WIDTH_MIN, R_WIDTH_MAX);
+        let r_width = rng.gen_range("r_width", R_WIDTH_MIN, R_WIDTH_MAX);
 
-        const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 1.25;
+        const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 2.25;
         const MAX_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 16.;
+
+        // Min space to squeeze through
+        const SQUEEZE_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 4.25;
 
         let min_car_spacing = r_width * MIN_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
         let max_car_spacing = r_width * MAX_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
+        let squeeze_car_spacing_screen = r_width * SQUEEZE_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
 
         let mut cars0 = Vec::with_capacity(16);
         let mut cur = 0.0;
-        while (cur < 1.0) {
-            cur += rng.next_range(min_car_spacing, max_car_spacing);
+
+        // Make sure that there is at least one space at the end of the cycle large enough to go through
+        // Make sure we never produce an impossible level
+        while (cur < 1.0 - squeeze_car_spacing_screen) {
+            cur += rng.gen_range("car_spacing", min_car_spacing, max_car_spacing);
             cars0.push(Car(cur));
         }
 

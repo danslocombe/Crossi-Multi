@@ -46,13 +46,14 @@ impl Client {
 
     #[wasm_bindgen(constructor)]
     pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32) -> Self {
+        console_error_panic_hook::set_once();
         let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
 
         // Estimate server start
         let server_start = WasmInstant::now() - Duration::from_micros((server_time_us + estimated_latency) as u64);
 
         log!("CONSTRUCTING : Estamated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency);
-        
+
         Client {
             timeline,
             last_tick : server_time_us,
@@ -240,19 +241,20 @@ impl Client {
     }
 
     fn get_rows(&mut self) -> Vec<(i32, map::Row)> {
+        let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
         let mut vec = Vec::with_capacity(32);
         let range_min = self.screen_y;
         let range_max = (self.screen_y + 160/8 + 6).min(160/8);
         for i in range_min..range_max {
-            log!("Fetching {}", i);
             let y = i;
-            vec.push((y as i32, self.timeline.map.get_row(y).clone()));
+            vec.push((y as i32, self.timeline.map.get_row(round_id, y).clone()));
         }
         vec
     }
 
     pub fn get_cars_json(&self) -> String {
-        let cars = self.timeline.map.get_cars(self.timeline.top_state().time_us);
+        let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
+        let cars = self.timeline.map.get_cars(round_id, self.timeline.top_state().time_us);
         serde_json::to_string(&cars).unwrap()
     }
 
