@@ -71,6 +71,8 @@ impl Road {
             return false
         }
 
+        let frog_centre = frog_pos.x as f64 + 0.5;
+
         for car in &self.get_cars_onscreen(time_us) {
             // Be a little kind
             const MARGIN : f64 = CAR_WIDTH / 2.25;

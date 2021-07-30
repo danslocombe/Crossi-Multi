@@ -65,6 +65,30 @@ function create_dust(x, y) {
     }
 }
 
+function create_corpse(x, y, spr_dead) {
+    return {
+        spr : spr_dead,
+        x : x,
+        y : y,
+        dynamic_depth : y,
+
+        tick : () => {},
+        alive : () => true,
+        draw : function(froggy_draw_ctx) {
+            froggy_draw_ctx.ctx.drawImage(
+                this.spr,
+                0,
+                0,
+                SCALE,
+                SCALE,
+                x + froggy_draw_ctx.x_off,
+                y + froggy_draw_ctx.y_off,
+                SCALE,
+                SCALE);
+        }
+    }
+}
+
 function dan_lerp(x0, x, k) {
     return (x0 * (k-1) + x) / k;
 }
@@ -257,9 +281,16 @@ function create_player_def(sprites, move_sound, source) {
         x : 0,
         y : 0,
         dynamic_depth : 0,
+        created_corpse : false,
+
         tick : function(state, simple_entities) {
-            // hackkyyyy
             if (!this.source.client.player_alive(this.source.player_id)) {
+                if (!this.created_corpse) {
+                    this.created_corpse = true;
+                    const corpse = create_corpse(this.x, this.y, this.sprite_dead);
+                    simple_entities.push(corpse);
+                }
+
                 return;
             }
             this.source.tick(state, simple_entities, this);
@@ -267,6 +298,9 @@ function create_player_def(sprites, move_sound, source) {
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
             this.dynamic_depth = this.y;
+        },
+        new_round : function() {
+            this.created_corpse = false;
         },
         draw : function(crossy_draw_ctx) {
             // hackyyy

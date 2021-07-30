@@ -35,14 +35,30 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 }
 
                 const rule_state_json = this.client.get_rule_state_json()
+                let moving_into_warmup = false;
                 if (rule_state_json) {
-                    this.rule_state = JSON.parse(rule_state_json);
+                    const rule_state = JSON.parse(rule_state_json);
+
+                    if (this.rule_state && rule_state.RoundWarmup && !this.rule_state.RoundWarmup) {
+                        moving_into_warmup = true;
+                    }
+
+                    this.rule_state = rule_state;
                 }
 
                 document.getElementById("state").innerHTML = rule_state_json;
 
                 const players_json = this.client.get_players_json();
                 const current_player_states = JSON.parse(players_json);
+
+                if (moving_into_warmup) {
+                    this.simple_entities = [];
+                    for (const player of this.players) {
+                        if (player) {
+                            player.new_round();
+                        }
+                    }
+                }
 
                 const local_player_id = this.client.get_local_player_id();
                 if (local_player_id >= 0) {
@@ -123,7 +139,6 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 }
 
                 // TODO fixme
-
             }
         }
     }
