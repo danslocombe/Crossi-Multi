@@ -1,5 +1,8 @@
 import { SCALE} from "./constants.js";
 
+let spr_tree_top = new Image(SCALE, SCALE);
+spr_tree_top.src = '/sprites/spr_tree_top.png';
+
 export function draw_background(froggy_draw_ctx, in_lobby, client) {
     let ctx = froggy_draw_ctx.ctx;
     ctx.fillStyle = "#000000";
@@ -36,6 +39,23 @@ export function draw_background(froggy_draw_ctx, in_lobby, client) {
                 }
 
                 ctx.fillRect(x, SCALE*y + froggy_draw_ctx.y_off, x + 8, SCALE);
+            }
+
+            if (row[1].row_type.Path) {
+                const wall_width = row[1].row_type.Path.wall_width;
+                for (let i = 0; i < wall_width; i++) {
+                    {
+                        const xx = i * SCALE + froggy_draw_ctx.x_off;
+                        const yy = y * SCALE + froggy_draw_ctx.y_off;
+                        ctx.drawImage(spr_tree_top, 0, 0, SCALE, SCALE, xx, yy, SCALE, SCALE);
+                    }
+
+                    {
+                        const xx = 152 - (i * SCALE) + froggy_draw_ctx.x_off;
+                        const yy = y * SCALE + froggy_draw_ctx.y_off;
+                        ctx.drawImage(spr_tree_top, 0, 0, SCALE, SCALE, xx, yy, SCALE, SCALE);
+                    }
+                }
             }
         }
     }

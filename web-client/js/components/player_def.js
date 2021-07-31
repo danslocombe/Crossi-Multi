@@ -1,5 +1,6 @@
 import { SCALE} from "./constants.js";
 import { dan_lerp, diff} from "./utils.js";
+import { create_whiteout } from "./visual_effects.js";
 
 function load_sprites(name) {
     let spr = new Image(SCALE, SCALE);
@@ -37,6 +38,9 @@ for (let sound of sounds_list) {
     sound.volume = 0.15;
 }
 
+let snd_hit_car = new Audio('/sounds/snd_car.wav');
+snd_hit_car.volume = 0.25;
+
 let spr_dust = new Image(SCALE,SCALE);
 spr_dust.src = "/sprites/spr_dust.png";
 const spr_smoke_count = 4;
@@ -53,7 +57,7 @@ function create_dust(x, y) {
         },
 
         alive: function() {
-            return this.scale > 0;
+            return this.scale > 0
         },
 
         draw : function(froggy_draw_ctx) {
@@ -282,6 +286,11 @@ function create_player_def(sprites, move_sound, source) {
                     this.created_corpse = true;
                     const corpse = create_corpse(this.x, this.y, this.sprite_dead);
                     simple_entities.push(corpse);
+
+                    const whiteout = create_whiteout()
+                    simple_entities.push(whiteout);
+
+                    snd_hit_car.play();
                 }
 
                 return;

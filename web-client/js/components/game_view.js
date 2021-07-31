@@ -3,6 +3,7 @@ import { create_player_remote, create_player_local } from "./player_def";
 import { draw_background } from "./background";
 import { make_car } from "./car";
 import { create_camera } from "./camera";
+import { create_countdown } from "./countdown";
 //import "/components/player_def";
 
 export function create_game_view(ctx, client, ws, key_event_source) {
@@ -17,6 +18,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         rule_state : undefined,
         players : [],
         camera : create_camera(),
+        countdown : create_countdown(),
 
         tick : function()
         {
@@ -97,6 +99,8 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 this.camera.tick(this.rule_state);
                 this.froggy_draw_ctx.x_off = Math.round(-SCALE * this.camera.x);
                 this.froggy_draw_ctx.y_off = Math.round(-SCALE * this.camera.y);
+
+                this.countdown.tick(this.rule_state);
             }
         },
 
@@ -125,26 +129,13 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     }
                 }
 
-                draw_with_depth.sort((a, b) => {
-                    if (a.dynamic_depth === undefined && b.dynamic_depth === undefined) {
-                        return a.depth - b.depth;
-                    } 
-                    else if (a.dynamic_depth === undefined && b.dynamic_depth) {
-                        return -1;
-                    } 
-                    else if (a.dynamic_depth && b.dynamic_depth == undefined) {
-                        return 1;
-                    }
-                    else {
-                        return a.dynamic_depth - b.dynamic_depth;
-                    }
-                });
+                draw_with_depth.sort(sort_depth);
 
                 for (const drawable of draw_with_depth) {
                     drawable.draw(this.froggy_draw_ctx);
                 }
 
-                // TODO fixme
+                this.countdown.draw(this.froggy_draw_ctx);
             }
         }
     }
@@ -155,4 +146,30 @@ export function create_game_view(ctx, client, ws, key_event_source) {
     }
 
     return view;
+}
+
+function sort_depth(a, b) {
+    // Would be so nice in rust :(
+    // We order by: foreground_depth then dynamic_depth then depth
+    if (a.foreground_depth && b.foreground_depth) {
+        return a.foreground_depth - b.foreground_depth
+    }
+    else if (a.foreground_depth) {
+        return 1;
+    }
+    else if (b.foreground_depth) {
+        return -1;
+    }
+    else if (a.dynamic_depth && b.dynamic_depth) {
+        return a.dynamic_depth - b.dynamic_depth;
+    }
+    else if (a.dynamic_depth) {
+        return 1;
+    }
+    else if (b.dynamic_depth) {
+        return -1;
+    } 
+    else {
+        return a.depth - b.depth;
+    }
 }

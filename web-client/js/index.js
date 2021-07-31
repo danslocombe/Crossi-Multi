@@ -81,7 +81,7 @@ function ping(initial_ping) {
 /////////////////////////////////////////////////////////////////////////////////////
 
 function write_game_id(game_id) {
-    document.getElementById("game_id").innerHTML = "GameId: " + game_id.toString();
+    document.getElementById("game_id").innerHTML = '<a href="' + '/?game_id=' + game_id.toString() + '"> GameId: ' + game_id.toString() + '</a>';
 }
 
 function start_game() {

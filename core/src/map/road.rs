@@ -45,7 +45,7 @@ impl Road {
         let r_width = rng.gen_range("r_width", R_WIDTH_MIN, R_WIDTH_MAX);
 
         const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 2.25;
-        const MAX_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 16.;
+        const MAX_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 22.;
 
         // Min space to squeeze through
         const SQUEEZE_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 4.25;
