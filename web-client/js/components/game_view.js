@@ -106,7 +106,8 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
         draw : function() {
             const in_lobby = !this.rule_state || this.rule_state.Lobby;
-            draw_background(this.froggy_draw_ctx, in_lobby, this.client)
+            const in_warmup = this.rule_state && this.rule_state.RoundWarmup;
+            draw_background(this.froggy_draw_ctx, in_lobby, in_warmup, this.client)
 
             if (this.client) {
                 let draw_with_depth = [];

@@ -285,7 +285,7 @@ impl RowId {
 
 
 fn outside_walls(x : i32, wall_width : i32) -> bool {
-    x < wall_width as i32 || x >= (SCREEN_SIZE - wall_width as i32)
+    x <= wall_width as i32 || x >= (SCREEN_SIZE - 1 - wall_width as i32)
 }
 
 impl Row {
