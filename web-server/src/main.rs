@@ -73,6 +73,8 @@ impl GameDb {
 async fn main() {
     let games = GameDb::new();
 
+    crossy_multi_core::set_debug_logger(Box::new(crossy_multi_core::StdoutLogger()));
+
     println!("Serving...");
 
     let serve_dir = "C:\\Users\\Dan\\crossy_multi\\web-client\\dist";

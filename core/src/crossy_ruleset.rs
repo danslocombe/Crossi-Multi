@@ -77,7 +77,7 @@ impl CrossyRulesetFST
 
                 if (enough_players && all_ready) {
 
-                    println!("Starting Game! ...");
+                    debug_log!("Starting Game! ...");
 
                     // Initialize to all zero
                     let win_counts = PlayerIdMap::seed_from(player_states, 0);

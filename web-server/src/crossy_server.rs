@@ -186,7 +186,7 @@ impl Server {
             });
 
             if top_state.frame_id as usize % 300 == 0 {
-                println!("Sending tick {:?}", tick);
+                //println!("Sending tick {:?}", tick);
             }
 
             self.outbound_tx.send(tick).unwrap();

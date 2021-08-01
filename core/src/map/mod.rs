@@ -211,7 +211,8 @@ impl MapRound {
             let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
             //println!("{} {} {:?}", self.seed, self.round_id, row_id);
             let rng = FroggyRng::from_hash((self.seed, self.round_id, row_id));
-            //println!("generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
+
+            debug_log!("generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
 
             if (rng.gen("gen_feature") % 5 == 0) {
                 //if (rng.gen("feature_type") % 2 == 0) {
@@ -222,6 +223,7 @@ impl MapRound {
                     for i in 0..lanes {
                         let rid = RowId(row_id.0 + i);
                         let y = rid.to_y();
+                        debug_log!("Adding road at {}", y);
                         self.roads.push((y, Road::new(self.seed, self.round_id, y, initial_direction)));
                         self.rows.push_front(Row {
                             row_id: rid,
@@ -233,6 +235,7 @@ impl MapRound {
                     for i in 0..lanes {
                         let rid = RowId(row_id.0 + lanes + i);
                         let y = rid.to_y();
+                        debug_log!("Adding road at {}", y);
                         self.roads.push((y, Road::new(self.seed, self.round_id, y, !initial_direction)));
                         self.rows.push_front(Row {
                             row_id: rid,

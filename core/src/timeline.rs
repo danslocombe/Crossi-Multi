@@ -67,14 +67,14 @@ impl Timeline {
     }
 
     pub fn add_player(&mut self, player_id: PlayerId, pos: Pos) {
-        println!("Adding new player {:?}", player_id);
+        debug_log!("Adding new player {:?}", player_id);
 
         let new = self.top_state().add_player(player_id, pos);
         self.push_state(new);
     }
 
     pub fn remove_player(&mut self, player_id: PlayerId) {
-        println!("Dropping player {:?}", player_id);
+        debug_log!("Dropping player {:?}", player_id);
 
         let new = self.top_state().remove_player(player_id);
         self.push_state(new);
@@ -105,7 +105,6 @@ impl Timeline {
 
     fn propagate_input(&mut self, input: &RemoteInput) {
         if let Some(index) = self.split_with_input(input.player_id, input.input, input.time_us) {
-            println!("Splitting");
             // TODO handle index == 0
             if (index > 0) {
                 self.simulate_up_to_date(index);

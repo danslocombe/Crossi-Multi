@@ -15,6 +15,13 @@ macro_rules! log {
     }
 }
 
+struct ConsoleDebugLogger();
+impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
+    fn log(&self, logline: &str) {
+        log!("{}", logline);
+    }
+}
+
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -46,7 +53,10 @@ impl Client {
 
     #[wasm_bindgen(constructor)]
     pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32) -> Self {
+        // Setup statics
         console_error_panic_hook::set_once();
+        crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
+
         let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
 
         // Estimate server start
@@ -127,7 +137,7 @@ impl Client {
 
         if (self.timeline.top_state().frame_id.floor() as u32 % 60) == 0
         {
-            log!("{:?}", self.timeline.top_state());
+            //log!("{:?}", self.timeline.top_state());
         }
     }
 

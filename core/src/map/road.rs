@@ -38,10 +38,10 @@ const CAR_WIDTH : f64 = 24.0 / 8.0;
 impl Road {
     pub fn new(seed : u32, round : u8, y : i32, inverted : bool) -> Self {
         let rng = FroggyRng::from_hash((seed, round, y));
-        println!("Create road rng {:?}", rng);
+        debug_log!("Create road seed={} round={} y={} rng {:?}", seed, round, y, rng);
 
-        const R_WIDTH_MIN : f64 = 0.2;
-        const R_WIDTH_MAX : f64 = 0.25;
+        const R_WIDTH_MIN : f64 = 0.15;
+        const R_WIDTH_MAX : f64 = 0.30;
         let r_width = rng.gen_range("r_width", R_WIDTH_MIN, R_WIDTH_MAX);
 
         const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 2.25;
@@ -60,7 +60,7 @@ impl Road {
         // Make sure that there is at least one space at the end of the cycle large enough to go through
         // Make sure we never produce an impossible level
         while (cur < 1.0 - squeeze_car_spacing_screen) {
-            cur += rng.gen_range("car_spacing", min_car_spacing, max_car_spacing);
+            cur += rng.gen_range(("car_spacing", cars0.len()), min_car_spacing, max_car_spacing);
             cars0.push(Car(cur));
         }
 
@@ -84,7 +84,9 @@ impl Road {
         for car in &self.get_cars_onscreen(time_us) {
             // Be a little kind
             const MARGIN : f64 = CAR_WIDTH / 2.25;
-            if (frog_centre - self.realise_car(car)).abs() < MARGIN {
+            let realised_car = self.realise_car(car);
+            if (frog_centre - realised_car).abs() < MARGIN {
+                debug_log!("Killing, Collided with car {} {:?}", realised_car, frog_pos);
                 return true;
             }
         }

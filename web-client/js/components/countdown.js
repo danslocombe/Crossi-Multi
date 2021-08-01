@@ -20,7 +20,7 @@ export function create_countdown() {
 
             if (rule_state.RoundWarmup) {
                 const time = Math.ceil(rule_state.RoundWarmup.remaining_us / 1000000);
-                console.log(rule_state.RoundWarmup);
+                //console.log(rule_state.RoundWarmup);
                 if (time != this.time) {
                     snd_countdown.play();
                 }

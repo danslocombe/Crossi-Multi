@@ -18,6 +18,23 @@ pub struct FroggyRng {
     seed : u64,
 }
 
+struct DumbHash {
+    value : u64,
+}
+
+impl Hasher for DumbHash {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.value
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for x in bytes {
+            self.value += *x as u64;
+        }
+    }
+}
+
 fn split_mix_64(index : u64) -> u64 {
     let mut z = Wrapping(index) + Wrapping(0x9E3779B97F4A7C15);
     z = (z ^ (z >> 30)) * Wrapping(0xBF58476D1CE4E5B9);
@@ -28,7 +45,8 @@ fn split_mix_64(index : u64) -> u64 {
 fn hash<T : Hash>(x : T) -> u64 {
     // TODO jenkins hasher chosen as it gives deterministic results across wasm/x64
     // Look at others.
-    let mut hasher = deterministic_hash::DeterministicHasher::new(hashers::jenkins::Lookup3Hasher::default());
+    //let mut hasher = deterministic_hash::DeterministicHasher::new(hashers::jenkins::Lookup3Hasher::default());
+    let mut hasher = deterministic_hash::DeterministicHasher::new(DumbHash {value : 0});
     x.hash(&mut hasher);
     hasher.finish()
 }
@@ -43,8 +61,11 @@ impl FroggyRng {
     }
 
     pub fn gen<T : Hash>(&self, x : T) -> u64 {
-        let index = (Wrapping(self.seed) + Wrapping(hash(x))).0;
-        split_mix_64(index)
+        let hash = hash(x);
+        let index = (Wrapping(self.seed) + Wrapping(hash)).0;
+        let res = split_mix_64(index);
+        debug_log!("Generating for index {} from seed {} hash {} | {}", index, self.seed, hash, res);
+        res
     }
 
     pub fn gen_unit<T : Hash>(&self, x : T) -> f64 {
