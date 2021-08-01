@@ -222,7 +222,7 @@ impl GameState {
             // We can safely unwrap as we are iterating over valid_ids()
             let player_state = self.player_states.get(id).unwrap();
 
-            let iterated = player_state.tick_iterate(self, player_input, dt_us, &mut pushes);
+            let iterated = player_state.tick_iterate(self, player_input, dt_us, &mut pushes, map);
             drop(player_state);
 
             self.set_player_state(id, iterated);
@@ -258,11 +258,15 @@ impl GameState {
         false 
     }
 
-    fn can_push(&self, id : PlayerId, dir : Input) -> bool {
+    fn can_push(&self, id : PlayerId, dir : Input, time_us : u32, rule_state : &CrossyRulesetFST, map : &Map) -> bool {
         let player = self.get_player(id).unwrap();
         match player.pos {
             Pos::Coord(p) => {
                 let new = p.apply_input(dir);
+                if (map.solid(time_us, rule_state, new)) {
+                    return false;
+                }
+
                 !self.space_occupied_with_player(Pos::Coord(new), id)
             }
             _ => {
@@ -345,7 +349,7 @@ impl PlayerState {
         }
     }
 
-    fn tick_iterate(&self, state: &GameState, input: Input, dt_us: u32, pushes : &mut Vec<Push>) -> Self {
+    fn tick_iterate(&self, state: &GameState, input: Input, dt_us: u32, pushes : &mut Vec<Push>, map : &Map) -> Self {
         let mut new = self.clone();
         match new.move_state {
             MoveState::Stationary => {
@@ -377,7 +381,7 @@ impl PlayerState {
         }
 
         if new.can_move() && input != Input::None {
-            if let Some(moving_state) = new.try_move(input, state, pushes) {
+            if let Some(moving_state) = new.try_move(input, state, pushes, map) {
                 new.move_state = MoveState::Moving(moving_state);
             }
         }
@@ -399,18 +403,23 @@ impl PlayerState {
         new
     }
 
-    fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>) -> Option<MovingState> {
+    fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>, map : &Map) -> Option<MovingState> {
         let mut new_pos = None;
         let mut push_info = PushInfo::default();
 
         match self.pos {
             Pos::Coord(pos) => {
-                let candidate_pos = Pos::Coord(pos.apply_input(input));
+                let coord = pos.apply_input(input);
+                let candidate_pos = Pos::Coord(coord);
+                if (map.solid(state.time_us, &state.ruleset_state, coord)) {
+                    return None;
+                }
+
                 new_pos = Some(candidate_pos);
 
                 for (_, other_player) in state.player_states.iter().filter(|(id, _)| *id != self.id) {
 
-                    let possible_push_info = self.try_move_player(input, candidate_pos, other_player, state, pushes)?;
+                    let possible_push_info = self.try_move_player(input, candidate_pos, other_player, state, pushes, map)?;
                     if (possible_push_info.pushing.is_some()) {
                         // Because only one player per spot
                         // We can only push one person
@@ -427,14 +436,21 @@ impl PlayerState {
         })
     }
 
-    fn try_move_player(&self, dir : Input, candidate_pos : Pos, other : &PlayerState, state: &GameState, pushes : &mut Vec<Push>) -> Option<PushInfo>
+    fn try_move_player(
+        &self,
+        dir : Input,
+        candidate_pos : Pos,
+        other : &PlayerState,
+        state: &GameState,
+        pushes : &mut Vec<Push>,
+        map : &Map) -> Option<PushInfo>
     {
         if other.pos == candidate_pos {
             // Try to move into some other player
             match &other.move_state {
                 MoveState::Moving(_ms) => None,
                 MoveState::Stationary => {
-                    if (state.can_push(other.id, dir)) {
+                    if (state.can_push(other.id, dir, state.time_us, &state.ruleset_state, map)) {
                         pushes.push(Push {
                             id : other.id,
                             pushed_by : self.id,

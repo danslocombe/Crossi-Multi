@@ -5,6 +5,8 @@ pub mod road;
 
 use road::{RoadDescr, Road, CarPublic};
 use crate::rng::FroggyRng;
+use crate::crossy_ruleset::CrossyRulesetFST;
+use crate::game::CoordPos;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash)]
 pub struct RowId(u32);
@@ -20,6 +22,8 @@ pub enum RowType {
   River(RiverDescr),
   Path(PathDescr),
   Road(RoadDescr),
+  StartingBarrier(),
+  Stands(),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,7 +91,7 @@ impl Map {
         guard.get(round).get_cars(time_us)
     }
 
-    pub fn collides_car(&self, time_us : u32, round : u8, pos : crate::game::CoordPos) -> bool {
+    pub fn collides_car(&self, time_us : u32, round : u8, pos : CoordPos) -> bool {
         let mut guard = self.inner.lock().unwrap();
         guard.get_mut(round).generate_to_y(RowId::from_y(pos.y));
         for (_y, road) in &guard.get(round).roads {
@@ -97,6 +101,11 @@ impl Map {
         }
 
         false
+    }
+
+    pub fn solid(&self, time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
+        let mut guard = self.inner.lock().unwrap();
+        guard.get_mut(rule_state.get_round_id()).get_row(RowId::from_y(pos.y)).solid(time_us, rule_state, pos)
     }
 }
 
@@ -140,13 +149,17 @@ impl MapRound {
             });
         }
 
-        Self {
+        let mut round = Self {
             seed,
             round_id,
             gen_state_wall_width : 0,
             roads : Vec::with_capacity(24),
             rows,
-        }
+        };
+
+        round.initial_generate();
+
+        round
     }
 
     /*
@@ -178,19 +191,34 @@ impl MapRound {
         self.rows[diff as usize].clone()
     }
 
+    fn initial_generate(&mut self) {
+        const STANDS_HEIGHT : u32 = 8;
+        for i in 0..8 {
+            self.rows.push_front(Row {
+                row_id : RowId(i),
+                row_type : RowType::Stands(),
+            });
+        }
+
+        self.rows.push_front(Row {
+            row_id : RowId(STANDS_HEIGHT),
+            row_type : RowType::StartingBarrier(),
+        })
+    }
+
     fn generate_to_y(&mut self, row_id_target : RowId) {
         while self.rows.front().map(|row| row_id_target.0 > row.row_id.0).unwrap_or(true) {
             let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
-            println!("{} {} {:?}", self.seed, self.round_id, row_id);
+            //println!("{} {} {:?}", self.seed, self.round_id, row_id);
             let rng = FroggyRng::from_hash((self.seed, self.round_id, row_id));
-            println!("generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
+            //println!("generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
 
             if (rng.gen("gen_feature") % 5 == 0) {
                 //if (rng.gen("feature_type") % 2 == 0) {
                     let lanes = *rng.choose("road_lanes", &[1, 2, 3, 4, 5]);
                     let initial_direction = *rng.choose("initial_direction", &[true, false]);
 
-                    println!("generating road at {:?}, y={}, lanes {}", row_id, row_id.to_y(), lanes);
+                    //println!("generating road at {:?}, y={}, lanes {}", row_id, row_id.to_y(), lanes);
                     for i in 0..lanes {
                         let rid = RowId(row_id.0 + i);
                         let y = rid.to_y();
@@ -231,52 +259,6 @@ impl MapRound {
         }
     }
 
-    fn generate_to_y_old(&mut self, row_id_target : RowId) {
-        // Tmp dumb impl
-        while self.rows.front().map(|row| row_id_target.0 > row.row_id.0).unwrap_or(true) {
-            let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
-
-            let row_type = if (row_id.0 > 6) {
-                let mod_val = (row_id.0 / 2) % 6;
-                if mod_val == 1 {
-
-                    RowType::Path(PathDescr {
-                        wall_width: 1,
-                    })
-                    /*
-                    RowType::River(RiverDescr{
-                        seed : 0,
-                    })
-                    */
-                }
-                else if mod_val == 3 {
-                    let y = row_id.to_y();
-                    let inverted = row_id.0 % 2 == 0;
-                    self.roads.push((y, Road::new(self.seed, self.round_id, y, inverted)));
-
-                    RowType::Road(RoadDescr {
-                        seed : 0,
-                        inverted,
-                    })
-                }
-                else {
-                    RowType::Path(PathDescr {
-                        wall_width: 1,
-                    })
-                }
-            }
-            else {
-                RowType::Path(PathDescr {
-                    wall_width: 1,
-                })
-            };
-
-            self.rows.push_front(Row{
-                row_id,
-                row_type,
-            });
-        }
-    }
 
     fn get_cars(&self, time_us : u32) -> Vec<CarPublic> {
         let mut cars = Vec::with_capacity(8);
@@ -298,5 +280,42 @@ impl RowId {
 
     pub fn to_y(&self) -> i32 {
         (SCREEN_SIZE - self.0 as i32)
+    }
+}
+
+
+fn outside_walls(x : i32, wall_width : i32) -> bool {
+    x < wall_width as i32 || x >= (SCREEN_SIZE - wall_width as i32)
+}
+
+impl Row {
+    pub fn solid(&self, _time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
+        assert!(self.row_id.to_y() == pos.y);
+        let x = pos.x;
+
+        if let CrossyRulesetFST::Lobby(_) = rule_state {
+            // Nothing is solid
+            return false;
+        }
+
+        const STANDS_WIDTH : i32 = 6;
+        match &self.row_type {
+            RowType::Path(s) => {
+                outside_walls(x, s.wall_width as i32)
+            },
+            RowType::StartingBarrier() => {
+                if let CrossyRulesetFST::RoundWarmup(_) = rule_state {
+                    // Whole row solid while barrier is up
+                    true
+                }
+                else{
+                    outside_walls(x, STANDS_WIDTH)
+                }
+            }
+            RowType::Stands() => {
+                outside_walls(x, STANDS_WIDTH)
+            },
+            _ => false,
+        }
     }
 }
