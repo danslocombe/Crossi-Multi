@@ -45,7 +45,7 @@ impl FroggyRng {
         let hash = hash(x);
         let index = (Wrapping(self.seed) + Wrapping(hash)).0;
         let res = split_mix_64(index);
-        debug_log!("Generating for index {} from seed {} hash {} | {}", index, self.seed, hash, res);
+        //debug_log!("Generating for index {} from seed {} hash {} | {}", index, self.seed, hash, res);
         res
     }
 

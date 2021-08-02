@@ -13,8 +13,17 @@ export function create_camera() {
         },
 
         tick : function(rule_state) {
-            if (rule_state && rule_state.Round) {
-                this.target_y = rule_state.Round.screen_y;
+            if (rule_state) {
+                if (rule_state.Round) {
+                    this.target_y = rule_state.Round.screen_y;
+                }
+                else if (rule_state.RoundWarmup) {
+                    this.target_y = 0;
+                }
+                else if (rule_state.RoundCooldown) {
+                    console.log(rule_state);
+                    this.target_y = rule_state.RoundCooldown.round_state.screen_y;
+                }
             } 
             this.y = dan_lerp(this.y, this.target_y, 3);
             if (this.screen_shake_t > 0) {

@@ -50,7 +50,7 @@ pub enum CrossyRulesetFST
 const MIN_PLAYERS : usize = 2;
 const COUNTDOWN_TIME_US : u32 = 3 * 1_000_000;
 const COOLDOWN_TIME_US : u32 = 4 * 1_000_000;
-const REQUIRED_WIN_COUNT : u8 = 3;
+const REQUIRED_WIN_COUNT : u8 = 25;
 
 use CrossyRulesetFST::*;
 
@@ -96,6 +96,12 @@ impl CrossyRulesetFST
             RoundWarmup(state) => {
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
+                        // HACK hold players in position for some time to enforce
+                        // propagation
+                        if (remaining_us > 2_000_000) {
+                            reset_positions(player_states);
+                        }
+
                         RoundWarmup(WarmupState {
                             remaining_us,
                             in_game : state.in_game.clone(),

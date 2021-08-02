@@ -57,8 +57,6 @@ impl Road {
         let mut cars0 = Vec::with_capacity(16);
         let mut cur = 0.0;
 
-        cars0.push(Car(0.0));
-
         // Make sure that there is at least one space at the end of the cycle large enough to go through
         // Make sure we never produce an impossible level
         while ({
