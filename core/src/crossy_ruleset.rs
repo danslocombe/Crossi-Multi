@@ -124,7 +124,7 @@ impl CrossyRulesetFST
                 let mut new_state = state.clone();
                 // New player joined?
                 new_state.alive_players.seed_missing(player_states, false);
-                new_state.screen_y = update_screen_y(new_state.screen_y, player_states);
+                new_state.screen_y = update_screen_y(new_state.screen_y, player_states, &new_state.alive_players);
                 kill_players(time_us, new_state.round_id, &mut new_state.alive_players, map, player_states, new_state.screen_y);
 
                 let alive_player_count = new_state.alive_players.iter().filter(|(_, x)| **x).count();
@@ -142,7 +142,7 @@ impl CrossyRulesetFST
             RoundCooldown(state) => {
                 let mut new_state = state.clone();
                 new_state.round_state.alive_players.seed_missing(player_states, false);
-                new_state.round_state.screen_y = update_screen_y(new_state.round_state.screen_y, player_states);
+                new_state.round_state.screen_y = update_screen_y(new_state.round_state.screen_y, player_states, &new_state.round_state.alive_players);
                 kill_players(time_us, state.round_state.round_id, &mut new_state.round_state.alive_players, map, player_states, new_state.round_state.screen_y);
 
                 match state.remaining_us.checked_sub(dt) {
@@ -215,6 +215,16 @@ impl CrossyRulesetFST
             }
         }
     }
+     
+    pub fn get_screen_y(&self) -> i32 {
+        match self {
+            Lobby(_) => 0,
+            RoundWarmup(_) => 0,
+            Round(state) => state.screen_y,
+            RoundCooldown(state) => state.round_state.screen_y,
+            End(_) => 0,
+        }
+    }
 }
 
 fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {
@@ -226,11 +236,13 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {
     }
 }
 
-fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>) -> i32 {
+fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>, alive_players : &PlayerIdMap<bool>) -> i32 {
     const SCREEN_Y_BUFFER : i32 = 6;
-    for (_, player) in player_states.iter() {
-        if let Pos::Coord(pos) = player.pos {
-            screen_y = screen_y.min(pos.y - SCREEN_Y_BUFFER);
+    for (id, player) in player_states.iter() {
+        if alive_players.get_copy(id).unwrap_or(false) {
+            if let Pos::Coord(pos) = player.pos {
+                screen_y = screen_y.min(pos.y - SCREEN_Y_BUFFER);
+            }
         }
     }
 

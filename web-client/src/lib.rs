@@ -46,7 +46,6 @@ pub struct Client {
 
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
-    screen_y : i32,
 
     queued_server_messages : VecDeque<interop::ServerTick>,
 }
@@ -76,7 +75,6 @@ impl Client {
             // TODO proper ready state
             ready_state : true,
             trusted_rule_state: None,
-            screen_y : 0,
             queued_server_messages: VecDeque::new(),
         } 
     }
@@ -193,10 +191,6 @@ impl Client {
 
         self.last_server_tick = Some(server_tick.latest.time_us);
         self.trusted_rule_state = Some(server_tick.rule_state.clone());
-
-        if let crossy_ruleset::CrossyRulesetFST::Round(rs) = &server_tick.rule_state {
-            self.screen_y = rs.screen_y;
-        }
     }
 
     pub fn recv(&mut self, server_tick : &[u8])
@@ -274,8 +268,9 @@ impl Client {
     fn get_rows(&mut self) -> Vec<(i32, map::Row)> {
         let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
         let mut vec = Vec::with_capacity(32);
-        let range_min = self.screen_y;
-        let range_max = (self.screen_y + 160/8 + 6).min(160/8);
+        let screen_y = self.trusted_rule_state.as_ref().map(|x| x.get_screen_y()).unwrap_or(0);
+        let range_min = screen_y;
+        let range_max = (screen_y + 160/8 + 6).min(160/8);
         for i in range_min..range_max {
             let y = i;
             vec.push((y as i32, self.timeline.map.get_row(round_id, y).clone()));
