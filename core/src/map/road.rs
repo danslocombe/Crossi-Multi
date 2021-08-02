@@ -123,9 +123,7 @@ impl Road {
         let mut cars = Vec::with_capacity(self.cars0.len());
         for car in &self.cars0 {
             let driven_car = car.drive(self.time_scale * time_us as f64);
-            if (driven_car.on_screen()) {
-                cars.push(driven_car);
-            }
+            cars.push(driven_car);
         }
 
         cars
@@ -135,9 +133,5 @@ impl Road {
 impl Car {
     fn drive(self, time : f64 ) -> Self {
         Car(f64::fract(self.0 + time))
-    }
-
-    fn on_screen(&self) -> bool {
-        self.0 > -CAR_WIDTH || self.0 < super::SCREEN_SIZE as f64 + CAR_WIDTH
     }
 }

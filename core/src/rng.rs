@@ -43,9 +43,6 @@ fn split_mix_64(index : u64) -> u64 {
 }
 
 fn hash<T : Hash>(x : T) -> u64 {
-    // TODO jenkins hasher chosen as it gives deterministic results across wasm/x64
-    // Look at others.
-    //let mut hasher = deterministic_hash::DeterministicHasher::new(hashers::jenkins::Lookup3Hasher::default());
     let mut hasher = deterministic_hash::DeterministicHasher::new(DumbHash {value : 0});
     x.hash(&mut hasher);
     hasher.finish()
