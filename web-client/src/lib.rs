@@ -2,6 +2,7 @@ mod wasm_instant;
 
 use wasm_bindgen::prelude::*;
 
+use std::collections::VecDeque;
 use wasm_instant::WasmInstant;
 use std::time::Duration;
 use serde::Deserialize;
@@ -46,6 +47,8 @@ pub struct Client {
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
     screen_y : i32,
+
+    queued_server_messages : VecDeque<interop::ServerTick>,
 }
 
 #[wasm_bindgen]
@@ -74,6 +77,7 @@ impl Client {
             ready_state : true,
             trusted_rule_state: None,
             screen_y : 0,
+            queued_server_messages: VecDeque::new(),
         } 
     }
 
@@ -131,9 +135,21 @@ impl Client {
         });
 
         // Tick 
-
+        let current_time_us = current_time.as_micros() as u32;
         self.timeline
             .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
+
+        // BIGGEST hack
+        // dont have the energy to explain, but the timing is fucked and just want to demo something.
+        let mut server_tick_it = None;
+        while  {
+            self.queued_server_messages.back().map(|x| x.latest.time_us < current_time_us).unwrap_or(false)
+        }
+        {server_tick_it = self.queued_server_messages.pop_back();}
+
+        if let Some(server_tick) = server_tick_it {
+            self.process_server_message(&server_tick);
+        }
 
         if (self.timeline.top_state().frame_id.floor() as u32 % 60) == 0
         {
@@ -141,15 +157,7 @@ impl Client {
         }
     }
 
-    pub fn recv(&mut self, server_tick : &[u8])
-    {
-        if let Some(deserialized) = try_deserialize_server_tick(server_tick)
-        {
-            self.recv_internal(&deserialized);
-        }
-    }
-
-    fn recv_internal(&mut self, server_tick : &interop::ServerTick)
+    fn process_server_message(&mut self, server_tick : &interop::ServerTick)
     {
         match self.local_player_info.as_ref()
         {
@@ -189,6 +197,19 @@ impl Client {
         if let crossy_ruleset::CrossyRulesetFST::Round(rs) = &server_tick.rule_state {
             self.screen_y = rs.screen_y;
         }
+    }
+
+    pub fn recv(&mut self, server_tick : &[u8])
+    {
+        if let Some(deserialized) = try_deserialize_server_tick(server_tick)
+        {
+            self.recv_internal(deserialized);
+        }
+    }
+
+    fn recv_internal(&mut self, server_tick : interop::ServerTick)
+    {
+        self.queued_server_messages.push_front(server_tick);
     }
 
     pub fn get_client_message(&self) -> Vec<u8>
