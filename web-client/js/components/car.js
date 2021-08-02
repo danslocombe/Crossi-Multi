@@ -2,11 +2,14 @@ import { SCALE} from "./constants.js";
 
 const spr_car_width = 24;
 const spr_car_height = 16;
+const car_sprite_count = 4;
+
 let spr_car = new Image(spr_car_width, spr_car_height);
 spr_car.src = '/sprites/spr_car_flipped.png';
 
 let spr_car_flipped = new Image(spr_car_width, spr_car_height);
 spr_car_flipped.src = '/sprites/spr_car.png';
+
 
 export function make_car(car) {
     const x = car[0] * SCALE;
@@ -26,6 +29,7 @@ export function make_car(car) {
         frame_id : frame_id,
         spr : spr,
         draw : function(froggy_draw_ctx) {
+            this.frame_id = Math.floor(this.x / 8) % car_sprite_count;
             froggy_draw_ctx.ctx.drawImage(this.spr,
                 spr_car_width*this.frame_id,
                 0,
