@@ -41,18 +41,20 @@ impl Road {
         debug_log!("Create road seed={} round={} y={} rng {:?}", seed, round, y, rng);
 
         const R_WIDTH_MIN : f64 = 0.15;
-        const R_WIDTH_MAX : f64 = 0.30;
+        const R_WIDTH_MAX : f64 = 0.35;
         let r_width = rng.gen_range("r_width", R_WIDTH_MIN, R_WIDTH_MAX);
 
-        const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 2.25;
+        const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 1.25;
         const MAX_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 22.;
 
         // Min space to squeeze through
-        const SQUEEZE_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 4.25;
+        const SQUEEZE_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 3.25;
+        //const TILES_TO_UNIT :  = (1.0 / super::SCREEN_SIZE as f64) * 
 
-        let min_car_spacing = r_width * MIN_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
-        let max_car_spacing = r_width * MAX_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
-        let squeeze_car_spacing_screen = r_width * SQUEEZE_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
+        //let tile_size_under_r = r_width / super::SCREEN_SIZE as f64;
+        let min_car_spacing = MIN_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
+        let max_car_spacing = MAX_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
+        let squeeze_car_spacing_screen = SQUEEZE_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
 
         let mut cars0 = Vec::with_capacity(16);
         let mut cur = 0.0;
@@ -69,7 +71,7 @@ impl Road {
             cars0,
             r0 : 0.5 - r_width,
             r1 : 0.5 + r_width,
-            time_scale : 1.0 / 8_000_000.0, 
+            time_scale : 1.0 / 12_000_000.0, 
             inverted,
         }
     }

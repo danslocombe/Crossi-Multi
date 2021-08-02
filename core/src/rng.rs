@@ -78,7 +78,10 @@ impl FroggyRng {
     }
 
     pub fn choose<'a, T : Hash, X>(&self, x : T, choices : &'a [X]) -> &'a X {
-        let i = self.gen(x) as usize % choices.len();
+        // usize can be aliased to u32 or u64 in wasm based on the compilation
+        // for safety we restrict to u32 range.
+        let index = self.gen(x) as u64 % u32::MAX as u64;
+        let i = index as usize % choices.len();
         &choices[i]
     }
 }
