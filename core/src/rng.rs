@@ -18,23 +18,6 @@ pub struct FroggyRng {
     seed : u64,
 }
 
-struct DumbHash {
-    value : u64,
-}
-
-impl Hasher for DumbHash {
-    #[inline]
-    fn finish(&self) -> u64 {
-        self.value
-    }
-
-    fn write(&mut self, bytes: &[u8]) {
-        for x in bytes {
-            self.value += *x as u64;
-        }
-    }
-}
-
 fn split_mix_64(index : u64) -> u64 {
     let mut z = Wrapping(index) + Wrapping(0x9E3779B97F4A7C15);
     z = (z ^ (z >> 30)) * Wrapping(0xBF58476D1CE4E5B9);
@@ -42,8 +25,9 @@ fn split_mix_64(index : u64) -> u64 {
     (z ^ (z >> 31)).0
 }
 
+#[inline]
 fn hash<T : Hash>(x : T) -> u64 {
-    let mut hasher = deterministic_hash::DeterministicHasher::new(DumbHash {value : 0});
+    let mut hasher = deterministic_hash::DeterministicHasher::new(FroggyHash::new());
     x.hash(&mut hasher);
     hasher.finish()
 }
@@ -80,5 +64,36 @@ impl FroggyRng {
         let index = self.gen(x) as u64 % u32::MAX as u64;
         let i = index as usize % choices.len();
         &choices[i]
+    }
+}
+
+// We don't need a smart hash as this is just used as an input to splitmix.
+// splitmix generates outputs in a uniform distribution, just need something 
+// platform independent that gives varied results based on input order.
+struct FroggyHash {
+    value : Wrapping<u64>,
+}
+
+impl FroggyHash {
+    #[inline]
+    fn new() -> Self {
+        Self {
+            value : Wrapping(12345674357),
+        }
+    }
+}
+
+impl Hasher for FroggyHash {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.value.0
+    }
+
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        for x in bytes {
+            self.value = Wrapping(self.value.0.rotate_left(1));
+            self.value += Wrapping(*x as u64);
+        }
     }
 }

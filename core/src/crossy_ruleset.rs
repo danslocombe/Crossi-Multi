@@ -29,9 +29,7 @@ pub struct RoundState {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CooldownState {
     pub remaining_us : u32,
-    pub alive_players : PlayerIdMap<bool>,
-    pub win_counts : PlayerIdMap<u8>,
-    pub round_id : u8,
+    pub round_state : RoundState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -117,49 +115,42 @@ impl CrossyRulesetFST
                 }
             },
             Round(state) => {
-                let mut new_round = state.clone();
+                let mut new_state = state.clone();
                 // New player joined?
-                new_round.alive_players.seed_missing(player_states, false);
-                kill_players(time_us, new_round.round_id, &mut new_round.alive_players, map, player_states);
+                new_state.alive_players.seed_missing(player_states, false);
+                new_state.screen_y = update_screen_y(new_state.screen_y, player_states);
+                kill_players(time_us, new_state.round_id, &mut new_state.alive_players, map, player_states, new_state.screen_y);
 
-                const SCREEN_Y_BUFFER : i32 = 6;
-                for (_, player) in player_states.iter() {
-                    if let Pos::Coord(pos) = player.pos {
-                        new_round.screen_y = new_round.screen_y.min(pos.y - SCREEN_Y_BUFFER);
-                    }
-                }
-                let alive_player_count = new_round.alive_players.iter().filter(|(_, x)| **x).count();
+                let alive_player_count = new_state.alive_players.iter().filter(|(_, x)| **x).count();
 
                 if (alive_player_count <= 1) {
                     RoundCooldown(CooldownState {
                         remaining_us : COOLDOWN_TIME_US,
-                        alive_players : new_round.alive_players.clone(),
-                        win_counts : new_round.win_counts.clone(),
-                        round_id : state.round_id,
+                        round_state : new_state,
                     })
                 }
                 else {
-                    Round(new_round)
+                    Round(new_state)
                 }
             },
             RoundCooldown(state) => {
-                let mut alive_players = state.alive_players.clone();
-                kill_players(time_us, state.round_id, &mut alive_players, map, player_states);
+                let mut new_state = state.clone();
+                new_state.round_state.alive_players.seed_missing(player_states, false);
+                new_state.round_state.screen_y = update_screen_y(new_state.round_state.screen_y, player_states);
+                kill_players(time_us, state.round_state.round_id, &mut new_state.round_state.alive_players, map, player_states, new_state.round_state.screen_y);
 
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
                         RoundCooldown(CooldownState {
                             remaining_us,
-                            alive_players : state.alive_players.clone(),
-                            win_counts : state.win_counts.clone(),
-                            round_id : state.round_id,
+                            round_state : new_state.round_state,
                         })
                     }
                     _ => {
                         // We know up to one person is alive here
-                        let winner = state.alive_players.iter().filter(|(_, x)| **x).map(|(id, _)| id).next();
+                        let winner = new_state.round_state.alive_players.iter().filter(|(_, x)| **x).map(|(id, _)| id).next();
 
-                        let mut win_counts = state.win_counts.clone();
+                        let mut win_counts = new_state.round_state.win_counts.clone();
 
                         if let Some(winner_id) = winner {
                             let new_count = win_counts.get(winner_id).map(|x| *x).unwrap_or(0) + 1;
@@ -180,7 +171,7 @@ impl CrossyRulesetFST
                             remaining_us : COUNTDOWN_TIME_US,
                             win_counts,
                             in_game,
-                            round_id : state.round_id + 1,
+                            round_id : new_state.round_state.round_id + 1,
                         })
                     }
                 }
@@ -195,7 +186,7 @@ impl CrossyRulesetFST
             Lobby(_) => 0,
             RoundWarmup(x) => x.round_id,
             Round(x) => x.round_id,
-            RoundCooldown(x) => x.round_id,
+            RoundCooldown(x) => x.round_state.round_id,
             End(_) => 0,
         }
     }
@@ -211,7 +202,7 @@ impl CrossyRulesetFST
                 state.alive_players.get_copy(player_id).unwrap_or(false)
             },
             RoundCooldown(state) => {
-                state.alive_players.get_copy(player_id).unwrap_or(false)
+                state.round_state.alive_players.get_copy(player_id).unwrap_or(false)
             },
             End(state) => {
                 player_id == state.winner_id
@@ -229,33 +220,53 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {
     }
 }
 
-fn kill_players(time_us : u32, round_id : u8, alive_players : &mut PlayerIdMap<bool>, map : &Map, player_states : &PlayerIdMap<PlayerState>) {
+fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>) -> i32 {
+    const SCREEN_Y_BUFFER : i32 = 6;
+    for (_, player) in player_states.iter() {
+        if let Pos::Coord(pos) = player.pos {
+            screen_y = screen_y.min(pos.y - SCREEN_Y_BUFFER);
+        }
+    }
+
+    screen_y
+}
+
+fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerState, screen_y : i32) -> bool{
+    // TODO also check position you are moving to
+    //if let Stationary = player_state.move_state {
+        match player_state.pos {
+            Pos::Coord(coord_pos) => {
+                let CoordPos{x : _x, y} = coord_pos;
+                const SCREEN_KILL_BUFFER : i32 = 4;
+                if y > screen_y + crate::SCREEN_SIZE + SCREEN_KILL_BUFFER {
+                    return true;
+                }
+
+                let row = map.get_row(round_id, y);
+                if let RowType::River(_) = row.row_type {
+                    return true;
+                }
+
+                if map.collides_car(time_us, round_id, coord_pos) {
+                    return true;
+                }
+            },
+            // TODO
+            _ => {},
+        }
+    //}
+
+    false
+}
+
+fn kill_players(time_us : u32, round_id : u8, alive_players : &mut PlayerIdMap<bool>, map : &Map, player_states : &PlayerIdMap<PlayerState>, screen_y : i32) {
     for (id, player_state) in player_states {
         let alive = alive_players.get_copy(id).unwrap_or(false);
         if (!alive) {
             continue;
         }
 
-        let mut kill = false;
-        //if let Stationary = player_state.move_state {
-            match player_state.pos {
-                Pos::Coord(coord_pos) => {
-                    let CoordPos{x : _x, y} = coord_pos;
-                    let row = map.get_row(round_id, y);
-                    if let RowType::River(_) = row.row_type {
-                        kill = true;
-                    }
-                    else if map.collides_car(time_us, round_id, coord_pos) {
-                        kill = true;
-                    }
-                },
-                _ => {},
-            }
-        //}
-
-
-
-        if (kill) {
+        if should_kill(time_us, round_id, map, player_state, screen_y) {
             alive_players.set(id, false);
         }
     }

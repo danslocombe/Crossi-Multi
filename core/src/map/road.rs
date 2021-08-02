@@ -44,14 +44,12 @@ impl Road {
         const R_WIDTH_MAX : f64 = 0.35;
         let r_width = rng.gen_range("r_width", R_WIDTH_MIN, R_WIDTH_MAX);
 
-        const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 1.25;
-        const MAX_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 22.;
+        const MIN_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 0.8;
+        const MAX_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 4.;
 
         // Min space to squeeze through
-        const SQUEEZE_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 3.25;
-        //const TILES_TO_UNIT :  = (1.0 / super::SCREEN_SIZE as f64) * 
+        const SQUEEZE_CAR_SPACING_SCREEN : f64 = CAR_WIDTH  * 1.35;
 
-        //let tile_size_under_r = r_width / super::SCREEN_SIZE as f64;
         let min_car_spacing = MIN_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
         let max_car_spacing = MAX_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
         let squeeze_car_spacing_screen = SQUEEZE_CAR_SPACING_SCREEN / super::SCREEN_SIZE as f64;
@@ -59,10 +57,15 @@ impl Road {
         let mut cars0 = Vec::with_capacity(16);
         let mut cur = 0.0;
 
+        cars0.push(Car(0.0));
+
         // Make sure that there is at least one space at the end of the cycle large enough to go through
         // Make sure we never produce an impossible level
-        while (cur < 1.0 - squeeze_car_spacing_screen) {
+        while ({
             cur += rng.gen_range(("car_spacing", cars0.len()), min_car_spacing, max_car_spacing);
+            cur < 1.0 - squeeze_car_spacing_screen
+        })
+        {
             cars0.push(Car(cur));
         }
 

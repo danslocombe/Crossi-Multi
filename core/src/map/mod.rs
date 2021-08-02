@@ -7,6 +7,7 @@ use road::{RoadDescr, Road, CarPublic};
 use crate::rng::FroggyRng;
 use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::game::CoordPos;
+use crate::SCREEN_SIZE;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash)]
 pub struct RowId(u32);
@@ -227,7 +228,9 @@ impl MapRound {
                         let rid = RowId(row_id.0 + i);
                         let y = rid.to_y();
                         debug_log!("Adding road at {}", y);
-                        self.roads.push((y, Road::new(self.seed, self.round_id, y, initial_direction)));
+                        let road = Road::new(self.seed, self.round_id, y, initial_direction);
+                        debug_log!("Road {:?}", &road);
+                        self.roads.push((y, road));
                         self.rows.push_front(Row {
                             row_id: rid,
                             row_type: RowType::Road(RoadDescr {
@@ -239,7 +242,9 @@ impl MapRound {
                         let rid = RowId(row_id.0 + lanes + i);
                         let y = rid.to_y();
                         debug_log!("Adding road inverted at {}", y);
-                        self.roads.push((y, Road::new(self.seed, self.round_id, y, !initial_direction)));
+                        let road = Road::new(self.seed, self.round_id, y, !initial_direction);
+                        debug_log!("Road {:?}", &road);
+                        self.roads.push((y, road));
                         self.rows.push_front(Row {
                             row_id: rid,
                             row_type: RowType::Road(RoadDescr {
@@ -277,7 +282,6 @@ impl MapRound {
 }
 
 // Hackkyyyyy
-const SCREEN_SIZE : i32 = 160 / 8;
 
 impl RowId {
     pub fn from_y(y : i32) -> Self {

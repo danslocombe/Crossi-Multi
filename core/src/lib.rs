@@ -37,6 +37,8 @@ macro_rules! debug_log {
     }
 }
 
+const SCREEN_SIZE : i32 = 160 / 8;
+
 pub mod game;
 pub mod player_id_map;
 pub mod interop;
