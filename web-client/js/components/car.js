@@ -29,14 +29,19 @@ export function make_car(car) {
         frame_id : frame_id,
         spr : spr,
         draw : function(froggy_draw_ctx) {
-            this.frame_id = Math.floor(this.x / 8) % car_sprite_count;
+            const xx = this.x - spr_car_width / 2 + froggy_draw_ctx.x_off;
+            const yy = this.y - spr_car_height / 2 + froggy_draw_ctx.y_off;
+
+            // Add 100 to x to make sure we end up with a postive value
+            this.frame_id = Math.floor((100 + this.x) / 8) % car_sprite_count;
+
             froggy_draw_ctx.ctx.drawImage(this.spr,
                 spr_car_width*this.frame_id,
                 0,
                 spr_car_width,
                 spr_car_height,
-                this.x - spr_car_width / 2 + froggy_draw_ctx.x_off,
-                this.y - spr_car_height / 2 + froggy_draw_ctx.y_off,
+                xx,
+                yy,
                 spr_car_width,
                 spr_car_height);
         }
