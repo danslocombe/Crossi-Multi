@@ -57,7 +57,7 @@ impl Server {
                 new_players: Vec::new(),
                 timeline: Timeline::new(),
                 prev_tick: start,
-                start: start,
+                start,
                 next_socket_id : SocketId(0),
             }),
         }
@@ -193,11 +193,8 @@ impl Server {
 
             let now = Instant::now();
             let elapsed_time = now.saturating_duration_since(tick_start);
-            match DESIRED_TICK_TIME.checked_sub(elapsed_time) {
-                Some(sleep_time) => {
-                    tokio::time::sleep(sleep_time).await;
-                }
-                None => {},
+            if let Some(sleep_time) = DESIRED_TICK_TIME.checked_sub(elapsed_time) {
+                tokio::time::sleep(sleep_time).await;
             }
         }
     }

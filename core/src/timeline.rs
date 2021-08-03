@@ -90,7 +90,7 @@ impl Timeline {
     }
 
     pub fn propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) {
-        if (inputs.len() == 0) {
+        if (inputs.is_empty()) {
             return;
         }
 
@@ -151,7 +151,6 @@ impl Timeline {
             inputs.set(player_id, input);
             let mut split_state = state_before.simulate(Some(inputs), dt as u32, &self.map);
             split_state.frame_id -= 0.5;
-            drop(state_before);
 
             self.states.insert(before, split_state);
             Some(before)
@@ -192,7 +191,7 @@ impl Timeline {
         let mut use_client_predictions : Vec<PlayerId> = local_player.into_iter().collect();
 
         if let Some(state) = client_latest_remote_state.as_ref() {
-            if let Some(index) = self.split_with_state(&vec![], &state.states, None, state.time_us) {
+            if let Some(index) = self.split_with_state(&[], &state.states, None, state.time_us) {
                 while self.states.len() > index + 1 {
                     self.states.pop_back();
                 }
@@ -200,12 +199,12 @@ impl Timeline {
                 if (index > 0) {
                     self.simulate_up_to_date(index);
 
-                    local_player.map(|lp| {
+                    if let Some(lp) = local_player {
                         use_client_predictions = self.players_to_use_client_predictions(index, lp);
                         //if (use_client_predictions.len() > 1) {
                             //crate::debug_log(&format!("{:?}", use_client_predictions));
                         //}
-                    });
+                    }
                 }
             }
         }
@@ -251,8 +250,6 @@ impl Timeline {
             }
 
             split_state.frame_id -= 0.5;
-            drop(state_before);
-
             self.states.insert(before, split_state);
             Some(before)
         }
@@ -335,6 +332,10 @@ impl Timeline {
 
     pub fn len(&self) -> usize {
         self.states.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
     }
 }
 

@@ -10,6 +10,12 @@ pub struct PlayerIdMap<T> {
     inner : Vec<Option<T>>,
 }
 
+impl<T> Default for PlayerIdMap<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> PlayerIdMap<T> {
     pub fn new() -> Self {
         PlayerIdMap {

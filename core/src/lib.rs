@@ -16,7 +16,7 @@ pub fn set_debug_logger(logger : Box<dyn DebugLogger>) {
 
 fn debug_logline(logline : &str)
 {
-    unsafe { DEBUG_LOGGER.as_ref().map(|x| x.log(logline)); }
+    unsafe { if let Some(x) = DEBUG_LOGGER.as_ref() { x.log(logline); }}
 }
 
 pub trait DebugLogger {

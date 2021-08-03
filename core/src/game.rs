@@ -133,7 +133,7 @@ impl GameState {
     pub fn from_server_parts(_seed: u32, time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
         let player_states = PlayerIdMap::from_definition(player_states_def.into_iter().map(|x| (x.id, x)).collect());
         GameState {
-            time_us: time_us,
+            time_us,
             player_states,
             player_inputs: PlayerInputs::new(),
             ruleset_state,
@@ -209,7 +209,7 @@ impl GameState {
         self.time_us += dt_us;
         self.frame_id += 1.0;
 
-        self.player_inputs = player_inputs.unwrap_or(PlayerInputs::new());
+        self.player_inputs = player_inputs.unwrap_or_default();
 
         for _log in &mut self.log_states {
             // TODO
@@ -221,16 +221,13 @@ impl GameState {
 
             // We can safely unwrap as we are iterating over valid_ids()
             let player_state = self.player_states.get(id).unwrap();
-
             let iterated = player_state.tick_iterate(self, player_input, dt_us, &mut pushes, map);
-            drop(player_state);
 
             self.set_player_state(id, iterated);
 
             if let Some(push) = pushes.first() {
                 let player_state = self.get_player(push.id).unwrap();
                 let pushed = player_state.push(push);
-                drop(player_state);
                 self.set_player_state(push.id, pushed);
             }
         }
@@ -343,7 +340,7 @@ pub const MOVE_DUR: u32 = 7 * (1_000_000 / 60);
 impl PlayerState {
     pub fn can_move(&self) -> bool {
         if let MoveState::Stationary = self.move_state {
-            self.move_cooldown <= 0
+            self.move_cooldown == 0
         } else {
             false
         }
@@ -353,14 +350,14 @@ impl PlayerState {
         let mut new = self.clone();
         match new.move_state {
             MoveState::Stationary => {
-                new.move_cooldown = new.move_cooldown.checked_sub(dt_us).unwrap_or(0);
+                new.move_cooldown = new.move_cooldown.saturating_sub(dt_us);
             }
             MoveState::Moving(moving_state) => {
                 match moving_state.remaining_us.checked_sub(dt_us)
                 {
                     Some(remaining_us) =>
                     {
-                        let mut new_state = moving_state.clone();
+                        let mut new_state = moving_state;
                         new_state.remaining_us = remaining_us;
                         new.move_state = MoveState::Moving(new_state);
                     },
@@ -374,7 +371,7 @@ impl PlayerState {
                         new.move_state = MoveState::Stationary;
 
                         // rem_ms <= 0 so we add it to the max cooldown
-                        new.move_cooldown = MOVE_COOLDOWN_MAX.checked_sub(leftover_us).unwrap_or(0);
+                        new.move_cooldown = MOVE_COOLDOWN_MAX.saturating_sub(leftover_us);
                     },
                 }
             }

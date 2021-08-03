@@ -159,7 +159,7 @@ impl CrossyRulesetFST
                         let mut win_counts = new_state.round_state.win_counts.clone();
 
                         if let Some(winner_id) = winner {
-                            let new_count = win_counts.get(winner_id).map(|x| *x).unwrap_or(0) + 1;
+                            let new_count = win_counts.get(winner_id).copied().unwrap_or(0) + 1;
                             if (new_count >= REQUIRED_WIN_COUNT) {
                                 return End(EndState {
                                     winner_id,
