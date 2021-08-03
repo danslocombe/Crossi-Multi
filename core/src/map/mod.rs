@@ -288,7 +288,7 @@ impl RowId {
         Self((SCREEN_SIZE - y) as u32)
     }
 
-    pub fn to_y(&self) -> i32 {
+    pub fn to_y(self) -> i32 {
         (SCREEN_SIZE - self.0 as i32)
     }
 }

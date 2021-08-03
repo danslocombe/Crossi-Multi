@@ -45,20 +45,20 @@ pub struct ServerDescription {
     pub seed: u32,
 }
 
-pub const INIT_MESSAGE: [u8; 4] = ['h' as u8, 'e' as u8, 'l' as u8, 'o' as u8];
+pub const INIT_MESSAGE: &[u8; 4] = b"helo";
 pub const CURRENT_VERSION: u8 = 1;
 
 impl ClientHello {
     pub fn new(latency_us: u32) -> Self {
         ClientHello {
-            header: INIT_MESSAGE,
+            header: *INIT_MESSAGE,
             version: CURRENT_VERSION,
             latency_us,
         }
     }
 
     pub fn check(&self, required_version: u8) -> bool {
-        self.header == INIT_MESSAGE && self.version >= required_version
+        self.header == *INIT_MESSAGE && self.version >= required_version
     }
 }
 
