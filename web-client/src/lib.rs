@@ -73,7 +73,7 @@ impl Client {
             server_start,
             local_player_info : None,
             // TODO proper ready state
-            ready_state : true,
+            ready_state : false,
             trusted_rule_state: None,
             queued_server_messages: VecDeque::new(),
         } 

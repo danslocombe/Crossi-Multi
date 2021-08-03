@@ -23,8 +23,9 @@ function draw_static_inverted(froggy_draw_ctx, spr, x, y) {
 
 export function draw_background(froggy_draw_ctx, in_lobby, in_warmup, client) {
     let ctx = froggy_draw_ctx.ctx;
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, 256, 256);
+    //ctx.fillStyle = "#000000";
+    ctx.fillStyle = "#EEFFAA";
+    ctx.fillRect(0, 0, 160, 160);
 
     if (!in_lobby) {
         const rows = JSON.parse(client.get_rows_json());

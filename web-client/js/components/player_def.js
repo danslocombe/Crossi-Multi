@@ -14,6 +14,7 @@ function load_sprites(name) {
         spr : spr,
         spr_flipped : spr_flipped,
         spr_dead : spr_dead,
+        spr_name : name,
     }
 }
 
@@ -273,6 +274,7 @@ function create_player_def(sprites, move_sound, source) {
         sprite : sprites.spr,
         sprite_flipped : sprites.spr_flipped,
         sprite_dead : sprites.spr_dead,
+        sprite_name : sprites.spr_name,
         move_sound : move_sound,
         source : source,
         x : 0,

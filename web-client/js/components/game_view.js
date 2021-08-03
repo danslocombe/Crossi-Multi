@@ -4,6 +4,7 @@ import { draw_background } from "./background";
 import { make_car } from "./car";
 import { create_camera } from "./camera";
 import { create_countdown } from "./countdown";
+import { create_dialogue_controller } from "./dialogue";
 //import "/components/player_def";
 
 export function create_game_view(ctx, client, ws, key_event_source) {
@@ -19,6 +20,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         players : [],
         camera : create_camera(),
         countdown : create_countdown(),
+        dialogue : create_dialogue_controller(),
 
         tick : function()
         {
@@ -101,6 +103,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 this.froggy_draw_ctx.y_off = Math.round(-SCALE * this.camera.y);
 
                 this.countdown.tick(this.rule_state);
+                this.dialogue.tick(this.rule_state, this.players, this.simple_entities);
             }
         },
 
@@ -136,6 +139,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     drawable.draw(this.froggy_draw_ctx);
                 }
 
+                this.dialogue.draw(this.froggy_draw_ctx);
                 this.countdown.draw(this.froggy_draw_ctx);
             }
         }
