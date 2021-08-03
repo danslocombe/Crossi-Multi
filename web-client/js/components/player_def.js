@@ -39,6 +39,9 @@ for (let sound of sounds_list) {
     sound.volume = 0.15;
 }
 
+let snd_push = new Audio('/sounds/snd_push.wav');
+snd_push.volume = 0.14;
+
 let snd_hit_car = new Audio('/sounds/snd_car.wav');
 snd_hit_car.volume = 0.25;
 
@@ -241,6 +244,10 @@ export function create_player_local(client, key_event_source) {
                     }
 
                     player_def.move_sound.play();
+
+                    if (player_state.move_state.Moving.push_info.pushing) {
+                        snd_push.play();
+                    }
                 }
                 this.x = x;
                 this.y = y;
