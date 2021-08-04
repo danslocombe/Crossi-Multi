@@ -21,7 +21,6 @@ export function create_camera() {
                     this.target_y = 0;
                 }
                 else if (rule_state.RoundCooldown) {
-                    console.log(rule_state);
                     this.target_y = rule_state.RoundCooldown.round_state.screen_y;
                 }
             } 

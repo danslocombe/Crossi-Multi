@@ -9,10 +9,8 @@ dialogue_sprites.frog.src = "sprites/spr_frog_dialogue.png";
 dialogue_sprites.mouse = new Image(90, 72);
 dialogue_sprites.mouse.src = "sprites/spr_mouse_dialogue.png";
 
-let snd_join = new Audio('/sounds/snd_car.wav');
+let snd_join = new Audio('/sounds/snd_join.wav');
 snd_join.volume = 0.2;
-
-const DIALOGUE_SPR_SIZE = 90;
 
 function ease_in_quad(x) {
     return 1 - (1 - x) * (1 - x);
@@ -130,9 +128,14 @@ export function create_dialogue_controller() {
         lobby_join_queue : [],
         lobby_first_tick : true,
 
+        round_cooldown_first_tick : true,
+
         tick : function(rule_state, players, simple_entities) {
             if (rule_state && rule_state.Lobby) {
                 this.tick_lobby(players, simple_entities);
+            }
+            else {
+                this.tick_game(players, rule_state, simple_entities);
             }
 
             if (this.dialogue_instance)
@@ -142,6 +145,41 @@ export function create_dialogue_controller() {
                 {
                     this.dialogue_instance = undefined;
                 }
+            }
+        },
+
+        tick_game : function(players, rule_state, simple_entities) {
+            if (rule_state && rule_state.RoundCooldown) {
+                let alive_player = false;
+                let alive_player_id = 0;
+
+                // Up to one alive player
+                for (let i in rule_state.RoundCooldown.round_state.alive_players.inner) {
+                    if (rule_state.RoundCooldown.round_state.alive_players.inner[i]) {
+                        alive_player = true;
+                        alive_player_id = i;
+                    }
+                }
+
+                if (this.round_cooldown_first_tick) {
+                    this.round_cooldown_first_tick = false;
+
+                    if (alive_player) 
+                    {
+                        const whiteout = create_whiteout()
+                        simple_entities.push(whiteout);
+                        const sprite_name = players[alive_player_id].sprite_name;
+                        this.dialogue_instance = create_dialogue(sprite_name);
+                    }
+                }
+                else {
+                    if (this.dialogue_instance && (!alive_player || rule_state.RoundCooldown.remaining_us < 20000)) {
+                        this.dialogue_instance.trigger_close();
+                    }
+                }
+            }
+            else {
+                this.round_cooldown_first_tick = true;
             }
         },
 
