@@ -55,7 +55,7 @@ impl Server {
             inner : Mutex::new(ServerInner {
                 clients: Vec::new(),
                 new_players: Vec::new(),
-                timeline: Timeline::from_seed(id as u32),
+                timeline: Timeline::from_seed(1000 + id as u32),
                 prev_tick: start,
                 start,
                 next_socket_id : SocketId(0),

@@ -24,8 +24,12 @@ if (DEBUG)
     // Fetch from specific localhost / port in order to allow better debugging
     // (we host debug build from localhost:8081)
     // NOTE HAVE TO RUN CHROME WITH NO CORS
-    endpoint = 'http://localhost:8080'
-    ws_endpoint = 'ws://localhost:8080'
+    endpoint = 'http://localhost:8080';
+    ws_endpoint = 'ws://localhost:8080';
+}
+else {
+    endpoint = 'http://51.140.157.154:8085';
+    ws_endpoint = 'ws://51.140.157.154:8085';
 }
 
 function dan_fetch(url) {
@@ -115,7 +119,7 @@ function join() {
             socket_id = response.socket_id;
 
             console.log("Creating client");
-            const seed = parseInt(game_id);
+            const seed = 1000 + parseInt(game_id);
             client = new Client(seed, response.server_time_us, estimated_latency_us);
 
             play();
