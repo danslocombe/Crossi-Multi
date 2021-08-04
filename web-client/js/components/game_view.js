@@ -120,7 +120,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     draw_with_depth.push(entity);
                 }
 
-                //if (!in_lobby)
+                if (!in_lobby)
                 {
                     const cars = JSON.parse(this.client.get_cars_json());
                     for (const car of cars) {

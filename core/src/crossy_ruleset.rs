@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::game::{PlayerId, PlayerState, Pos, CoordPos};
+use crate::game::{PlayerId, Pos, CoordPos};
+use crate::player::PlayerState;
 use crate::player_id_map::PlayerIdMap;
 use crate::map::{Map, RowType};
 

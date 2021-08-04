@@ -4,12 +4,12 @@ use crate::player_id_map::PlayerIdMap;
 use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::map::Map;
 
-pub const MAX_PLAYERS: usize = 8;
+use crate::player::*;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Pos {
     Coord(CoordPos),
-    Log(LogId),
+    Lillipad(LillipadId),
 }
 
 impl Pos {
@@ -25,6 +25,13 @@ pub struct CoordPos {
 }
 
 impl CoordPos {
+    pub fn to_precise(self) -> PreciseCoords {
+        PreciseCoords {
+            x: self.x as f64,
+            y: self.y,
+        }
+    }
+
     pub fn apply_input(&self, input: Input) -> Self {
         match input {
             Input::None => *self,
@@ -48,11 +55,53 @@ impl CoordPos {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct PreciseCoords {
+    pub x : f64,
+    pub y : i32,
+}
+
+impl PreciseCoords {
+    pub fn to_coords(self) -> CoordPos {
+        CoordPos {
+            x: self.x.round() as i32,
+            y: self.y,
+        }
+    }
+
+    pub fn apply_input(&self, input: Input) -> Self {
+        match input {
+            Input::None => *self,
+            Input::Up => Self {
+                x: self.x,
+                y: self.y - 1,
+            },
+            Input::Down => Self {
+                x: self.x,
+                y: self.y + 1,
+            },
+            Input::Left => Self {
+                x: self.x - 1.0,
+                y: self.y,
+            },
+            Input::Right => Self {
+                x: self.x + 1.0,
+                y: self.y,
+            },
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
 pub struct PlayerId(pub u8);
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
-pub struct LogId(pub u32);
+pub struct LillipadId
+{
+    pub id : u8,
+    pub y : i32,
+    pub round_id : u8,
+}
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 #[repr(i32)]
@@ -111,10 +160,9 @@ pub struct GameState {
     // Should be fine
     // Only worry is drift from summing, going to matter?
     pub time_us: u32,
-    player_states: PlayerIdMap<PlayerState>,
+    pub(crate) player_states: PlayerIdMap<PlayerState>,
     pub ruleset_state : CrossyRulesetFST,
     pub player_inputs: PlayerInputs,
-    pub log_states: Vec<LogState>,
     pub frame_id: f64,
 }
 
@@ -125,7 +173,6 @@ impl GameState {
             player_states: PlayerIdMap::new(),
             player_inputs: PlayerInputs::new(),
             ruleset_state: CrossyRulesetFST::start(),
-            log_states: vec![],
             frame_id: 0.0,
         }
     }
@@ -137,8 +184,6 @@ impl GameState {
             player_states,
             player_inputs: PlayerInputs::new(),
             ruleset_state,
-            log_states: vec![],
-            //TODO
             frame_id: 0.0,
         }
     }
@@ -211,10 +256,6 @@ impl GameState {
 
         self.player_inputs = player_inputs.unwrap_or_default();
 
-        for _log in &mut self.log_states {
-            // TODO
-        }
-
         for id in self.player_states.valid_ids() {
             let mut pushes = Vec::new();
             let player_input = self.player_inputs.get(id);
@@ -227,7 +268,7 @@ impl GameState {
 
             if let Some(push) = pushes.first() {
                 let player_state = self.get_player(push.id).unwrap();
-                let pushed = player_state.push(push);
+                let pushed = player_state.push(push, self, map);
                 self.set_player_state(push.id, pushed);
             }
         }
@@ -255,261 +296,19 @@ impl GameState {
         false 
     }
 
-    fn can_push(&self, id : PlayerId, dir : Input, time_us : u32, rule_state : &CrossyRulesetFST, map : &Map) -> bool {
+    pub(crate) fn can_push(&self, id : PlayerId, dir : Input, time_us : u32, rule_state : &CrossyRulesetFST, map : &Map) -> bool {
         let player = self.get_player(id).unwrap();
-        match player.pos {
-            Pos::Coord(p) => {
-                let new = p.apply_input(dir);
-                if (map.solid(time_us, rule_state, new)) {
-                    return false;
-                }
 
-                !self.space_occupied_with_player(Pos::Coord(new), id)
+        match map.try_apply_input(time_us, &rule_state, &player.pos, dir)
+        {
+            Some(new_pos) => {
+                !self.space_occupied_with_player(new_pos, id)
             }
-            _ => {
-                false
-            }
-        }
-    }
-}
-
-// TODO change these times to u32 from f64 micros
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct PlayerState {
-    pub id: PlayerId,
-
-    pub move_state: MoveState,
-    pub move_cooldown: u32,
-
-    pub pos: Pos,
-}
-
-// TODO a really good idea here
-// if a player being pushed recovers faster than the pusher then stunlock would be lessened
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Default)]
-pub struct PushInfo {
-    pub pushed_by : Option<PlayerId>,
-    pub pushing : Option<PlayerId>,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
-pub struct MovingState
-{
-    pub remaining_us : u32,
-    pub target : Pos,
-    pub push_info : PushInfo,
-}
-
-impl MovingState {
-    pub fn new(target : Pos) -> MovingState {
-        MovingState {
-            remaining_us : MOVE_DUR,
-            push_info : Default::default(),
-            target,
-        }
-    }
-
-    pub fn with_push(target : Pos, push_info : PushInfo) -> MovingState {
-        MovingState {
-            remaining_us : MOVE_DUR,
-            target,
-            push_info,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
-pub enum MoveState {
-    Stationary,
-    Moving(MovingState),
-}
-
-struct Push {
-    pub id : PlayerId,
-    pub pushed_by : PlayerId,
-    pub dir : Input,
-}
-
-// In us
-// In original game move cd is 7 frames
-//pub const MOVE_COOLDOWN_MAX: u32 = 150_000;
-//pub const MOVE_COOLDOWN_MAX: u32 = 7 * (1_000_000 / 60);
-pub const MOVE_COOLDOWN_MAX: u32 = 1;
-pub const MOVE_DUR: u32 = 7 * (1_000_000 / 60);
-
-impl PlayerState {
-    pub fn can_move(&self) -> bool {
-        if let MoveState::Stationary = self.move_state {
-            self.move_cooldown == 0
-        } else {
-            false
-        }
-    }
-
-    fn tick_iterate(&self, state: &GameState, input: Input, dt_us: u32, pushes : &mut Vec<Push>, map : &Map) -> Self {
-        let mut new = self.clone();
-        match new.move_state {
-            MoveState::Stationary => {
-                new.move_cooldown = new.move_cooldown.saturating_sub(dt_us);
-            }
-            MoveState::Moving(moving_state) => {
-                match moving_state.remaining_us.checked_sub(dt_us)
-                {
-                    Some(remaining_us) =>
-                    {
-                        let mut new_state = moving_state;
-                        new_state.remaining_us = remaining_us;
-                        new.move_state = MoveState::Moving(new_state);
-                    },
-                    _ => {
-                        // Safe as we know dt_us >= remaining_us from previous
-                        // subtraction. 
-                        let leftover_us = dt_us - moving_state.remaining_us;
-
-                        // In new pos
-                        new.pos = moving_state.target;
-                        new.move_state = MoveState::Stationary;
-
-                        // rem_ms <= 0 so we add it to the max cooldown
-                        new.move_cooldown = MOVE_COOLDOWN_MAX.saturating_sub(leftover_us);
-                    },
-                }
-            }
-        }
-
-        if new.can_move() && input != Input::None {
-            if let Some(moving_state) = new.try_move(input, state, pushes, map) {
-                new.move_state = MoveState::Moving(moving_state);
-            }
-        }
-
-        new
-    }
-
-    fn push(&self, push : &Push) -> Self {
-        let mut new = self.clone();
-        match new.pos {
-            Pos::Coord(p) => {
-                let new_pos = p.apply_input(push.dir);
-                let mut push_info = PushInfo::default();
-                push_info.pushed_by = Some(push.pushed_by);
-                new.move_state = MoveState::Moving(MovingState::with_push(Pos::Coord(new_pos), push_info));
-            }
-            _ => {},
-        }
-        new
-    }
-
-    fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>, map : &Map) -> Option<MovingState> {
-        let mut new_pos = None;
-        let mut push_info = PushInfo::default();
-
-        match self.pos {
-            Pos::Coord(pos) => {
-                let coord = pos.apply_input(input);
-                let candidate_pos = Pos::Coord(coord);
-                if (map.solid(state.time_us, &state.ruleset_state, coord)) {
-                    return None;
-                }
-
-                new_pos = Some(candidate_pos);
-
-                for (_, other_player) in state.player_states.iter().filter(|(id, _)| *id != self.id) {
-
-                    let possible_push_info = self.try_move_player(input, candidate_pos, other_player, state, pushes, map)?;
-                    if (possible_push_info.pushing.is_some()) {
-                        // Because only one player per spot
-                        // We can only push one person
-                        push_info = possible_push_info;
-                        break;
-                    }
-                }
-            },
-            _ => {},
-        }
-
-        new_pos.map(|target| {
-            MovingState::with_push(target, push_info)
-        })
-    }
-
-    fn try_move_player(
-        &self,
-        dir : Input,
-        candidate_pos : Pos,
-        other : &PlayerState,
-        state: &GameState,
-        pushes : &mut Vec<Push>,
-        map : &Map) -> Option<PushInfo>
-    {
-        if other.pos == candidate_pos {
-            // Try to move into some other player
-            match &other.move_state {
-                MoveState::Moving(_ms) => None,
-                MoveState::Stationary => {
-                    if (state.can_push(other.id, dir, state.time_us, &state.ruleset_state, map)) {
-                        pushes.push(Push {
-                            id : other.id,
-                            pushed_by : self.id,
-                            dir,
-                        });
-
-                        // Managed to push
-                        let mut push_info = PushInfo::default();
-                        push_info.pushing = Some(other.id);
-                        Some(push_info)
-                    }
-                    else {
-                        None
-                    }
-                }
-            }
-        }
-        else {
-            match &other.move_state {
-                MoveState::Moving(state) => {
-                    // Only allow movement if we are going to a different position to another frog
-                    if (state.target != candidate_pos)
-                    {
-                        Some(PushInfo::default())
-                    }
-                    else
-                    {
-                        None
-                    }
-                },
-                _ => Some(PushInfo::default())
-            }
-        }
-    }
-
-    pub fn is_being_pushed(&self) -> bool {
-        match (&self.move_state) {
-            MoveState::Moving(s) if s.push_info.pushed_by.is_some() => {
-                true
-            },
-            _ => false,
-        }
-    }
-
-    pub fn is_being_pushed_by(&self, player : PlayerId) -> bool {
-        match (&self.move_state) {
-            MoveState::Moving(s) if s.push_info.pushed_by == Some(player) => {
-                true
-            },
             _ => false,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct LogState {
-    id: LogId,
-    y: i32,
-
-    x: f64,
-    xvel: f64,
-}
 
 #[cfg(test)]
 mod tests {
@@ -523,7 +322,6 @@ mod tests {
             player_states,
             player_inputs: PlayerInputs::default(),
             ruleset_state : CrossyRulesetFST::start(),
-            log_states : vec![],
         }
     }
 

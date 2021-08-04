@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::map::Map;
-
-use super::game::*;
+use crate::game::*;
+use crate::player::PlayerState;
 
 const STATE_BUFFER_SIZE: usize = 128;
 
@@ -342,6 +342,7 @@ impl Timeline {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::player::*;
 
     // We dont want to actually expose this
     fn clone_timeline(timeline : &Timeline) -> Timeline {

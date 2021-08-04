@@ -1,5 +1,6 @@
 use crate::rng::FroggyRng;
 use crate::map::obstacle_row::*;
+use crate::{CoordPos, LillipadId};
 
 #[derive(Debug)]
 pub struct River {
@@ -49,5 +50,49 @@ impl River {
 
     pub fn get_lillipads_public(&self, time_us : u32) -> Vec<ObstaclePublic> {
         self.row.get_obstacles_public(time_us)
+    }
+
+    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : crate::PreciseCoords) -> Option<LillipadId> {
+        if (pos.y != self.row.y) {
+            return None;
+        }
+
+        let frog_centre = pos.x;
+
+        let mut closest = None;
+        let mut closest_dist = f64::MAX;
+
+        for (id, lillipad) in self.row.get_obstacles_onscreen(time_us).iter().enumerate() {
+            let realised = self.row.realise_obstacle(lillipad);
+            let dist = (frog_centre - realised).abs();
+
+            if (dist < closest_dist) {
+                closest_dist = dist;
+                closest = Some(id);
+            }
+        }
+
+        const MARGIN : f64 = LILLIPAD_WIDTH_TILES / 2.0;
+        debug_log!("Closest {}", closest_dist);
+        if (closest_dist < MARGIN) {
+            if let Some(id) = closest {
+                let lillipad_id = LillipadId {
+                    y : pos.y,
+                    id : id  as u8,
+                    round_id,
+                };
+
+                debug_log!("Lillipad at pos, {:?}, lillipad {:?}", pos, &lillipad_id);
+
+                return Some(lillipad_id);
+            }
+        }
+
+        None
+    }
+
+    pub fn get_lillipad_screen_x(&self, time_us : u32, lillipad_id : &LillipadId) -> f64 {
+        let lillipad = self.row.get_obstacle(time_us, lillipad_id.id as usize);
+        self.row.realise_obstacle(&lillipad)
     }
 }

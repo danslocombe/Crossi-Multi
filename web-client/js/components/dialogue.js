@@ -28,6 +28,11 @@ function create_dialogue(sprite_name, duration = undefined) {
     const target_letterbox = 30;
     const target_face_scale = 1.5;
     const face_x_off_max = 140;
+
+    if (!duration) {
+        duration = 180;
+    }
+
     return {
         sprite : sprite,
         is_alive : true,
@@ -205,7 +210,7 @@ export function create_dialogue_controller() {
             if (this.lobby_join_queue.length > 0) {
                 if (!this.dialogue_instance) {
                     const sprite = this.lobby_join_queue.shift();
-                    this.dialogue_instance = create_dialogue(sprite, 120);
+                    this.dialogue_instance = create_dialogue(sprite, 90);
                 }
             }
 

@@ -13,6 +13,7 @@ use crate::rng::FroggyRng;
 use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::game::CoordPos;
 use crate::SCREEN_SIZE;
+use crate::{Pos, PreciseCoords, Input};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash)]
 pub struct RowId(u32);
@@ -118,6 +119,65 @@ impl Map {
     pub fn solid(&self, time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
         let mut guard = self.inner.lock().unwrap();
         guard.get_mut(rule_state.get_round_id()).get_row(RowId::from_y(pos.y)).solid(time_us, rule_state, pos)
+    }
+
+    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : PreciseCoords) -> Option<crate::LillipadId> {
+        let mut guard = self.inner.lock().unwrap();
+        guard.get_mut(round_id).generate_to_y(RowId::from_y(pos.y));
+        for (_y, river) in &guard.get(round_id).rivers {
+            if let Some(lid) = river.lillipad_at_pos(round_id, time_us, pos) {
+                return Some(lid);
+            }
+        }
+
+        None
+    }
+
+    pub fn get_lillipad_screen_x(&self, time_us : u32, lillipad : &crate::LillipadId) -> f64 {
+        let mut guard = self.inner.lock().unwrap();
+        let round_id = lillipad.round_id;
+
+        // Do we need this gen to?
+        guard.get_mut(round_id).generate_to_y(RowId::from_y(lillipad.y));
+
+        for (y, river) in &guard.get(round_id).rivers {
+            if (*y == lillipad.y) {
+                return river.get_lillipad_screen_x(time_us, lillipad)
+            }
+        }
+
+        panic!("Error, could not find a lillipad from lillipad_id {:?}", lillipad);
+    }
+
+    pub fn realise_pos(&self, round_id : u8, time_us : u32, pos : &crate::Pos) -> PreciseCoords {
+        match pos {
+            crate::Pos::Coord(coord) => {
+                coord.to_precise()
+            },
+            crate::Pos::Lillipad(lilli_id) => {
+                let x = self.get_lillipad_screen_x(time_us, lilli_id);
+                PreciseCoords{x, y: lilli_id.y}
+            },
+        }
+    }
+
+    pub fn try_apply_input(&self, time_us : u32, rule_state : &crate::crossy_ruleset::CrossyRulesetFST, pos : &crate::Pos, input : Input) -> Option<Pos> {
+        let round_id = rule_state.get_round_id();
+        let pos = self.realise_pos(round_id, time_us, pos);
+        let precise = pos.apply_input(input);
+
+        if let Some(lillipad_id) = self.lillipad_at_pos(round_id, time_us, precise) {
+            Some(Pos::Lillipad(lillipad_id))
+        }
+        else {
+            let coord_pos = precise.to_coords();
+            if (self.solid(time_us, &rule_state, coord_pos)) {
+                return None;
+            }
+            else {
+                Some(Pos::Coord(coord_pos))
+            }
+        }
     }
 }
 

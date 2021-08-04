@@ -131,26 +131,23 @@ export function create_player_remote(client, player_id) {
             // TODO if local player is pushing then we should be much tighter on this
             const k = 4;
 
-            let x1 = player_state.pos.Coord.x;
-            let y1 = player_state.pos.Coord.y;
+            let x1 = player_state.x
+            let y1 = player_state.y
 
-            if (player_state.move_state != "Stationary") {
-                const moving_state = player_state.move_state.Moving;
-                if (moving_state.target.Coord) {
-                    x1 = moving_state.target.Coord.x;
-                    y1 = moving_state.target.Coord.y;
-                }
+            if (player_state.moving) {
+                x1 = player_state.t_x;
+                y1 = player_state.t_y;
             }
 
-            let x = dan_lerp(this.x, player_state.pos.Coord.x, k);
-            let y = dan_lerp(this.y, player_state.pos.Coord.y, k);
+            let x = dan_lerp(this.x, x1, k);
+            let y = dan_lerp(this.y, y1, k);
 
             const kk = 0.45;
-            if (diff(x, player_state.pos.Coord.x) < kk) {
-                x = player_state.pos.Coord.x;
+            if (diff(x, x1) < kk) {
+                x = x1;
             }
-            if (diff(y, player_state.pos.Coord.y) < kk) {
-                y = player_state.pos.Coord.y;
+            if (diff(y, y1) < kk) {
+                y = y1;
             }
 
             const delta = 0.1;
@@ -207,59 +204,51 @@ export function create_player_local(client, key_event_source) {
         frame_id : 0,
 
         tick : function(player_state, simple_entities, player_def) {
-            if (player_state.pos.Coord)
-            {
-                let x,y;
-                const x0 = player_state.pos.Coord.x;
-                const y0 = player_state.pos.Coord.y;
+            const x0 = player_state.x;
+            const y0 = player_state.y;
 
-                const moving = player_state.move_state != "Stationary";
-                if (moving) {
-                    const moving_state = player_state.move_state.Moving;
-                    // TODO don't replicate this constant
-                    const MOVE_T = 7 * (1000 * 1000 / 60);
-                    const lerp_t = (1 - moving_state.remaining_us / MOVE_T);
+            let x,y;
+            if (player_state.moving) {
+                // TODO don't replicate this constant
+                const MOVE_T = 7 * (1000 * 1000 / 60);
+                const lerp_t = (1 - player_state.remaining_move_dur / MOVE_T);
 
-                    let x1 = x0;
-                    let y1 = y0;
-                    if (moving_state.target.Coord) {
-                        x1 = moving_state.target.Coord.x;
-                        y1 = moving_state.target.Coord.y;
-                    }
+                const x1 = player_state.t_x;
+                const y1 = player_state.t_y;
 
-                    x = x0 + lerp_t * (x1 - x0);
-                    y = y0 + lerp_t * (y1 - y0);
-                    this.frame_id = Math.floor(lerp_t * (player_frame_count - 1));
+                x = x0 + lerp_t * (x1 - x0);
+                y = y0 + lerp_t * (y1 - y0);
+                this.frame_id = Math.floor(lerp_t * (player_frame_count - 1));
 
-                }
-                else {
-                    x = x0;
-                    y = y0;
-                    this.frame_id = 0;
-                }
-
-                // Started moving
-                if (moving && !this.moving) {
-
-                    // Make dust
-                    for (let i = 0; i < 2; i++) {
-                        const dust_off = Math.random() * (3 / SCALE);
-                        const dust_dir = Math.random() * 2 * 3.141;
-                        const dust_x = x + dust_off * Math.cos(dust_dir);
-                        const dust_y = y + dust_off * Math.sin(dust_dir);
-                        simple_entities.push(create_dust(dust_x, dust_y));
-                    }
-
-                    player_def.move_sound.play();
-
-                    if (player_state.move_state.Moving.push_info.pushing) {
-                        snd_push.play();
-                    }
-                }
-                this.x = x;
-                this.y = y;
-                this.moving = moving;
             }
+            else {
+                x = x0;
+                y = y0;
+                this.frame_id = 0;
+            }
+
+            // Started moving
+            if (player_state.moving && !this.moving) {
+
+                // Make dust
+                for (let i = 0; i < 2; i++) {
+                    const dust_off = Math.random() * (3 / SCALE);
+                    const dust_dir = Math.random() * 2 * 3.141;
+                    const dust_x = x + dust_off * Math.cos(dust_dir);
+                    const dust_y = y + dust_off * Math.sin(dust_dir);
+                    simple_entities.push(create_dust(dust_x, dust_y));
+                }
+
+                player_def.move_sound.play();
+
+                if (player_state.pushing >= 0) {
+                    snd_push.play();
+                }
+            }
+
+            this.x = x;
+            this.y = y;
+            this.moving = player_state.moving;
         }
     }
 

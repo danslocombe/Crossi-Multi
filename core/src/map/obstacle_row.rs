@@ -76,6 +76,10 @@ impl ObstacleRow {
 
         cars
     }
+
+    pub fn get_obstacle(&self, time_us : u32, i : usize) -> Obstacle {
+        self.obstacles0[i].at_time(self.time_scale * time_us as f64)
+    }
 }
 
 impl Obstacle {

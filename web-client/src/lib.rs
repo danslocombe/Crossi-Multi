@@ -231,13 +231,13 @@ impl Client {
 
     pub fn get_players_json(&self) -> String
     {
-        let players = self.get_players();
+        let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
+        let time_us = self.timeline.top_state().time_us;
+        let players : Vec<_> = self.timeline.top_state().get_valid_player_states()
+            .iter()
+            .map(|x| x.to_public(round_id, time_us, &self.timeline.map))
+            .collect();
         serde_json::to_string(&players).unwrap()
-    }
-
-    fn get_players(&self) -> Vec<PlayerState>
-    {
-        self.timeline.top_state().get_valid_player_states()
     }
 
     // Return -1 if no local player

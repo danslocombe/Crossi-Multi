@@ -14,14 +14,16 @@ export function create_lillipad(lillipad) {
     return {
         x : x,
         y : y,
-        dynamic_depth : y,
+
+        // Make sure that we draw under players
+        dynamic_depth : y - 10,
+
         frame_id : frame_id,
         spr : spr,
         draw : function(froggy_draw_ctx) {
             const xx = this.x + froggy_draw_ctx.x_off;
             const yy = this.y + froggy_draw_ctx.y_off;
 
-            console.log("Drawing lil " + xx + " " + yy);
             froggy_draw_ctx.ctx.drawImage(this.spr,
                 SCALE*this.frame_id,
                 0,
