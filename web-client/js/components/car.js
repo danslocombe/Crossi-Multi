@@ -11,7 +11,7 @@ let spr_car_flipped = new Image(spr_car_width, spr_car_height);
 spr_car_flipped.src = '/sprites/spr_car.png';
 
 
-export function make_car(car) {
+export function create_car(car) {
     const x = car[0] * SCALE;
     const y = car[1] * SCALE;
     const flipped = car[2];

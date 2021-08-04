@@ -2,8 +2,13 @@ use std::collections::VecDeque;
 use serde::{Deserialize, Serialize};
 
 pub mod road;
+pub mod river;
+pub mod obstacle_row;
 
-use road::{RoadDescr, Road, CarPublic};
+use road::Road;
+use river::River;
+use obstacle_row::{ObstaclePublic, ObstacleRowDescr};
+
 use crate::rng::FroggyRng;
 use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::game::CoordPos;
@@ -20,9 +25,9 @@ pub struct Row {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RowType {
-  River(RiverDescr),
+  River(ObstacleRowDescr),
   Path(PathDescr),
-  Road(RoadDescr),
+  Road(ObstacleRowDescr),
   StartingBarrier(),
   Stands(),
 }
@@ -42,6 +47,7 @@ struct MapRound {
     round_id : u8,
     gen_state_wall_width : i32,
     roads : Vec<(i32, Road)>,
+    rivers : Vec<(i32, River)>,
     rows : VecDeque<Row>,
 }
 
@@ -87,9 +93,14 @@ impl Map {
         guard.get_mut(round).get_row(RowId::from_y(y))
     }
 
-    pub fn get_cars(&self, round : u8, time_us : u32) -> Vec<CarPublic> {
+    pub fn get_cars(&self, round : u8, time_us : u32) -> Vec<ObstaclePublic> {
         let mut guard = self.inner.lock().unwrap();
         guard.get(round).get_cars(time_us)
+    }
+
+    pub fn get_lillipads(&self, round : u8, time_us : u32) -> Vec<ObstaclePublic> {
+        let mut guard = self.inner.lock().unwrap();
+        guard.get(round).get_lillipads(time_us)
     }
 
     pub fn collides_car(&self, time_us : u32, round : u8, pos : CoordPos) -> bool {
@@ -155,6 +166,7 @@ impl MapRound {
             round_id,
             gen_state_wall_width : 0,
             roads : Vec::with_capacity(24),
+            rivers : Vec::with_capacity(24),
             rows,
         };
 
@@ -210,20 +222,21 @@ impl MapRound {
     fn generate_to_y(&mut self, row_id_target : RowId) {
         while self.rows.front().map(|row| row_id_target.0 > row.row_id.0).unwrap_or(true) {
             let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
-            //println!("{} {} {:?}", self.seed, self.round_id, row_id);
             let rng = FroggyRng::from_hash((self.seed, self.round_id, row_id));
 
             debug_log!("Generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
 
-            if (rng.gen("gen_feature") % 5 == 0) {
-                    debug_log!("Generating road... at y={}", row_id.to_y());
-                //if (rng.gen("feature_type") % 2 == 0) {
+            if (rng.gen_unit("gen_feature") < 0.2) {
+                debug_log!("Generating obtacle row at y={}", row_id.to_y());
+
+                if (rng.gen_unit("feature_type") < 0.5) {
+                    debug_log!("Generating road");
+
                     let lanes = *rng.choose("road_lanes", &[1, 2, 3, 4, 5]);
-                    let initial_direction = *rng.choose("initial_direction", &[true, false]);
+                    let initial_direction = *rng.choose("road_initial_direction", &[true, false]);
 
                     debug_log!("lanes {}, initial_direction {}", lanes, initial_direction);
 
-                    //println!("generating road at {:?}, y={}, lanes {}", row_id, row_id.to_y(), lanes);
                     for i in 0..lanes {
                         let rid = RowId(row_id.0 + i);
                         let y = rid.to_y();
@@ -233,7 +246,7 @@ impl MapRound {
                         self.roads.push((y, road));
                         self.rows.push_front(Row {
                             row_id: rid,
-                            row_type: RowType::Road(RoadDescr {
+                            row_type: RowType::Road(ObstacleRowDescr {
                                 seed: self.seed,
                                 inverted: initial_direction,
                         })});
@@ -247,12 +260,36 @@ impl MapRound {
                         self.roads.push((y, road));
                         self.rows.push_front(Row {
                             row_id: rid,
-                            row_type: RowType::Road(RoadDescr {
+                            row_type: RowType::Road(ObstacleRowDescr {
                                 seed: self.seed,
                                 inverted: !initial_direction,
                         })});
                     }
-                //}
+                }
+                else {
+                    debug_log!("Generating river");
+
+                    let lanes = *rng.choose("river_lanes", &[2, 2, 3, 4]);
+                    let river_direction = *rng.choose("river_direction", &[true, false]);
+
+                    debug_log!("lanes {}, river_direction {}", lanes, river_direction);
+
+                    for i in 0..lanes {
+                        let rid = RowId(row_id.0 + i);
+                        let y = rid.to_y();
+
+                        debug_log!("Adding river at {}", y);
+                        let river = River::new(self.seed, self.round_id, y, river_direction);
+                        debug_log!("River {:?}", &river);
+                        self.rivers.push((y, river));
+                        self.rows.push_front(Row {
+                            row_id: rid,
+                            row_type: RowType::River(ObstacleRowDescr {
+                                seed: self.seed,
+                                inverted: river_direction,
+                        })});
+                    }
+                }
             }
             else {
                 const WALL_WIDTH_MAX : i32 = 4;
@@ -271,7 +308,7 @@ impl MapRound {
     }
 
 
-    fn get_cars(&self, time_us : u32) -> Vec<CarPublic> {
+    fn get_cars(&self, time_us : u32) -> Vec<ObstaclePublic> {
         let mut cars = Vec::with_capacity(8);
         for (_y, road) in &self.roads {
             // TODO y offset
@@ -279,11 +316,19 @@ impl MapRound {
         }
         cars
     }
+
+    fn get_lillipads(&self, time_us : u32) -> Vec<ObstaclePublic> {
+        let mut lillipads = Vec::with_capacity(8);
+        for (_y, river) in &self.rivers {
+            // TODO y offset
+            lillipads.extend(river.get_lillipads_public(time_us));
+        }
+        lillipads
+    }
 }
 
-// Hackkyyyyy
-
 impl RowId {
+    // Hackkyyyyy because we hardcode screen size.
     pub fn from_y(y : i32) -> Self {
         Self((SCREEN_SIZE - y) as u32)
     }

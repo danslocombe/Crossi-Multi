@@ -288,6 +288,12 @@ impl Client {
         serde_json::to_string(&cars).unwrap()
     }
 
+    pub fn get_lillipads_json(&self) -> String {
+        let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
+        let lillipads = self.timeline.map.get_lillipads(round_id, self.timeline.top_state().time_us);
+        serde_json::to_string(&lillipads).unwrap()
+    }
+
     pub fn player_alive(&self, player_id : u32) -> bool {
         // We have to be careful here.
         // We dont want to tell the client a player is dead if they could possibly "come back alive".

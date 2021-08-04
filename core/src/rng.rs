@@ -1,5 +1,6 @@
 use std::hash::{Hash, Hasher};
 use std::num::Wrapping;
+use std::fmt::Debug;
 
 /// Take insperation from 
 /// https://www.youtube.com/watch?v=e4b--cyXEsM
@@ -41,24 +42,25 @@ impl FroggyRng {
         Self::new(hash(x))
     }
 
-    pub fn gen<T : Hash>(&self, x : T) -> u64 {
+    pub fn gen<T : Hash + Debug>(&self, x : T) -> u64 {
+        //debug_log!("Generating from {:?} + seed {}", x, self.seed);
         let hash = hash(x);
         let index = (Wrapping(self.seed) + Wrapping(hash)).0;
         let res = split_mix_64(index);
-        //debug_log!("Generating for index {} from seed {} hash {} | {}", index, self.seed, hash, res);
+        //debug_log!("Generated={}", res);
         res
     }
 
-    pub fn gen_unit<T : Hash>(&self, x : T) -> f64 {
+    pub fn gen_unit<T : Hash + Debug>(&self, x : T) -> f64 {
         // Should be enough precision for a game
         (self.gen(x) % 1_000_000) as f64 / 1_000_000.0
     }
 
-    pub fn gen_range<T : Hash>(&self, x : T, min : f64, max : f64) -> f64 {
+    pub fn gen_range<T : Hash + Debug>(&self, x : T, min : f64, max : f64) -> f64 {
         min + self.gen_unit(x) * (max - min)
     }
 
-    pub fn choose<'a, T : Hash, X>(&self, x : T, choices : &'a [X]) -> &'a X {
+    pub fn choose<'a, T : Hash + Debug, X>(&self, x : T, choices : &'a [X]) -> &'a X {
         // usize can be aliased to u32 or u64 in wasm based on the compilation
         // for safety we restrict to u32 range.
         let index = self.gen(x) as u64 % u32::MAX as u64;

@@ -1,10 +1,11 @@
 import { SCALE} from "./constants"
 import { create_player_remote, create_player_local } from "./player_def";
 import { draw_background } from "./background";
-import { make_car } from "./car";
+import { create_car } from "./car";
 import { create_camera } from "./camera";
 import { create_countdown } from "./countdown";
 import { create_dialogue_controller } from "./dialogue";
+import { create_lillipad } from "./lillipad";
 //import "/components/player_def";
 
 export function create_game_view(ctx, client, ws, key_event_source) {
@@ -123,7 +124,12 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 {
                     const cars = JSON.parse(this.client.get_cars_json());
                     for (const car of cars) {
-                        draw_with_depth.push(make_car(car));
+                        draw_with_depth.push(create_car(car));
+                    }
+
+                    const lillipads = JSON.parse(this.client.get_lillipads_json());
+                    for (const lillipad of lillipads) {
+                        draw_with_depth.push(create_lillipad(lillipad));
                     }
                 }
 
