@@ -86,6 +86,10 @@ impl Client {
         })
     }
 
+    pub fn get_ready_state(&self) -> bool {
+        self.ready_state
+    }
+
     pub fn set_ready_state(&mut self, state : bool) {
         self.ready_state = state;
     }

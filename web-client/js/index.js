@@ -163,9 +163,20 @@ function connect_ws() {
 /////////////////////////////////////////////////////////////////////////////////////
 
 let key_event_source = {
-    listeners : [],
+    input_listeners : [],
+    activate_listeners : [],
     on_keydown : function(e) {
         let code = e.keyCode;
+
+        if (code == 32) {
+            // Space
+            for (const listener of this.activate_listeners) {
+                listener.on_activate_keydown();
+            }
+
+            return;
+        }
+
         let input = "None";
         switch (code) {
             case 37: input = "Left"; break;
@@ -175,13 +186,18 @@ let key_event_source = {
             default: break;
         }
 
-        for (const listener of this.listeners) {
-            listener.on_keydown(input);
+        for (const listener of this.input_listeners) {
+            listener.on_input_keydown(input);
         }
     },
-    add_listener : function() {
+    add_input_listener : function() {
         let new_listener = {};
-        this.listeners.push(new_listener);
+        this.input_listeners.push(new_listener);
+        return new_listener;
+    },
+    add_activate_listener : function() {
+        let new_listener = {};
+        this.activate_listeners.push(new_listener);
         return new_listener;
     }
 }

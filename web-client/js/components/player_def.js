@@ -18,17 +18,24 @@ function load_sprites(name) {
     }
 }
 
-let spr_shadow = new Image(SCALE, SCALE);
+const spr_shadow = new Image(SCALE, SCALE);
 spr_shadow.src = '/sprites/spr_shadow.png';
 
-let sprites_list = [
+const sprites_list = [
     load_sprites('frog'),
     load_sprites('mouse'),
     load_sprites('bird'),
     load_sprites('snake'),
 ]
 
-let sounds_list = [
+const colours_list = [
+    "#4aef5c",
+    "#884835",
+    "#000000",
+    "#000000",
+]
+
+const sounds_list = [
     new Audio('/sounds/snd_move1.wav'),
     new Audio('/sounds/snd_move2.wav'),
     new Audio('/sounds/snd_move3.wav'),
@@ -39,14 +46,15 @@ for (let sound of sounds_list) {
     sound.volume = 0.15;
 }
 
-let snd_push = new Audio('/sounds/snd_push.wav');
+const snd_push = new Audio('/sounds/snd_push.wav');
 snd_push.volume = 0.14;
 
-let snd_hit_car = new Audio('/sounds/snd_car.wav');
+const snd_hit_car = new Audio('/sounds/snd_car.wav');
 snd_hit_car.volume = 0.25;
 
-let spr_dust = new Image(SCALE,SCALE);
+const spr_dust = new Image(SCALE,SCALE);
 spr_dust.src = "/sprites/spr_dust.png";
+
 const spr_smoke_count = 4;
 
 function create_dust(x, y) {
@@ -206,7 +214,6 @@ export function create_player_local(client, key_event_source) {
                 const y0 = player_state.pos.Coord.y;
 
                 const moving = player_state.move_state != "Stationary";
-                const pushed = false;
                 if (moving) {
                     const moving_state = player_state.move_state.Moving;
                     // TODO don't replicate this constant
@@ -256,8 +263,8 @@ export function create_player_local(client, key_event_source) {
         }
     }
 
-    let listener = key_event_source.add_listener();
-    listener.on_keydown = function(input) {
+    let listener = key_event_source.add_input_listener();
+    listener.on_input_keydown = function(input) {
         if (input == "Left") {
             source.x_flip = -1;
         }
@@ -271,25 +278,30 @@ export function create_player_local(client, key_event_source) {
 
 function player_def_from_player_id(id, source) {
     // player ids start from 1
-    let sprites = sprites_list[id - 1];
-    let move_sound = sounds_list[id - 1];
-    return create_player_def(sprites, move_sound, source)
+    const sprites = sprites_list[id - 1];
+    const move_sound = sounds_list[id - 1];
+    const colour = colours_list[id - 1];
+    return create_player_def(sprites, move_sound, colour, source)
 }
 
-function create_player_def(sprites, move_sound, source) {
+function create_player_def(sprites, move_sound, colour, source) {
     return {
         sprite : sprites.spr,
         sprite_flipped : sprites.spr_flipped,
         sprite_dead : sprites.spr_dead,
         sprite_name : sprites.spr_name,
+        colour : colour,
         move_sound : move_sound,
         source : source,
         x : 0,
         y : 0,
         dynamic_depth : 0,
         created_corpse : false,
+        t : 0,
+        lobby_ready : false,
 
-        tick : function(state, simple_entities) {
+        tick : function(state, simple_entities, rule_state) {
+            this.t += 1;
             if (!this.source.client.player_alive(this.source.player_id)) {
                 if (!this.created_corpse) {
                     this.created_corpse = true;
@@ -304,11 +316,18 @@ function create_player_def(sprites, move_sound, source) {
 
                 return;
             }
-            this.source.tick(state, simple_entities, this);
+            this.source.tick(state, simple_entities, this, rule_state);
 
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
             this.dynamic_depth = this.y;
+
+            if (rule_state && rule_state.Lobby) {
+                this.lobby_ready = rule_state.Lobby.ready_states.inner[source.player_id];
+            }
+            else {
+                this.lobby_ready = false;
+            }
         },
         new_round : function() {
             this.created_corpse = false;
@@ -327,6 +346,20 @@ function create_player_def(sprites, move_sound, source) {
             const x = this.x + crossy_draw_ctx.x_off;
             const y = this.y + crossy_draw_ctx.y_off - 1;
             const frame_id = this.source.frame_id;
+
+            if (this.lobby_ready) {
+                crossy_draw_ctx.ctx.strokeStyle = this.colour;
+                crossy_draw_ctx.ctx.beginPath();
+                const tt = this.t + 100 * this.source.player_id;
+                const xx = x + 4 + Math.round(Math.sin(tt / 13));
+                const yy = y - 1 + Math.round(Math.sin(tt / 7));
+                crossy_draw_ctx.ctx.moveTo(xx, yy - 1);
+                crossy_draw_ctx.ctx.lineTo(xx, yy - 3);
+                crossy_draw_ctx.ctx.stroke();
+                crossy_draw_ctx.ctx.moveTo(xx, yy - 4);
+                crossy_draw_ctx.ctx.lineTo(xx, yy - 9);
+                crossy_draw_ctx.ctx.stroke();
+            }
 
             // TODO make transparent
             // do in sprite

@@ -84,7 +84,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                         }
 
                         let player = this.players[current_player_state.id];
-                        player.tick(current_player_state, this.simple_entities);
+                        player.tick(current_player_state, this.simple_entities, this.rule_state);
                     }
                 }
 
@@ -145,9 +145,14 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         }
     }
 
-    let listener = key_event_source.add_listener();
-    listener.on_keydown = function(input) {
+    let listener = key_event_source.add_input_listener();
+    listener.on_input_keydown = function(input) {
         view.current_input = input;
+    }
+
+    let activate_listener = key_event_source.add_activate_listener();
+    activate_listener.on_activate_keydown = function() {
+        view.client.set_ready_state(!view.client.get_ready_state());
     }
 
     return view;
