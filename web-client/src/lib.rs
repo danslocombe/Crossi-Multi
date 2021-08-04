@@ -197,6 +197,10 @@ impl Client {
         self.trusted_rule_state = Some(server_tick.rule_state.clone());
     }
 
+    fn get_round_id(&self) -> u8 {
+        self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0)
+    }
+
     pub fn recv(&mut self, server_tick : &[u8])
     {
         if let Some(deserialized) = try_deserialize_server_tick(server_tick)
@@ -231,11 +235,10 @@ impl Client {
 
     pub fn get_players_json(&self) -> String
     {
-        let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
         let time_us = self.timeline.top_state().time_us;
         let players : Vec<_> = self.timeline.top_state().get_valid_player_states()
             .iter()
-            .map(|x| x.to_public(round_id, time_us, &self.timeline.map))
+            .map(|x| x.to_public(self.get_round_id(), time_us, &self.timeline.map))
             .collect();
         serde_json::to_string(&players).unwrap()
     }
@@ -270,27 +273,24 @@ impl Client {
     }
 
     fn get_rows(&mut self) -> Vec<(i32, map::Row)> {
-        let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
         let mut vec = Vec::with_capacity(32);
         let screen_y = self.trusted_rule_state.as_ref().map(|x| x.get_screen_y()).unwrap_or(0);
         let range_min = screen_y;
         let range_max = (screen_y + 160/8 + 6).min(160/8);
         for i in range_min..range_max {
             let y = i;
-            vec.push((y as i32, self.timeline.map.get_row(round_id, y).clone()));
+            vec.push((y as i32, self.timeline.map.get_row(self.get_round_id(), y).clone()));
         }
         vec
     }
 
     pub fn get_cars_json(&self) -> String {
-        let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
-        let cars = self.timeline.map.get_cars(round_id, self.timeline.top_state().time_us);
+        let cars = self.timeline.map.get_cars(self.get_round_id(), self.timeline.top_state().time_us);
         serde_json::to_string(&cars).unwrap()
     }
 
     pub fn get_lillipads_json(&self) -> String {
-        let round_id = self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0);
-        let lillipads = self.timeline.map.get_lillipads(round_id, self.timeline.top_state().time_us);
+        let lillipads = self.timeline.map.get_lillipads(self.get_round_id(), self.timeline.top_state().time_us);
         serde_json::to_string(&lillipads).unwrap()
     }
 
@@ -303,6 +303,14 @@ impl Client {
         self.get_latest_server_rule_state().map(|x| {
             x.get_player_alive(PlayerId(player_id as u8))
         }).unwrap_or(false)
+    }
+
+    pub fn is_river(&self, y : f64) -> bool {
+        match self.timeline.map.get_row(self.get_round_id(), y.round() as i32).row_type
+        {
+            map::RowType::River(_) => true,
+            _ => false,
+        }
     }
 }
 

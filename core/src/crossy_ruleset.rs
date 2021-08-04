@@ -87,7 +87,7 @@ impl CrossyRulesetFST
                         win_counts,
                         in_game,
                         remaining_us : COUNTDOWN_TIME_US,
-                        round_id : 0,
+                        round_id : 1,
                     })
                 }
                 else {

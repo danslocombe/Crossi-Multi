@@ -43,7 +43,7 @@ pub struct ServerInner {
 }
 
 impl Server {
-    pub fn new(_id : u64) -> Self {
+    pub fn new(id : u64) -> Self {
         let start = Instant::now();
         let init_message = CrossyMessage::EmptyMessage();
         let (outbound_tx, outbound_rx) = tokio::sync::watch::channel(init_message);
@@ -55,7 +55,7 @@ impl Server {
             inner : Mutex::new(ServerInner {
                 clients: Vec::new(),
                 new_players: Vec::new(),
-                timeline: Timeline::new(),
+                timeline: Timeline::from_seed(id as u32),
                 prev_tick: start,
                 start,
                 next_socket_id : SocketId(0),

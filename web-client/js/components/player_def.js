@@ -52,6 +52,9 @@ snd_push.volume = 0.14;
 const snd_hit_car = new Audio('/sounds/snd_car.wav');
 snd_hit_car.volume = 0.25;
 
+const snd_drown = new Audio('/sounds/snd_drown_bubbles.wav');
+snd_drown.volume = 0.75;
+
 const spr_dust = new Image(SCALE,SCALE);
 spr_dust.src = "/sprites/spr_dust.png";
 
@@ -294,13 +297,20 @@ function create_player_def(sprites, move_sound, colour, source) {
             if (!this.source.client.player_alive(this.source.player_id)) {
                 if (!this.created_corpse) {
                     this.created_corpse = true;
-                    const corpse = create_corpse(this.x, this.y, this.sprite_dead);
-                    simple_entities.push(corpse);
+                    const is_river = source.client.is_river(state.y);
+                    if (!is_river)
+                    {
+                        const corpse = create_corpse(this.x, this.y, this.sprite_dead);
+                        simple_entities.push(corpse);
+                        snd_hit_car.play();
+                    }
+                    else {
+                        snd_drown.play();
+                    }
 
                     const whiteout = create_whiteout()
                     simple_entities.push(whiteout);
 
-                    snd_hit_car.play();
                 }
 
                 return;

@@ -246,12 +246,12 @@ impl PlayerState {
 
         player_state_public.id = self.id.0;
 
-        let PreciseCoords{x, y} = map.realise_pos(round_id, time_us, &self.pos);
+        let PreciseCoords{x, y} = map.realise_pos(time_us, &self.pos);
         player_state_public.x = x;
         player_state_public.y = y;
         
         if let MoveState::Moving(ms) = &self.move_state {
-            let PreciseCoords{x: t_x, y: t_y} = map.realise_pos(round_id, time_us, &ms.target);
+            let PreciseCoords{x: t_x, y: t_y} = map.realise_pos(time_us, &ms.target);
             player_state_public.moving = true;
             player_state_public.t_x = t_x;
             player_state_public.t_y = t_y;

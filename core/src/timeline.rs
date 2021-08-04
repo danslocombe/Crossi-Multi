@@ -36,6 +36,15 @@ impl Timeline {
         }
     }
 
+    pub fn from_seed(seed: u32) -> Self {
+        let mut states = VecDeque::new();
+        states.push_front(GameState::new());
+        Timeline {
+            states,
+            map : Map::new(seed),
+        }
+    }
+
     pub fn from_server_parts(
         seed: u32,
         time_us: u32,

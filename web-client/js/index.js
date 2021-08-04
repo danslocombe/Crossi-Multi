@@ -115,9 +115,8 @@ function join() {
             socket_id = response.socket_id;
 
             console.log("Creating client");
-            const seed = 0;
-            const num_players = 4;
-            client = new Client(seed, response.server_time_us, estimated_latency_us, num_players);
+            const seed = parseInt(game_id);
+            client = new Client(seed, response.server_time_us, estimated_latency_us);
 
             play();
             connect_ws();

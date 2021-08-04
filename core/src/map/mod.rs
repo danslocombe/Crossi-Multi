@@ -149,7 +149,7 @@ impl Map {
         panic!("Error, could not find a lillipad from lillipad_id {:?}", lillipad);
     }
 
-    pub fn realise_pos(&self, round_id : u8, time_us : u32, pos : &crate::Pos) -> PreciseCoords {
+    pub fn realise_pos(&self, time_us : u32, pos : &crate::Pos) -> PreciseCoords {
         match pos {
             crate::Pos::Coord(coord) => {
                 coord.to_precise()
@@ -163,7 +163,7 @@ impl Map {
 
     pub fn try_apply_input(&self, time_us : u32, rule_state : &crate::crossy_ruleset::CrossyRulesetFST, pos : &crate::Pos, input : Input) -> Option<Pos> {
         let round_id = rule_state.get_round_id();
-        let pos = self.realise_pos(round_id, time_us, pos);
+        let pos = self.realise_pos(time_us, pos);
         let precise = pos.apply_input(input);
 
         if let Some(lillipad_id) = self.lillipad_at_pos(round_id, time_us, precise) {
@@ -183,9 +183,14 @@ impl Map {
 
 impl MapInner {
     fn new(seed : u32) -> Self {
+        let mut rounds = Vec::with_capacity(8);
+
+        // Always set first map seed to zero
+        rounds.push(MapRound::new(0, 0));
+
         Self {
             seed,
-            rounds : Vec::with_capacity(8),
+            rounds,
         }
     }
 
@@ -286,7 +291,9 @@ impl MapRound {
 
             debug_log!("Generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
 
-            if (rng.gen_unit("gen_feature") < 0.2) {
+            // Seed 0 is reserved for lobbies
+            // We shouldnt generate any roads / rivers
+            if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.2) {
                 debug_log!("Generating obtacle row at y={}", row_id.to_y());
 
                 if (rng.gen_unit("feature_type") < 0.5) {
