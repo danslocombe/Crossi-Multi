@@ -28,7 +28,8 @@ fn split_mix_64(index : u64) -> u64 {
 
 #[inline]
 fn hash<T : Hash>(x : T) -> u64 {
-    let mut hasher = deterministic_hash::DeterministicHasher::new(FroggyHash::new());
+    //let mut hasher = deterministic_hash::DeterministicHasher::new(FroggyHash::new());
+    let mut hasher = deterministic_hash::DeterministicHasher::new(hashers::jenkins::Lookup3Hasher::default());
     x.hash(&mut hasher);
     hasher.finish()
 }
@@ -43,11 +44,11 @@ impl FroggyRng {
     }
 
     pub fn gen<T : Hash + Debug>(&self, x : T) -> u64 {
-        //debug_log!("Generating from {:?} + seed {}", x, self.seed);
+        debug_log!("Generating from {:?} + seed {}", x, self.seed);
         let hash = hash(x);
         let index = (Wrapping(self.seed) + Wrapping(hash)).0;
         let res = split_mix_64(index);
-        //debug_log!("Generated={}", res);
+        debug_log!("Generated={}", res);
         res
     }
 
@@ -66,6 +67,19 @@ impl FroggyRng {
         let index = self.gen(x) as u64 % u32::MAX as u64;
         let i = index as usize % choices.len();
         &choices[i]
+    }
+
+    // I dont know what a statistic is
+    pub fn gen_froggy<T : Hash + Debug>(&self, x : T, min : f64, max : f64, n : u32) -> f64 {
+        let mut sum = 0.;
+        let gen_min = min / n as f64;
+        let gen_max = max / n as f64;
+
+        for i in 0..n {
+            sum += self.gen_range((&x, i), gen_min, gen_max);
+        }
+
+        sum
     }
 }
 

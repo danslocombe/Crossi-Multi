@@ -241,9 +241,12 @@ fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>
     const SCREEN_Y_BUFFER : i32 = 6;
     for (id, player) in player_states.iter() {
         if alive_players.get_copy(id).unwrap_or(false) {
-            if let Pos::Coord(pos) = player.pos {
-                screen_y = screen_y.min(pos.y - SCREEN_Y_BUFFER);
-            }
+            let y = match &player.pos {
+                Pos::Coord(pos) => pos.y,
+                Pos::Lillipad(lilli) => lilli.y,
+            };
+
+            screen_y = screen_y.min(y - SCREEN_Y_BUFFER);
         }
     }
 

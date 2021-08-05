@@ -8,7 +8,7 @@ pub struct River {
 }
 
 const LILLIPAD_WIDTH_TILES : f64 = 1.0;
-const R_WIDTH_MIN : f64 = 0.32;
+const R_WIDTH_MIN : f64 = 0.22;
 const R_WIDTH_MAX : f64 = 0.42;
 //const TIME_SCALE : f64 = 12_000_000.0;
 const TIME_SCALE : f64 = 18_000_000.0;
@@ -20,20 +20,20 @@ impl River {
         let mut obstacles = Vec::with_capacity(16);
         let mut cur = 0.0;
 
-        let length = 3 + (rng.gen_unit("lillipad_length") * 5.0) as u32;
-        let r_width = rng.gen_range("r_width", R_WIDTH_MIN, R_WIDTH_MAX);
+        let length = 3 + (rng.gen_froggy("lillipad_length", 0., 5., 3)) as u32;
+        let r_width = rng.gen_froggy("r_width", R_WIDTH_MIN, R_WIDTH_MAX, 4);
 
         let r = 2.0 * r_width;
 
-        let min_spacing = r / crate::SCREEN_SIZE as f64;
-        let max_spacing = r * 5. / crate::SCREEN_SIZE as f64;
+        let min_spacing = r * 1.9 / crate::SCREEN_SIZE as f64;
+        let max_spacing = r * 6.8 / crate::SCREEN_SIZE as f64;
 
         let lillipad_width_screen = r * LILLIPAD_WIDTH_TILES / crate::SCREEN_SIZE as f64;
 
         let squeeze_spacing = (1.0 + length as f64) / crate::SCREEN_SIZE as f64;
 
         while ({
-            cur += rng.gen_range(("lillipad_spacing", obstacles.len()), min_spacing, max_spacing);
+            cur += rng.gen_froggy(("lillipad_spacing", obstacles.len()), min_spacing, max_spacing, 2);
             cur < 1.0 - squeeze_spacing
         })
         {

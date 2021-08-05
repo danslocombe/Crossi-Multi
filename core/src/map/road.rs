@@ -9,36 +9,39 @@ pub struct Road {
 
 const CAR_WIDTH : f64 = 24.0 / 8.0;
 
-const R_WIDTH_MIN : f64 = 0.15;
-const R_WIDTH_MAX : f64 = 0.35;
-const TIME_SCALE : f64 = 12_000_000.0;
+const R_WIDTH_MIN : f64 = 0.11;
+const R_WIDTH_MAX : f64 = 0.31;
+const TIME_SCALE : f64 = 8_500_000.0;
 
 const MIN_SPAWN_DIST_TILES : f64 = CAR_WIDTH * 0.8;
-const MAX_SPAWN_DIST_TILES : f64 = CAR_WIDTH * 4.0;
-const SQUEEZE_SPAWN_DIST_TILES : f64 = CAR_WIDTH * 1.35;
+const MAX_SPAWN_DIST_TILES : f64 = CAR_WIDTH * 10.5;
+const SQUEEZE_SPAWN_DIST_TILES : f64 = CAR_WIDTH * 3.45;
 
-const MIN_SPACING : f64 = MIN_SPAWN_DIST_TILES / crate::SCREEN_SIZE as f64;
-const MAX_SPACING : f64 = MAX_SPAWN_DIST_TILES / crate::SCREEN_SIZE as f64;
-const SQUEEZE_SPACING : f64 = SQUEEZE_SPAWN_DIST_TILES / crate::SCREEN_SIZE as f64;
 
 impl Road {
     pub fn new(seed : u32, round : u8, y : i32, inverted : bool) -> Self {
         let rng = FroggyRng::from_hash((seed, round, y));
 
+
+        let r_width = rng.gen_froggy("r_width", R_WIDTH_MIN, R_WIDTH_MAX, 4);
+
+        let r = r_width * 2.;
+        let min_spacing = r * MIN_SPAWN_DIST_TILES / crate::SCREEN_SIZE as f64;
+        let max_spacing = r * MAX_SPAWN_DIST_TILES / crate::SCREEN_SIZE as f64;
+        let squeeze_spacing = r * SQUEEZE_SPAWN_DIST_TILES / crate::SCREEN_SIZE as f64;
+
         let mut obstacles = Vec::with_capacity(16);
-        let mut cur = 0.0;
+
+        // initial spacing
+        let mut cur = rng.gen_range("car_spacing_0", 0., min_spacing) + rng.gen_range("car_spacing_0_0", 0., min_spacing);
 
         // Make sure that there is at least one space at the end of the cycle large enough to go through
         // Make sure we never produce an impossible level
-        while ({
-            cur += rng.gen_range(("car_spacing", obstacles.len()), MIN_SPACING, MAX_SPACING);
-            cur < 1.0 - SQUEEZE_SPACING
-        })
+        while (cur < 1.0 - squeeze_spacing)
         {
             obstacles.push(Obstacle(cur));
+            cur += rng.gen_froggy(("car_spacing", obstacles.len()), min_spacing, max_spacing, 2);
         }
-
-        let r_width = rng.gen_range("r_width", R_WIDTH_MIN, R_WIDTH_MAX);
 
         Road {
             row : ObstacleRow::new(y, inverted, TIME_SCALE, obstacles, r_width),

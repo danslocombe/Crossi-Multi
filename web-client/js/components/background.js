@@ -62,7 +62,7 @@ export function draw_background(froggy_draw_ctx, in_lobby, in_warmup, client) {
 
             if (row[1].row_type.Path) {
                 const wall_width = row[1].row_type.Path.wall_width;
-                for (let i = 0; i < wall_width; i++) {
+                for (let i = 0; i <= wall_width; i++) {
                     draw_static(froggy_draw_ctx, spr_tree_top, i, y);
                     draw_static_inverted(froggy_draw_ctx, spr_tree_top, i, y);
                 }
