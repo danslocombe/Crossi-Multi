@@ -16,7 +16,7 @@ export function create_lillipad(lillipad) {
         y : y,
 
         // Make sure that we draw under players
-        dynamic_depth : y - 10,
+        dynamic_depth : y - 1000,
 
         frame_id : frame_id,
         spr : spr,

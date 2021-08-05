@@ -6,8 +6,15 @@ const dialogue_sprites = {}
 dialogue_sprites.frog = new Image(60, 46);
 dialogue_sprites.frog.src = "sprites/spr_frog_dialogue.png";
 
-dialogue_sprites.mouse = new Image(90, 72);
-dialogue_sprites.mouse.src = "sprites/spr_mouse_dialogue.png";
+//dialogue_sprites.mouse = new Image(90, 72);
+dialogue_sprites.mouse = new Image(60, 64);
+dialogue_sprites.mouse.src = "sprites/spr_mouse_dialogue_cute.png";
+
+dialogue_sprites.bird = new Image(60, 64);
+dialogue_sprites.bird.src = "sprites/spr_bird_dialogue_cute.png";
+
+dialogue_sprites.snake = new Image(90, 72);
+dialogue_sprites.snake.src = "sprites/spr_snake_dialogue.png";
 
 let snd_join = new Audio('/sounds/snd_join.wav');
 snd_join.volume = 0.2;

@@ -3,7 +3,7 @@
 import { create_game_view }  from "./components/game_view.js"
 import { Client } from "../pkg/index.js"
 
-const DEBUG = true;
+const DEBUG = false;
 
 const query_string = window.location.search;
 const url_params = new URLSearchParams(query_string);

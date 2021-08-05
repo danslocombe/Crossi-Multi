@@ -1,6 +1,6 @@
 import { SCALE} from "./constants.js";
 import { dan_lerp, diff} from "./utils.js";
-import { create_whiteout } from "./visual_effects.js";
+import { create_whiteout, create_dust, create_corpse, create_bubble } from "./visual_effects.js";
 
 function load_sprites(name) {
     let spr = new Image(SCALE, SCALE);
@@ -31,8 +31,8 @@ const sprites_list = [
 const colours_list = [
     "#4aef5c",
     "#884835",
-    "#000000",
-    "#000000",
+    "#fb3c3c",
+    "#80ffff",
 ]
 
 const sounds_list = [
@@ -54,60 +54,6 @@ snd_hit_car.volume = 0.25;
 
 const snd_drown = new Audio('/sounds/snd_drown_bubbles.wav');
 snd_drown.volume = 0.75;
-
-const spr_dust = new Image(SCALE,SCALE);
-spr_dust.src = "/sprites/spr_dust.png";
-
-const spr_smoke_count = 4;
-
-function create_dust(x, y) {
-    return {
-        frame_id : Math.floor(Math.random() * spr_smoke_count),
-        scale : 0.5 + Math.random() * 0.6,
-        static_depth : 100,
-        x : x,
-        y : y,
-        tick : function() {
-            this.scale -= 0.025;
-        },
-
-        alive: function() {
-            return this.scale > 0
-        },
-
-        draw : function(froggy_draw_ctx) {
-            //const x = this.x + 0 + (1-this.scale)*4 + froggy_draw_ctx.x_off;
-            //const y = this.y + 0 + (1-this.scale)*4 + froggy_draw_ctx.y_off;
-            const x = SCALE*(this.x + 0.25) + (1-this.scale) + froggy_draw_ctx.x_off;
-            const y = SCALE*(this.y + 0.25) + (1-this.scale) + froggy_draw_ctx.y_off;
-            froggy_draw_ctx.ctx.drawImage(spr_dust, SCALE*this.frame_id, 0, SCALE, SCALE, x, y, SCALE*this.scale, SCALE*this.scale);
-        }
-    }
-}
-
-function create_corpse(x, y, spr_dead) {
-    return {
-        spr : spr_dead,
-        x : x,
-        y : y,
-        dynamic_depth : y,
-
-        tick : () => {},
-        alive : () => true,
-        draw : function(froggy_draw_ctx) {
-            froggy_draw_ctx.ctx.drawImage(
-                this.spr,
-                0,
-                0,
-                SCALE,
-                SCALE,
-                x + froggy_draw_ctx.x_off,
-                y + froggy_draw_ctx.y_off,
-                SCALE,
-                SCALE);
-        }
-    }
-}
 
 // frog has duplicate frame for some reason
 //const frame_count = 6;
@@ -305,6 +251,14 @@ function create_player_def(sprites, move_sound, colour, source) {
                         snd_hit_car.play();
                     }
                     else {
+                        for (let i = 0; i < 2; i++) {
+                            const bubble_off = Math.random() * (3 / SCALE);
+                            const bubble_dir = Math.random() * 2 * 3.141;
+                            const bubble_x = this.source.x + bubble_off * Math.cos(bubble_dir);
+                            const bubble_y = this.source.y + bubble_off * Math.sin(bubble_dir);
+                            simple_entities.push(create_bubble(bubble_x, bubble_y));
+                        }
+
                         snd_drown.play();
                     }
 
