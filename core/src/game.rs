@@ -276,8 +276,8 @@ impl GameState {
         self.ruleset_state = self.ruleset_state.tick(dt_us, self.time_us, &mut self.player_states, map);
     }
 
-    fn space_occupied_with_player(&self, pos : Pos, ignore_id : PlayerId) -> bool {
-        for (_, player) in self.player_states.iter().filter(|(id, _)| *id != ignore_id) {
+    pub fn space_occupied_with_player(&self, pos : Pos, ignore_id : Option<PlayerId>) -> bool {
+        for (_, player) in self.player_states.iter().filter(|(id, _)| Some(*id) != ignore_id) {
             if player.pos == pos {
                 return true;
             }
@@ -302,7 +302,7 @@ impl GameState {
         match map.try_apply_input(time_us, &rule_state, &player.pos, dir)
         {
             Some(new_pos) => {
-                !self.space_occupied_with_player(new_pos, id)
+                !self.space_occupied_with_player(new_pos, Some(id))
             }
             _ => false,
         }

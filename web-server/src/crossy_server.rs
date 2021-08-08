@@ -148,7 +148,8 @@ impl Server {
             for new_player in new_players {
                 // We need to make sure this gets propagated properly
                 // Weird edge case bugs
-                inner.timeline.add_player(new_player, game::Pos::new_coord(10, 10));
+                let spawn_pos = find_spawn_pos(inner.timeline.top_state());
+                inner.timeline.add_player(new_player, spawn_pos);
             }
 
             for dropped_player in dropped_players {
@@ -277,4 +278,18 @@ impl ServerInner {
     
         None
     }
+}
+
+fn find_spawn_pos(game_state : &crossy_multi_core::game::GameState) -> crossy_multi_core::Pos {
+    for x in 7..=13 {
+        for y in 7..=13 {
+            let mut spawn_pos = game::Pos::new_coord(x, y);
+            if (!game_state.space_occupied_with_player(spawn_pos, None))
+            {
+                return spawn_pos;
+            }
+        }
+    }
+
+    panic!("Impossible, without 36 players");
 }
