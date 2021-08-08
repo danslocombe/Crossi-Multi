@@ -274,6 +274,7 @@ function create_player_def(sprites, move_sound, colour, source) {
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
             this.dynamic_depth = this.y;
+            console.log(this.dynamic_depth);
 
             if (rule_state && rule_state.Lobby) {
                 this.lobby_ready = rule_state.Lobby.ready_states.inner[source.player_id];

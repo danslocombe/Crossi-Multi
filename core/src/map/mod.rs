@@ -117,8 +117,23 @@ impl Map {
     }
 
     pub fn solid(&self, time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
+        if pos.x < 0 || pos.x >= SCREEN_SIZE {
+            return true;
+        }
+
+        if pos.y >= SCREEN_SIZE {
+            return true;
+        }
+
         let mut guard = self.inner.lock().unwrap();
-        guard.get_mut(rule_state.get_round_id()).get_row(RowId::from_y(pos.y)).solid(time_us, rule_state, pos)
+        let round_id = rule_state.get_round_id();
+        let round = guard.get_mut(round_id);
+
+        if (round.seed == 0 && pos.y < 0) {
+            return true;
+        }
+
+        round.get_row(RowId::from_y(pos.y)).solid(time_us, rule_state, pos)
     }
 
     pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : PreciseCoords) -> Option<crate::LillipadId> {

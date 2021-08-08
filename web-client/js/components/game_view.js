@@ -167,22 +167,22 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 function sort_depth(a, b) {
     // Would be so nice in rust :(
     // We order by: foreground_depth then dynamic_depth then depth
-    if (a.foreground_depth && b.foreground_depth) {
+    if (a.foreground_depth !== undefined && b.foreground_depth !== undefined) {
         return a.foreground_depth - b.foreground_depth
     }
-    else if (a.foreground_depth) {
+    else if (a.foreground_depth !== undefined) {
         return 1;
     }
-    else if (b.foreground_depth) {
+    else if (b.foreground_depth !== undefined) {
         return -1;
     }
-    else if (a.dynamic_depth && b.dynamic_depth) {
+    else if (a.dynamic_depth !== undefined && b.dynamic_depth !== undefined) {
         return a.dynamic_depth - b.dynamic_depth;
     }
-    else if (a.dynamic_depth) {
+    else if (a.dynamic_depth !== undefined) {
         return 1;
     }
-    else if (b.dynamic_depth) {
+    else if (b.dynamic_depth !== undefined) {
         return -1;
     } 
     else {
