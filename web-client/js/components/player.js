@@ -1,53 +1,7 @@
 import { SCALE} from "./constants.js";
 import { dan_lerp, diff} from "./utils.js";
 import { create_whiteout, create_dust, create_corpse, create_bubble } from "./visual_effects.js";
-
-// TODO don't replicate this constant
-const MOVE_T = 7 * (1000 * 1000 / 60);
-
-function load_sprites(name) {
-    let spr = new Image(SCALE, SCALE);
-    spr.src = '/sprites/spr_' + name + ".png";
-    let spr_flipped = new Image(SCALE, SCALE);
-    spr_flipped.src = '/sprites/spr_' + name + "_flipped.png";
-    let spr_dead = new Image(SCALE, SCALE);
-    spr_dead.src = '/sprites/spr_' + name + "_dead.png";
-
-    return {
-        spr : spr,
-        spr_flipped : spr_flipped,
-        spr_dead : spr_dead,
-        spr_name : name,
-    }
-}
-
-const spr_shadow = new Image(SCALE, SCALE);
-spr_shadow.src = '/sprites/spr_shadow.png';
-
-const sprites_list = [
-    load_sprites('frog'),
-    load_sprites('mouse'),
-    load_sprites('bird'),
-    load_sprites('snake'),
-]
-
-const colours_list = [
-    "#4aef5c",
-    "#884835",
-    "#fb3c3c",
-    "#80ffff",
-]
-
-const move_sounds_list = [
-    new Audio('/sounds/snd_move1.wav'),
-    new Audio('/sounds/snd_move2.wav'),
-    new Audio('/sounds/snd_move3.wav'),
-    new Audio('/sounds/snd_move4.wav'),
-]
-
-for (let sound of move_sounds_list) {
-    sound.volume = 0.15;
-}
+import { MOVE_T, spr_shadow, sprites_list, colours_list, move_sounds_list } from "./character_assets.js";
 
 const snd_push = new Audio('/sounds/snd_push.wav');
 snd_push.volume = 0.14;

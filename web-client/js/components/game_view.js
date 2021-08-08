@@ -1,12 +1,12 @@
 import { SCALE} from "./constants"
-import { create_player_remote, create_player_local } from "./player_def";
+import { create_player_remote, create_player_local } from "./player";
 import { draw_background } from "./background";
 import { create_car } from "./car";
 import { create_camera } from "./camera";
 import { create_countdown } from "./countdown";
 import { create_dialogue_controller } from "./dialogue";
 import { create_lillipad } from "./lillipad";
-//import "/components/player_def";
+import { create_prop_controller } from "./props";
 
 export function create_game_view(ctx, client, ws, key_event_source) {
     let view = {
@@ -22,6 +22,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         camera : create_camera(),
         countdown : create_countdown(),
         dialogue : create_dialogue_controller(),
+        prop_controller : create_prop_controller(),
 
         tick : function()
         {
@@ -106,6 +107,8 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 this.countdown.tick(this.rule_state);
                 this.dialogue.tick(this.rule_state, this.players, this.simple_entities);
+
+                this.prop_controller.tick(this.rule_state, this.simple_entities, this.client);
             }
         },
 
@@ -187,6 +190,6 @@ function sort_depth(a, b) {
         return -1;
     } 
     else {
-        return a.depth - b.depth;
+        return b.depth - a.depth;
     }
 }

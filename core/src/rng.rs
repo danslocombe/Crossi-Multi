@@ -44,11 +44,11 @@ impl FroggyRng {
     }
 
     pub fn gen<T : Hash + Debug>(&self, x : T) -> u64 {
-        debug_log!("Generating from {:?} + seed {}", x, self.seed);
+        //debug_log!("Generating from {:?} + seed {}", x, self.seed);
         let hash = hash(x);
         let index = (Wrapping(self.seed) + Wrapping(hash)).0;
         let res = split_mix_64(index);
-        debug_log!("Generated={}", res);
+        //debug_log!("Generated={}", res);
         res
     }
 

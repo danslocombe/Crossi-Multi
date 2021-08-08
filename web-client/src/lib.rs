@@ -312,6 +312,16 @@ impl Client {
             _ => false,
         }
     }
+
+    pub fn is_path(&self, y : f64) -> bool {
+        match self.timeline.map.get_row(self.get_round_id(), y.round() as i32).row_type
+        {
+            map::RowType::Path(_) => true,
+            map::RowType::Stands() => true,
+            map::RowType::StartingBarrier() => true,
+            _ => false,
+        }
+    }
 }
 
 fn try_deserialize_server_tick(buffer : &[u8]) -> Option<interop::ServerTick>

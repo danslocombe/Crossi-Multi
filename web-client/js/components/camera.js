@@ -1,4 +1,4 @@
-import { dan_lerp } from "./utils";
+import { dan_lerp, get_target_y_from_rule_state } from "./utils";
 
 export function create_camera() {
 
@@ -14,14 +14,9 @@ export function create_camera() {
 
         tick : function(rule_state) {
             if (rule_state) {
-                if (rule_state.Round) {
-                    this.target_y = rule_state.Round.screen_y;
-                }
-                else if (rule_state.RoundWarmup) {
-                    this.target_y = 0;
-                }
-                else if (rule_state.RoundCooldown) {
-                    this.target_y = rule_state.RoundCooldown.round_state.screen_y;
+                const new_target_y = get_target_y_from_rule_state(rule_state);
+                if (new_target_y !== undefined) {
+                    this.target_y = new_target_y;
                 }
             } 
             this.y = dan_lerp(this.y, this.target_y, 3);
