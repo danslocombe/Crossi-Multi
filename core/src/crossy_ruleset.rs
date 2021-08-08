@@ -229,9 +229,13 @@ impl CrossyRulesetFST
 }
 
 fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {
+    let player_count_for_offset = player_states.iter().map(|(id, _)| id.0 as i32).max().unwrap_or(0);
+
     for id in player_states.valid_ids() {
         let player_state = player_states.get_mut(id).unwrap();
-        let x = player_state.id.0 as i32 + 8;
+
+        let x_off_from_count = (player_count_for_offset / 2);
+        let x = player_state.id.0 as i32 + 9 - x_off_from_count;
         let y = 17;
         player_state.pos = Pos::Coord(CoordPos{x, y});
     }
