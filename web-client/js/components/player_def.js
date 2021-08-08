@@ -2,6 +2,9 @@ import { SCALE} from "./constants.js";
 import { dan_lerp, diff} from "./utils.js";
 import { create_whiteout, create_dust, create_corpse, create_bubble } from "./visual_effects.js";
 
+// TODO don't replicate this constant
+const MOVE_T = 7 * (1000 * 1000 / 60);
+
 function load_sprites(name) {
     let spr = new Image(SCALE, SCALE);
     spr.src = '/sprites/spr_' + name + ".png";
@@ -84,18 +87,21 @@ export function create_player_remote(client, player_id) {
             let y1 = player_state.y
 
             if (player_state.moving) {
-                x1 = player_state.t_x;
-                y1 = player_state.t_y;
+                const interp_t = (player_state.remaining_move_dur / MOVE_T);
+                x1 = player_state.x * (interp_t) + player_state.t_x * (1-interp_t);
+                y1 = player_state.y * (interp_t) + player_state.t_y * (1-interp_t);
             }
 
             let x = dan_lerp(this.x, x1, k);
             let y = dan_lerp(this.y, y1, k);
 
-            const kk = 0.45;
-            if (diff(x, x1) < kk) {
+            const dist = Math.sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1));
+
+            const snap_dir_small = 0.15;
+            const snap_dir_large = 3;
+
+            if (dist < snap_dir_small || dist > snap_dir_large) {
                 x = x1;
-            }
-            if (diff(y, y1) < kk) {
                 y = y1;
             }
 
@@ -158,8 +164,6 @@ export function create_player_local(client, key_event_source) {
 
             let x,y;
             if (player_state.moving) {
-                // TODO don't replicate this constant
-                const MOVE_T = 7 * (1000 * 1000 / 60);
                 const lerp_t = (1 - player_state.remaining_move_dur / MOVE_T);
 
                 const x1 = player_state.t_x;
@@ -274,7 +278,6 @@ function create_player_def(sprites, move_sound, colour, source) {
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
             this.dynamic_depth = this.y;
-            console.log(this.dynamic_depth);
 
             if (rule_state && rule_state.Lobby) {
                 this.lobby_ready = rule_state.Lobby.ready_states.inner[source.player_id];
