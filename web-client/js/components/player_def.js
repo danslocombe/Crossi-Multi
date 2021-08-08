@@ -38,14 +38,14 @@ const colours_list = [
     "#80ffff",
 ]
 
-const sounds_list = [
+const move_sounds_list = [
     new Audio('/sounds/snd_move1.wav'),
     new Audio('/sounds/snd_move2.wav'),
     new Audio('/sounds/snd_move3.wav'),
     new Audio('/sounds/snd_move4.wav'),
 ]
 
-for (let sound of sounds_list) {
+for (let sound of move_sounds_list) {
     sound.volume = 0.15;
 }
 
@@ -221,7 +221,7 @@ export function create_player_local(client, key_event_source) {
 function player_def_from_player_id(id, source) {
     // player ids start from 1
     const sprites = sprites_list[id - 1];
-    const move_sound = sounds_list[id - 1];
+    const move_sound = move_sounds_list[id - 1];
     const colour = colours_list[id - 1];
     return create_player_def(sprites, move_sound, colour, source)
 }

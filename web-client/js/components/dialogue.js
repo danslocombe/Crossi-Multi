@@ -16,6 +16,29 @@ dialogue_sprites.bird.src = "sprites/spr_bird_dialogue_cute.png";
 dialogue_sprites.snake = new Image(90, 72);
 dialogue_sprites.snake.src = "sprites/spr_snake_dialogue.png";
 
+const win_sounds= {
+    "frog": [
+        new Audio('/sounds/snd_frog_win.wav'),
+        new Audio('/sounds/snd_frog_win_2.wav'),
+    ],
+    "mouse": [
+        new Audio('/sounds/snd_mouse_win.wav'),
+        new Audio('/sounds/snd_mouse_win_2.wav'),
+    ],
+    "bird": [
+        new Audio('/sounds/snd_bird_win.wav'),
+    ],
+    "snake": [],
+}
+
+/*
+for (let sound_group of win_sounds) {
+    for (let sound of sound_group) {
+        sound.volume = 0.25;
+    }
+}
+*/
+
 let snd_join = new Audio('/sounds/snd_join.wav');
 snd_join.volume = 0.2;
 
@@ -30,11 +53,19 @@ function create_dialogue(sprite_name, duration = undefined) {
         // TODO default sprite
         sprite = dialogue_sprites.frog;
     }
+
+    let win_sound = undefined;
+    let win_sound_group = win_sounds[sprite_name]
+    if (win_sound_group) {
+        win_sound = win_sound_group[0];
+    }
+
     const fade_in_time = 16;
     const fade_out_time = 24;
     const target_letterbox = 30;
     const target_face_scale = 1.5;
     const face_x_off_max = 140;
+    const sound_delay = 80;
 
     if (!duration) {
         duration = 180;
@@ -42,6 +73,7 @@ function create_dialogue(sprite_name, duration = undefined) {
 
     return {
         sprite : sprite,
+        win_sound : win_sound,
         is_alive : true,
         t : 0,
         letterbox : 0,
@@ -49,6 +81,8 @@ function create_dialogue(sprite_name, duration = undefined) {
         scale_factor : 0,
         face_x_off : 0,
         frame_id : 0,
+
+        played_sound : false,
             
         t_end : duration,
 
@@ -64,6 +98,13 @@ function create_dialogue(sprite_name, duration = undefined) {
                 if (this.t < this.t_end - fade_out_time) {
                     // Steady state
                     this.scale_factor = 1;
+
+                    if (this.t > sound_delay && !this.played_sound) {
+                        this.played_sound = true;
+                        if (this.win_sound) {
+                            this.win_sound.play();
+                        }
+                    }
                 }
                 else if (this.t < this.t_end) {
                     // Easing out

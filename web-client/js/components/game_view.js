@@ -90,9 +90,10 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 }
 
                 let simple_entities_new = [];
+                const camera_y_max = (this.camera.y + 20) * SCALE;
                 for (let entity of this.simple_entities) {
                     entity.tick(); 
-                    if (entity.alive()) {
+                    if (entity.alive(camera_y_max)) {
                         simple_entities_new.push(entity);
                     }
                 }
