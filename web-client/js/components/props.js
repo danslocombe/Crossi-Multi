@@ -118,12 +118,13 @@ export function create_prop_controller() {
                 simple_entities.push(stand_left);
                 simple_entities.push(stand_right);
 
+                const prob_stands = 0.7;
                 const ymin = stand_left.y + 8;
                 for (let ix = 0; ix < 4; ix++) {
                     for (let iy = 0; iy < 4; iy++) {
                         const x = stand_left.x + ix * SCALE;
                         const y = ymin + x / 2 + 4 + SCALE * iy;
-                        rand_push_spectator(x + 4, y, false, simple_entities);
+                        rand_push_spectator(x + 4, y, false, prob_stands, simple_entities);
                     }
                 }
 
@@ -131,32 +132,34 @@ export function create_prop_controller() {
                     for (let iy = 0; iy < 4; iy++) {
                         const x = stand_right.x + ix * SCALE;
                         const y = ymin - 4 * ix + 16 + SCALE * iy;
-                        rand_push_spectator(x + 4, y, true, simple_entities);
+                        rand_push_spectator(x + 4, y, true, prob_stands, simple_entities);
                     }
                 }
 
+                const prob_front = 0.35;
                 for (let iy = 0; iy < 7; iy++) {
                     // In front of left stand
                     const yy = 13 * SCALE + iy * SCALE;
                     let xx = stand_left.x + 4 * SCALE + 4;
-                    rand_push_spectator(xx, yy, false, simple_entities);
+                    rand_push_spectator(xx, yy, false, prob_front, simple_entities);
 
                     // In front of right stand
                     xx = 14 * SCALE;
-                    rand_push_spectator(xx, yy, true, simple_entities);
+                    rand_push_spectator(xx, yy, true, prob_front, simple_entities);
                 }
 
+                const prob_below = 0.2;
                 for (let ix = 0; ix < 5; ix++) {
                     for (let iy = 0; iy < 2; iy++) {
                         const yy = 18 * SCALE + iy * SCALE;
 
                         // Below left stand
                         let xx = stand_left.x + ix * SCALE - SCALE + 4;
-                        rand_push_spectator(xx, yy, false, simple_entities);
+                        rand_push_spectator(xx, yy, false, prob_below, simple_entities);
 
                         // Below right stand
                         xx = 15 * SCALE + ix * SCALE;
-                        rand_push_spectator(xx, yy, true, simple_entities);
+                        rand_push_spectator(xx, yy, true, prob_below, simple_entities);
                     }
                 }
             }

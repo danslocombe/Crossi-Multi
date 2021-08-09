@@ -1,8 +1,8 @@
 import { SCALE} from "./constants.js";
 import { spr_shadow, sprites_list } from "./character_assets.js";
 
-export function rand_push_spectator(x, y, flipped, simple_entities) {
-    if (Math.random() < 0.45)
+export function rand_push_spectator(x, y, flipped, prob, simple_entities) {
+    if (Math.random() < prob)
     {
         simple_entities.push(create_spectator(x, y, flipped));
     }
