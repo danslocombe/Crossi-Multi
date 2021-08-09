@@ -8,6 +8,17 @@ import { create_dialogue_controller } from "./dialogue";
 import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";
 
+
+const audio_crowd = new Audio('/sounds/snd_win.wav');
+const audio_crowd_max = 0.325;
+audio_crowd.addEventListener('timeupdate', function(){
+    const buffer = .44
+    if (this.currentTime > this.duration - buffer) {
+        this.currentTime = 0;
+        this.play();
+    }
+});
+
 export function create_game_view(ctx, client, ws, key_event_source) {
     let view = {
         client : client,
@@ -61,6 +72,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 const current_player_states = JSON.parse(players_json);
 
                 if (moving_into_warmup) {
+                    audio_crowd.play();
                     this.simple_entities = [];
                     for (const player of this.players) {
                         if (player) {
@@ -89,6 +101,8 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                         player.tick(current_player_state, this.simple_entities, this.rule_state);
                     }
                 }
+
+                audio_crowd.volume = audio_crowd_max / (1 - 0.25 * this.camera.y);
 
                 let simple_entities_new = [];
                 const camera_y_max = (this.camera.y + 20) * SCALE;
