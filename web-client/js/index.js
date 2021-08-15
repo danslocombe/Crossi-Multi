@@ -3,7 +3,7 @@
 import { create_game_view }  from "./components/game_view.js"
 import { Client } from "../pkg/index.js"
 
-const DEBUG = true;
+const DEBUG = false;
 
 const query_string = window.location.search;
 const url_params = new URLSearchParams(query_string);
@@ -28,8 +28,8 @@ if (DEBUG)
     ws_endpoint = 'ws://localhost:8080';
 }
 else {
-    endpoint = 'http://51.140.157.154:8085';
-    ws_endpoint = 'ws://51.140.157.154:8085';
+    endpoint = 'https://roadtoads.io';
+    ws_endpoint = 'wss://roadtoads.io';
 }
 
 function dan_fetch(url) {
