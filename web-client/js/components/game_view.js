@@ -66,8 +66,6 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     this.rule_state = rule_state;
                 }
 
-                document.getElementById("state").innerHTML = rule_state_json;
-
                 const players_json = this.client.get_players_json();
                 const current_player_states = JSON.parse(players_json);
 

@@ -218,10 +218,7 @@ const canvasStyle =
     "image-rendering: -moz-crisp-edges;" +
     "image-rendering: pixelated;" +
     "image-rendering: -webkit-crisp-edges;" +
-    "image-rendering: crisp-edges;" +
-    "bottom: 0px;" +
-    "left: 0px;" +
-    "width: 40%;";
+    "image-rendering: crisp-edges;";
 
 canvas.style = canvasStyle;
 

@@ -1,0 +1,28 @@
+
+body {
+    background-image: url("/sprites/bg_tile_big.png");
+}
+
+#canvas {
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+    padding-top: 0;
+    width: 100%;
+    border: 8px solid #8f563b;
+}
+
+#outerborder {
+    padding-bottom: 0;
+    padding-top: 5%;
+    height: auto;
+}
+
+#align {
+    padding-left: 0;
+    padding-right: 0;
+    width: 40%;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
