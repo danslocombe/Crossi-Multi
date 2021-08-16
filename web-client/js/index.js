@@ -2,8 +2,10 @@
 
 import { create_game_view }  from "./components/game_view.js"
 import { Client } from "../pkg/index.js"
+import ClipboardJS from 'clipboard';
 
 const DEBUG = false;
+const DEBUG_PLAY_LINK = true;
 
 const query_string = window.location.search;
 const url_params = new URLSearchParams(query_string);
@@ -84,15 +86,19 @@ function ping(initial_ping) {
 
 /////////////////////////////////////////////////////////////////////////////////////
 
-function write_game_id(game_id) {
-    document.getElementById("game_id").innerHTML = '<a href="' + '/?game_id=' + game_id.toString() + '"> GameId: ' + game_id.toString() + '</a>';
+function write_join_link(game_id) {
+    if (DEBUG && DEBUG_PLAY_LINK)
+    {
+        document.getElementById("debug_join").innerHTML = '<a href="' + '/?game_id=' + game_id.toString() + '"> GameId: ' + game_id.toString() + '</a>';
+    }
+    document.getElementById("joinlink").value = endpoint + '/?game_id=' + game_id.toString();
 }
 
 function start_game() {
     if (game_id)
     {
         console.log("Joining game " + game_id);
-        write_game_id(game_id);
+        write_join_link(game_id);
         join();
     }
     else
@@ -103,7 +109,7 @@ function start_game() {
             console.log("Created game ");
             console.log(x);
             game_id = x.game_id;
-            write_game_id(game_id);
+            write_join_link(game_id);
             join();
         });
     }
@@ -235,3 +241,15 @@ function setup_view() {
 
     tick();
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+const clipboard = new ClipboardJS('.clipboard_btn');
+
+const join_link_copy = document.getElementById('join_link_copy');
+join_link_copy.addEventListener('click', () => {
+    join_link_copy.innerHTML = "Copied!";
+    setTimeout(() => {
+        join_link_copy.innerHTML = "Copy link";
+    }, 1200);
+})

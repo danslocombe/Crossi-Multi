@@ -1,6 +1,7 @@
 
 body {
     background-image: url("/sprites/bg_tile_big.png");
+    font-family: Helvetica;
 }
 
 #canvas {
@@ -25,4 +26,24 @@ body {
     margin-left: auto;
     margin-right: auto;
     display: block;
+}
+
+.clipboard_btn{
+    cursor: pointer;
+}
+
+#joincontainer {
+    background-color: #eeffaa;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 1rem;
+    padding-top: 1rem;
+    width : 80%;
+    border: 8px solid #8f563b;
+}
+
+.joincontainer_li {
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: space-between;
 }

@@ -11,8 +11,22 @@
         <canvas id="canvas" width="160" height="160"></canvas>
       </div>
       <br />
-      <div id="game_id"></div>
+      <div id="debug_join"></div>
       <script src="index.js"></script>
+      <div id="joincontainer">
+        <li class="joincontainer_li">
+        <span>
+          <b>Invite:</b>
+        </span>
+         <span>
+          <input type="text" id="joinlink" readonly>
+         <button id="join_link_copy" class="clipboard_btn" data-clipboard-target="#joinlink">
+           <!-- <img src="/assets/clipboard.svg" alt="Copy to clipboard"> -->
+           Copy link
+         </button>
+         </span>
+        </li>
+      </div>
     </div>
   </body>
 </html>
