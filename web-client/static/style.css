@@ -1,7 +1,7 @@
 
 body {
     background-image: url("/sprites/bg_tile_big.png");
-    font-family: Helvetica;
+    font-family:'Segoe UI','Roboto',sans-serif;
 }
 
 #canvas {
@@ -28,17 +28,43 @@ body {
     display: block;
 }
 
+.invite_text {
+    font-size: 18px;
+}
+
 .clipboard_btn{
     cursor: pointer;
+    display:inline-block;
+    padding:0.2em 1.45em;
+    margin:0.1em;
+    border:0.15em solid #CCCCCC;
+    box-sizing: border-box;
+    text-decoration:none;
+    font-family:'Segoe UI','Roboto',sans-serif;
+    font-weight:400;
+    color:#000000;
+    background-color:#CCCCCC;
+    text-align:center;
+    position:relative;
+}
+
+.clipboard_btn:hover{
+    border-color: #7a7a7a;
+}
+
+#joinlink {
+    color: #42413e;
+    background-color: #9e9d88;
+    font-family:'Segoe UI','Roboto',sans-serif;
 }
 
 #joincontainer {
-    background-color: #eeffaa;
+    background-color: #c4e6b5;
     padding-left: 1rem;
     padding-right: 1rem;
     padding-bottom: 1rem;
     padding-top: 1rem;
-    width : 80%;
+    width : auto;
     border: 8px solid #8f563b;
 }
 

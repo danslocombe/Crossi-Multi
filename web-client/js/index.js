@@ -4,7 +4,7 @@ import { create_game_view }  from "./components/game_view.js"
 import { Client } from "../pkg/index.js"
 import ClipboardJS from 'clipboard';
 
-const DEBUG = false;
+const DEBUG = true;
 const DEBUG_PLAY_LINK = true;
 
 const query_string = window.location.search;
