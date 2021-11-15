@@ -140,23 +140,22 @@ impl AIAgent for GoUpAI
             let test_pos = CoordPos { x : precise_pos.x.round() as i32, y : y_up };
             if (is_safe(&test_pos, game_state, map, &mut self.draw_state))
             {
-                /*
-                if (should_be_careful(&test_pos, game_state, map) && self.careful_t > 0) {
+                let self_pos_safe = is_safe(&player_pos_coords, game_state, map, &mut self.draw_state);
+
+                if (self_pos_safe && should_be_careful(&test_pos, game_state, map) && self.careful_t > 0) {
                     self.careful_t -= 1;
-                    Input::None
+                    return Input::None;
                 }
                 else {
-                    */
-                {
                     //log!("Testing {:?} was safe", &test_pos);
-                    if (is_safe(&player_pos_coords, game_state, map, &mut self.draw_state)) {
+                    if (self_pos_safe) {
                         return if (self.rng.gen_unit(("safe_idle", self.rng_t)) < 0.1)
                         {
                             //self.careful_t -= 1;
                             Input::None
                         }
                         else {
-                            //self.careful_t = 8;
+                            self.careful_t = 8;
                             Input::Up
                         }
                     }
@@ -178,10 +177,9 @@ impl AIAgent for GoUpAI
             // Last resort pick random
             return *(to_try.first().unwrap());
         }
-        else {
-            // Player dead
-            Input::None
-        }
+
+        // Player dead
+        return Input::None;
     }
 
     fn get_drawstate(&self) -> &AIDrawState {

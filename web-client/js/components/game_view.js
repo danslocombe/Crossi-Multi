@@ -119,7 +119,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 // before pruning by camera_y_max
                 const CAMERA_Y_MAX_BUGFIX = 160;
                 let camera_y_max = CAMERA_Y_MAX_BUGFIX;
-                if (this.rule_state.Round) {
+                if (this.rule_state && this.rule_state.Round) {
                     // Do proper pruning if we are in a round where camera cant go down
                     camera_y_max = (this.camera.y + 20) * SCALE;
                 }
