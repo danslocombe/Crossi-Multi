@@ -39,7 +39,17 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         {
             if (this.client)
             {
-                this.client.buffer_input_json('"' + this.current_input + '"');
+                if (this.current_input === "0") {
+                    this.client.set_ai("none");
+                }
+                else if (this.current_input === "1") {
+                    this.client.set_ai("go_up");
+                }
+                else
+                {
+                    this.client.buffer_input_json('"' + this.current_input + '"');
+                }
+
                 this.current_input = "None";
 
                 this.client.tick();

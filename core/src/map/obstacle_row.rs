@@ -10,7 +10,7 @@ pub struct ObstacleRowDescr {
 pub struct Obstacle(pub f64);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct ObstaclePublic(f64, i32, bool);
+pub struct ObstaclePublic(pub f64, pub i32, pub bool);
 
 /// Used for both cars on roads, and lillipads on rivers
 /// 

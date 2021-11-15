@@ -1,20 +1,25 @@
-mod wasm_instant;
+#![allow(unused_parens)]
 
 use wasm_bindgen::prelude::*;
-
-use std::collections::VecDeque;
-use wasm_instant::WasmInstant;
-use std::time::Duration;
-use serde::Deserialize;
-
-use crossy_multi_core::*;
-use crossy_multi_core::game::PlayerId;
 
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into());
     }
 }
+
+mod wasm_instant;
+mod ai;
+
+use std::time::Duration;
+use std::cell::RefCell;
+
+use std::collections::VecDeque;
+use wasm_instant::WasmInstant;
+use serde::Deserialize;
+
+use crossy_multi_core::*;
+use crossy_multi_core::game::PlayerId;
 
 struct ConsoleDebugLogger();
 impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
@@ -48,6 +53,8 @@ pub struct Client {
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
 
     queued_server_messages : VecDeque<interop::ServerTick>,
+
+    ai_agent : Option<RefCell<Box<dyn ai::AIAgent>>>,
 }
 
 #[wasm_bindgen]
@@ -76,6 +83,7 @@ impl Client {
             ready_state : false,
             trusted_rule_state: None,
             queued_server_messages: VecDeque::new(),
+            ai_agent : None,
         } 
     }
 
@@ -124,17 +132,29 @@ impl Client {
             });
         });
 
+        if (self.local_player_info.is_some())
+        {
+            let mut local_input = Input::None;
 
-        self.local_player_info.as_mut().map(|local_player| {
-            let mut input = Input::None;
-            if (can_move && local_player.buffered_input != Input::None)
+            if (can_move)
             {
-                input = local_player.buffered_input;
-                local_player.buffered_input = Input::None;
+                if let Some(ai_refcell) = &self.ai_agent {
+                    let mut ai = ai_refcell.borrow_mut();
+                    local_input = ai.think(&self.timeline.top_state(), &self.timeline.map);
+                }
+                else 
+                {
+                    let local_player_info = self.local_player_info.as_mut().unwrap();
+                    if (local_player_info.buffered_input != Input::None)
+                    {
+                        local_input = local_player_info.buffered_input;
+                        local_player_info.buffered_input = Input::None;
+                    }
+                }
             }
 
-            player_inputs.set(local_player.player_id, input);
-        });
+            player_inputs.set(self.local_player_info.as_ref().unwrap().player_id, local_input);
+        }
 
         // Tick 
         let current_time_us = current_time.as_micros() as u32;
@@ -320,6 +340,31 @@ impl Client {
             map::RowType::Stands() => true,
             map::RowType::StartingBarrier() => true,
             _ => false,
+        }
+    }
+
+    pub fn set_ai(&mut self, ai_config : &str) {
+        if (self.local_player_info.is_none())
+        {
+            log!("No local player to set ai on");
+            return;
+        }
+
+        let local_player_id = self.local_player_info.as_ref().unwrap().player_id;
+
+        let lower = ai_config.to_lowercase();
+        match lower.as_str() {
+            "none" => {
+                log!("Setting ai agent to none");
+                self.ai_agent = None;
+            },
+            "go_up" => {
+                log!("Setting ai agent to 'go_up'");
+                self.ai_agent = Some(RefCell::new(Box::new(ai::GoUpAI::new(local_player_id))));
+            },
+            _ => {
+                log!("Unknown ai agent {}", ai_config);
+            }
         }
     }
 }

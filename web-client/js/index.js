@@ -192,6 +192,10 @@ let key_event_source = {
             case 38: input = "Up"; break;
             case 39: input = "Right"; break;
             case 40: input = "Down"; break;
+            case 48: input = "0"; break;
+            case 49: input = "1"; break;
+            case 50: input = "2"; break;
+            case 51: input = "3"; break;
             default: break;
         }
 

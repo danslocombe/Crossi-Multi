@@ -212,6 +212,10 @@ impl GameState {
         &self.ruleset_state
     }
 
+    pub fn get_round_id(&self) -> u8 {
+        self.ruleset_state.get_round_id()
+    }
+
     pub fn add_player(&self, id: PlayerId, pos: Pos) -> Self {
         let mut new = self.clone();
 

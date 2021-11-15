@@ -161,10 +161,10 @@ export function create_player_local(client, key_event_source) {
 
     let listener = key_event_source.add_input_listener();
     listener.on_input_keydown = function(input) {
-        if (input == "Left") {
+        if (input === "Left") {
             source.x_flip = -1;
         }
-        if (input == "Right") {
+        if (input === "Right") {
             source.x_flip = 1;
         }
     };
