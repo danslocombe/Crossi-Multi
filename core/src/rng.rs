@@ -81,6 +81,20 @@ impl FroggyRng {
 
         sum
     }
+
+    pub fn gen_usize_range<T : Hash + Debug>(&self, x : T, min : usize, max : usize) -> usize {
+        let range = 1 + max - min;
+        min + ((self.gen(x) as usize) % range)
+    }
+
+    pub fn shuffle<T : Hash + Debug, X>(&self, x : T, xs : &mut [X]) {
+        // Fisher-yates
+        // See https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm
+        for i in 0..=xs.len()-2 {
+            let j = self.gen_usize_range((&x, i), i, xs.len() - 1);
+            xs.swap(i, j);
+        }
+    }
 }
 
 // We don't need a smart hash as this is just used as an input to splitmix.

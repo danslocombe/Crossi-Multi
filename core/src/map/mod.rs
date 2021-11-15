@@ -33,6 +33,16 @@ pub enum RowType {
   Stands(),
 }
 
+impl RowType {
+    pub fn is_dangerous(&self) -> bool {
+        match self {
+            RowType::River(_) => true,
+            RowType::Road(_) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiverDescr {
     seed : u32,
@@ -304,27 +314,27 @@ impl MapRound {
             let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
             let rng = FroggyRng::from_hash((self.seed, self.round_id, row_id));
 
-            debug_log!("Generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
+            verbose_log!("Generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
 
             // Seed 0 is reserved for lobbies
             // We shouldnt generate any roads / rivers
             if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.2) {
-                debug_log!("Generating obtacle row at y={}", row_id.to_y());
+                verbose_log!("Generating obtacle row at y={}", row_id.to_y());
 
                 if (rng.gen_unit("feature_type") < 0.5) {
-                    debug_log!("Generating road");
+                    verbose_log!("Generating road");
 
                     let lanes = *rng.choose("road_lanes", &[1, 2, 3, 4, 5]);
                     let initial_direction = *rng.choose("road_initial_direction", &[true, false]);
 
-                    debug_log!("lanes {}, initial_direction {}", lanes, initial_direction);
+                    verbose_log!("lanes {}, initial_direction {}", lanes, initial_direction);
 
                     for i in 0..lanes {
                         let rid = RowId(row_id.0 + i);
                         let y = rid.to_y();
-                        debug_log!("Adding road at {}", y);
+                        verbose_log!("Adding road at {}", y);
                         let road = Road::new(self.seed, self.round_id, y, initial_direction);
-                        debug_log!("Road {:?}", &road);
+                        verbose_log!("Road {:?}", &road);
                         self.roads.push((y, road));
                         self.rows.push_front(Row {
                             row_id: rid,
@@ -336,9 +346,9 @@ impl MapRound {
                     for i in 0..lanes {
                         let rid = RowId(row_id.0 + lanes + i);
                         let y = rid.to_y();
-                        debug_log!("Adding road inverted at {}", y);
+                        verbose_log!("Adding road inverted at {}", y);
                         let road = Road::new(self.seed, self.round_id, y, !initial_direction);
-                        debug_log!("Road {:?}", &road);
+                        verbose_log!("Road {:?}", &road);
                         self.roads.push((y, road));
                         self.rows.push_front(Row {
                             row_id: rid,
@@ -349,20 +359,20 @@ impl MapRound {
                     }
                 }
                 else {
-                    debug_log!("Generating river");
+                    verbose_log!("Generating river");
 
                     let lanes = *rng.choose("river_lanes", &[2, 2, 3, 4]);
                     let river_direction = *rng.choose("river_direction", &[true, false]);
 
-                    debug_log!("lanes {}, river_direction {}", lanes, river_direction);
+                    verbose_log!("lanes {}, river_direction {}", lanes, river_direction);
 
                     for i in 0..lanes {
                         let rid = RowId(row_id.0 + i);
                         let y = rid.to_y();
 
-                        debug_log!("Adding river at {}", y);
+                        verbose_log!("Adding river at {}", y);
                         let river = River::new(self.seed, self.round_id, y, river_direction);
-                        debug_log!("River {:?}", &river);
+                        verbose_log!("River {:?}", &river);
                         self.rivers.push((y, river));
                         self.rows.push_front(Row {
                             row_id: rid,

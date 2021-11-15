@@ -7,6 +7,7 @@ import { create_countdown } from "./countdown";
 import { create_dialogue_controller } from "./dialogue";
 import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";
+import { create_from_ai_overlay } from "./ai_overlay";
 
 
 const audio_crowd = new Audio('/sounds/snd_win.wav');
@@ -113,9 +114,19 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 audio_crowd.volume = audio_crowd_max / (1 - 0.25 * this.camera.y);
 
                 let simple_entities_new = [];
-                const camera_y_max = (this.camera.y + 20) * SCALE;
+
+                // TODO Fix the issue on respawn when camera is moving down
+                // before pruning by camera_y_max
+                const CAMERA_Y_MAX_BUGFIX = 160;
+                let camera_y_max = CAMERA_Y_MAX_BUGFIX;
+                if (this.rule_state.Round) {
+                    // Do proper pruning if we are in a round where camera cant go down
+                    camera_y_max = (this.camera.y + 20) * SCALE;
+                }
+
                 for (let entity of this.simple_entities) {
                     entity.tick(); 
+
                     if (entity.alive(camera_y_max)) {
                         simple_entities_new.push(entity);
                     }
@@ -156,6 +167,16 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     const lillipads = JSON.parse(this.client.get_lillipads_json());
                     for (const lillipad of lillipads) {
                         draw_with_depth.push(create_lillipad(lillipad));
+                    }
+
+                    const ai_overlay_json = this.client.get_ai_drawstate_json();
+                    if (ai_overlay_json && ai_overlay_json.length > 0)
+                    {
+                        const ai_overlay = JSON.parse(ai_overlay_json);
+                        const created = create_from_ai_overlay(ai_overlay);
+                        for (const c of created) {
+                            draw_with_depth.push(c);
+                        }
                     }
                 }
 

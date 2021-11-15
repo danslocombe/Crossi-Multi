@@ -55,7 +55,7 @@ impl CoordPos {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct PreciseCoords {
     pub x : f64,
     pub y : i32,

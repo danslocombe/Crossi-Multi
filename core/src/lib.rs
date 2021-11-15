@@ -19,6 +19,7 @@ fn debug_logline(logline : &str)
     unsafe { if let Some(x) = DEBUG_LOGGER.as_ref() { x.log(logline); }}
 }
 
+
 pub trait DebugLogger {
     fn log(&self, logline: &str);
 }
@@ -34,6 +35,16 @@ impl DebugLogger for StdoutLogger {
 macro_rules! debug_log {
     ( $( $t:tt )* ) => {
         crate::debug_logline(&format!( $( $t )* ));
+    }
+}
+
+const VERBOSE_LOG : bool = false;
+
+macro_rules! verbose_log {
+    ( $( $t:tt )* ) => {
+        if (crate::VERBOSE_LOG) {
+            crate::debug_logline(&format!( $( $t )* ));
+        }
     }
 }
 

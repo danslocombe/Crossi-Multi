@@ -360,10 +360,25 @@ impl Client {
             },
             "go_up" => {
                 log!("Setting ai agent to 'go_up'");
-                self.ai_agent = Some(RefCell::new(Box::new(ai::GoUpAI::new(local_player_id))));
+                self.ai_agent = Some(RefCell::new(Box::new(ai::go_up::GoUpAI::new(local_player_id))));
             },
             _ => {
                 log!("Unknown ai agent {}", ai_config);
+            }
+        }
+    }
+
+    fn get_ai_drawstate(&self) -> Option<ai::AIDrawState> {
+        self.ai_agent.as_ref().map(|x| x.borrow().get_drawstate().clone())
+    }
+
+    pub fn get_ai_drawstate_json(&self) -> String {
+        match self.get_ai_drawstate() {
+            Some(x) => {
+                serde_json::to_string(&x).unwrap()
+            }
+            _ => {
+                "".to_owned()
             }
         }
     }
