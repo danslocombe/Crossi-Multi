@@ -4,7 +4,7 @@ function create_ai_overlay(overlay_obj) {
     return {
         x : overlay_obj.precise_pos.x,
         y : overlay_obj.precise_pos.y,
-        dynamic_depth : overlay_obj.precise_pos.y - 2000,
+        dynamic_depth : overlay_obj.precise_pos.y - 20000,
         type : overlay_obj.draw_type,
         colour : overlay_obj.colour,
         draw : function(froggy_draw_ctx) {
@@ -64,39 +64,5 @@ export function create_from_ai_overlay(overlay) {
         drawables.push(create_ai_overlay(overlay_obj));
     }
 
-    //console.log(drawables);
     return drawables;
-
-    /*
-    const x = lillipad[0] * SCALE;
-    const y = lillipad[1] * SCALE;
-    //const flipped = car[2];
-    const frame_id = 0;
-    let spr = spr_log;
-
-    return {
-        x : x,
-        y : y,
-
-        // Make sure that we draw under players
-        dynamic_depth : y - 1000,
-
-        frame_id : frame_id,
-        spr : spr,
-        draw : function(froggy_draw_ctx) {
-            const xx = this.x + froggy_draw_ctx.x_off;
-            const yy = this.y + froggy_draw_ctx.y_off;
-
-            froggy_draw_ctx.ctx.drawImage(this.spr,
-                SCALE*this.frame_id,
-                0,
-                SCALE,
-                SCALE,
-                xx,
-                yy,
-                SCALE,
-                SCALE);
-        }
-    };
-    */
 }

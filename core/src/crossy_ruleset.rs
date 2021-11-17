@@ -226,6 +226,17 @@ impl CrossyRulesetFST
             End(_) => 0,
         }
     }
+
+    pub fn same_variant(&self, other : &Self) -> bool {
+        match (self, other) {
+            (Lobby(_), Lobby(_)) => true,
+            (RoundWarmup(_), RoundWarmup(_)) => true,
+            (Round(_), Round(_)) => true,
+            (RoundCooldown(_), RoundCooldown(_)) => true,
+            (End(_), End(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {

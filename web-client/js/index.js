@@ -196,6 +196,7 @@ let key_event_source = {
             case 49: input = "1"; break;
             case 50: input = "2"; break;
             case 51: input = "3"; break;
+            case 80: input = "P"; break;
             default: break;
         }
 

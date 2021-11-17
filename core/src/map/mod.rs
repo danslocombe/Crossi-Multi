@@ -437,6 +437,7 @@ fn outside_walls(x : i32, wall_width : i32) -> bool {
 
 impl Row {
     pub fn solid(&self, _time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
+        //debug_log!("Checking {:?} solid, assert value self.row_id.to_y() = {}", pos, self.row_id.to_y());
         assert!(self.row_id.to_y() == pos.y);
         let x = pos.x;
 

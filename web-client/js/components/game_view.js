@@ -51,9 +51,15 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     this.client.buffer_input_json('"' + this.current_input + '"');
                 }
 
-                this.current_input = "None";
+                if (this.current_input != "P")
+                {
+                    this.client.tick();
+                    this.current_input = "None";
 
-                this.client.tick();
+                    // DEBUG HACK
+                    //const html_elem = document.getElementById('invite_text_id');
+                    //html_elem.innerHTML = (this.client.get_rule_state_json());
+                }
 
                 // Check if ws in ready state
                 // https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/readyState

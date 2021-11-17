@@ -55,6 +55,7 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
                 false
             }
         }
+
         RowType::Road(_) => {
             let cars = map.get_cars(game_state.get_round_id(), game_state.time_us);
             const MIN_CAR_DIST : f64 = 3.0;

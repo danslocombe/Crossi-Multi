@@ -169,47 +169,65 @@ impl Client {
         }
         {server_tick_it = self.queued_server_messages.pop_back();}
 
+        //if (self.queued_server_messages.len() > 0) {
+        {
+            //log!("DROPPED {} SERVER MESSAGES AS THEY ARE IN THE FUTURE, GOT TICK {}", self.queued_server_messages.len(), server_tick_it.is_some());
+        }
+
         if let Some(server_tick) = server_tick_it {
             self.process_server_message(&server_tick);
         }
 
-        if (self.timeline.top_state().frame_id.floor() as u32 % 60) == 0
+        if (self.timeline.top_state().frame_id.floor() as u32 % 15) == 0
         {
+            //log!("{:?}", self.timeline.top_state().get_rule_state());
             //log!("{:?}", self.timeline.top_state());
         }
     }
 
     fn process_server_message(&mut self, server_tick : &interop::ServerTick)
     {
-        match self.local_player_info.as_ref()
+        let should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&server_tick.rule_state)).unwrap_or(false);
+
+        if (should_reset) {
+            self.timeline = timeline::Timeline::from_server_parts(
+                self.timeline.map.get_seed(),
+                server_tick.latest.time_us,
+                server_tick.latest.states.clone(),
+                server_tick.rule_state.clone());
+        }
+        else
         {
-            Some(lpi) => {
-                if (self.timeline.top_state().get_player(lpi.player_id)).is_none()
-                {
-                    // Edge case
-                    // First tick with the player
-                    // we need to take state from server
+            match self.local_player_info.as_ref()
+            {
+                Some(lpi) => {
+                    if (self.timeline.top_state().get_player(lpi.player_id)).is_none()
+                    {
+                        // Edge case
+                        // First tick with the player
+                        // we need to take state from server
+                        self.timeline.propagate_state(
+                            &server_tick.latest,
+                            Some(&server_tick.rule_state),
+                            Some(&server_tick.latest),
+                            None);
+                    }
+                    else
+                    {
+                        self.timeline.propagate_state(
+                            &server_tick.latest,
+                            Some(&server_tick.rule_state),
+                            server_tick.last_client_sent.get(lpi.player_id),
+                            Some(lpi.player_id));
+                    }
+                }
+                _ => {
                     self.timeline.propagate_state(
                         &server_tick.latest,
                         Some(&server_tick.rule_state),
-                        Some(&server_tick.latest),
+                        None,
                         None);
                 }
-                else
-                {
-                    self.timeline.propagate_state(
-                        &server_tick.latest,
-                        Some(&server_tick.rule_state),
-                        server_tick.last_client_sent.get(lpi.player_id),
-                        Some(lpi.player_id));
-                }
-            }
-            _ => {
-                self.timeline.propagate_state(
-                    &server_tick.latest,
-                    Some(&server_tick.rule_state),
-                    None,
-                    None);
             }
         }
 
