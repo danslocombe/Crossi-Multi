@@ -37,7 +37,7 @@ export function create_dust(x, y) {
     return {
         frame_id : Math.floor(Math.random() * spr_smoke_count),
         scale : 0.5 + Math.random() * 0.6,
-        static_depth : 100,
+        dynamic_depth : y-32,
         x : x,
         y : y,
         tick : function() {

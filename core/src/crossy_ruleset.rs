@@ -184,7 +184,7 @@ impl CrossyRulesetFST
                 }
             }
                     
-            _ => {todo!()},
+            _ => {todo!("Unknown state type {:?}", self)},
         }
     }
 
