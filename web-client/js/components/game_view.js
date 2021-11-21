@@ -91,7 +91,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     this.simple_entities = [];
                     for (const player of this.players) {
                         if (player) {
-                            player.new_round();
+                            player.new_round(this.rule_state.RoundWarmup, this.simple_entities);
                         }
                     }
                 }

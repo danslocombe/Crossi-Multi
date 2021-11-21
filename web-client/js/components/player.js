@@ -3,6 +3,9 @@ import { dan_lerp, diff} from "./utils.js";
 import { create_whiteout, create_dust, create_corpse, create_bubble } from "./visual_effects.js";
 import { MOVE_T, spr_shadow, sprites_list, colours_list, move_sounds_list } from "./character_assets.js";
 
+let spr_crown = new Image(8, 6);
+spr_crown.src = '/sprites/spr_crown.png';
+
 const snd_push = new Audio('/sounds/snd_push.wav');
 snd_push.volume = 0.14;
 
@@ -190,6 +193,49 @@ function player_def_from_player_id(id, source) {
     return create_player_def(sprites, move_sound, colour, source)
 }
 
+function create_crown(owning_player, i) {
+    return {
+        x: 0,
+        y: 0,
+        foreground_depth: 1,
+        visible : false,
+        t : 0,
+        is_alive : true,
+        crown_i : i,
+        owning_player : owning_player,
+
+        alive : function(max_y) {
+            return this.is_alive;
+        },
+
+        tick : function() {
+            this.x = this.owning_player.x + 1;
+            this.y = this.owning_player.y - (5*this.crown_i + 4);
+            this.visible = true;
+            this.t += 1;
+            if (this.t > 240 + this.crown_i * 6) {
+                this.is_alive = false;
+            }
+        },
+
+        draw : function(froggy_draw_ctx) {
+            const xx = this.x + froggy_draw_ctx.x_off;
+            const yy = this.y + froggy_draw_ctx.y_off;
+
+            froggy_draw_ctx.ctx.drawImage(
+                spr_crown,
+                0,
+                0,
+                spr_crown.width,
+                spr_crown.height,
+                xx,
+                yy,
+                spr_crown.width,
+                spr_crown.height);
+        }
+    }
+}
+
 function create_player_def(sprites, move_sound, colour, source) {
     return {
         sprite : sprites.spr,
@@ -211,7 +257,7 @@ function create_player_def(sprites, move_sound, colour, source) {
             if (!this.source.client.player_alive(this.source.player_id)) {
                 if (!this.created_corpse) {
                     this.created_corpse = true;
-                    const is_river = source.client.is_river(state.y);
+                    const is_river = this.source.client.is_river(state.y);
                     if (!is_river)
                     {
                         const corpse = create_corpse(this.x, this.y, this.sprite_dead);
@@ -244,14 +290,26 @@ function create_player_def(sprites, move_sound, colour, source) {
             this.dynamic_depth = this.source.y;
 
             if (rule_state && rule_state.Lobby) {
-                this.lobby_ready = rule_state.Lobby.ready_states.inner[source.player_id];
+                this.lobby_ready = rule_state.Lobby.ready_states.inner[this.source.player_id];
             }
             else {
                 this.lobby_ready = false;
             }
         },
-        new_round : function() {
+        new_round : function(warmup_state, simple_entities) {
             this.created_corpse = false;
+
+            if (warmup_state.win_counts && warmup_state.win_counts.inner) {
+                const win_count = warmup_state.win_counts.inner[this.source.player_id];
+                console.log("Win count " + win_count);
+                if (win_count && win_count > 0) {
+                    for (let i = 0; i < win_count; i++) {
+                        simple_entities.push(create_crown(this, i));
+                    }
+                }
+            } 
+
+            console.log(warmup_state);
         },
         draw : function(crossy_draw_ctx) {
             // hackyyy
