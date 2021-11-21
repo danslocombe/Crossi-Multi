@@ -16,6 +16,40 @@ snd_drown.volume = 0.75;
 //const frame_count = 6;
 const player_frame_count = 5;
 
+function lerp_snap(x0, y0, x1, y1)
+{
+    const k = 4;
+    let x = dan_lerp(x0, x1, k);
+    let y = dan_lerp(y0, y1, k);
+
+    const dist = Math.sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1));
+
+    const snap_dir_small = 0.15;
+    const snap_dir_large = 3;
+
+    if (dist < snap_dir_small || dist > snap_dir_large) {
+        x = x1;
+        y = y1;
+    }
+
+    return {
+        x : x,
+        y : y,
+    }
+}
+
+function move_effects(x, y, simple_entities, player_def) {
+    for (let i = 0; i < 2; i++) {
+        const dust_off = Math.random() * (3 / SCALE);
+        const dust_dir = Math.random() * 2 * 3.141;
+        const dust_x = x + dust_off * Math.cos(dust_dir);
+        const dust_y = y + dust_off * Math.sin(dust_dir);
+        simple_entities.push(create_dust(dust_x, dust_y));
+    }
+
+    player_def.move_sound.play();
+}
+
 export function create_player_remote(client, player_id) {
     let source = {
         client : client,
@@ -24,19 +58,14 @@ export function create_player_remote(client, player_id) {
         y : 0,
         dynamic_depth : 0,
         moving : false,
-        states : [],
         x_flip : 1,
         frame_id : 0,
 
         tick : function(player_state, simple_entities, player_def) {
-            this.states.push(player_state);
-
             // dumb implementation
             // basically inverse kinomatics, play back animations to match movement
             // Lerp to current pos
             // TODO if local player is pushing then we should be much tighter on this
-            const k = 4;
-
             let x1 = player_state.x
             let y1 = player_state.y
 
@@ -46,18 +75,9 @@ export function create_player_remote(client, player_id) {
                 y1 = player_state.y * (interp_t) + player_state.t_y * (1-interp_t);
             }
 
-            let x = dan_lerp(this.x, x1, k);
-            let y = dan_lerp(this.y, y1, k);
-
-            const dist = Math.sqrt((x - x1) * (x - x1) + (y - y1) * (y - y1));
-
-            const snap_dir_small = 0.15;
-            const snap_dir_large = 3;
-
-            if (dist < snap_dir_small || dist > snap_dir_large) {
-                x = x1;
-                y = y1;
-            }
+            const new_p = lerp_snap(this.x, this.y, x1, y1);
+            const x = new_p.x;
+            const y = new_p.y;
 
             const delta = 0.1;
             if (x > this.x + delta) {
@@ -79,16 +99,7 @@ export function create_player_remote(client, player_id) {
             }
 
             if (moving && !this.moving) {
-                // Make dust
-                for (let i = 0; i < 2; i++) {
-                    const dust_off = Math.random() * (3 / SCALE);
-                    const dust_dir = Math.random() * 2 * 3.141;
-                    const dust_x = x + dust_off * Math.cos(dust_dir);
-                    const dust_y = y + dust_off * Math.sin(dust_dir);
-                    simple_entities.push(create_dust(dust_x, dust_y));
-                }
-
-                player_def.move_sound.play();
+                move_effects(x, y, simple_entities, player_def);
             }
 
             this.moving = moving;
@@ -129,24 +140,23 @@ export function create_player_local(client, key_event_source) {
 
             }
             else {
-                x = x0;
-                y = y0;
-                this.frame_id = 0;
+                const new_p = lerp_snap(this.x, this.y, x0, y0);
+                x = new_p.x;
+                y = new_p.y;
+
+                const delta = 0.1;
+                if (diff(x, this.x) > delta || diff(y, this.y) > delta) {
+                    this.frame_id = (this.frame_id + 1) % player_frame_count;
+                }
+                else {
+                    this.frame_id = 0;
+                }
             }
 
             // Started moving
             if (player_state.moving && !this.moving) {
 
-                // Make dust
-                for (let i = 0; i < 2; i++) {
-                    const dust_off = Math.random() * (3 / SCALE);
-                    const dust_dir = Math.random() * 2 * 3.141;
-                    const dust_x = x + dust_off * Math.cos(dust_dir);
-                    const dust_y = y + dust_off * Math.sin(dust_dir);
-                    simple_entities.push(create_dust(dust_x, dust_y));
-                }
-
-                player_def.move_sound.play();
+                move_effects(x, y, simple_entities, player_def);
 
                 if (player_state.pushing >= 0) {
                     snd_push.play();
@@ -231,7 +241,7 @@ function create_player_def(sprites, move_sound, colour, source) {
 
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
-            this.dynamic_depth = this.y;
+            this.dynamic_depth = this.source.y;
 
             if (rule_state && rule_state.Lobby) {
                 this.lobby_ready = rule_state.Lobby.ready_states.inner[source.player_id];

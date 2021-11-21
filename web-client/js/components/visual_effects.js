@@ -55,7 +55,7 @@ export function create_dust(x, y) {
             const y = SCALE*(this.y + 0.25) + (1-this.scale) + froggy_draw_ctx.y_off;
             froggy_draw_ctx.ctx.drawImage(spr_dust, SCALE*this.frame_id, 0, SCALE, SCALE, x, y, SCALE*this.scale, SCALE*this.scale);
         }
-    }
+    };
 }
 
 const spr_bubble = new Image(SCALE,SCALE);
