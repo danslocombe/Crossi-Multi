@@ -211,15 +211,17 @@ function create_crown(owning_player, i) {
         tick : function() {
             this.x = this.owning_player.x + 1;
             this.y = this.owning_player.y - (5*this.crown_i + 4);
-            this.visible = true;
+            if (this.t > this.crown_i * 2) {
+                this.visible = true;
+            }
             this.t += 1;
-            if (this.t > 240 + this.crown_i * 6) {
+            if (this.t > 240 + this.crown_i * 3) {
                 this.is_alive = false;
             }
         },
 
         draw : function(froggy_draw_ctx) {
-            const xx = this.x + froggy_draw_ctx.x_off;
+            const xx = this.x + froggy_draw_ctx.x_off + Math.round(0.7*Math.sin(1.1235 * this.crown_i + this.t / 13));
             const yy = this.y + froggy_draw_ctx.y_off;
 
             froggy_draw_ctx.ctx.drawImage(
