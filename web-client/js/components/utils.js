@@ -2,6 +2,10 @@ export function dan_lerp(x0, x, k) {
     return (x0 * (k-1) + x) / k;
 }
 
+export function ease_in_quad(x) {
+    return 1 - (1 - x) * (1 - x);
+}
+
 export function diff(x, y) {
     return Math.abs(x - y);
 }

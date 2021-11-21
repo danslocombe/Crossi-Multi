@@ -3,7 +3,7 @@ import { create_player_remote, create_player_local } from "./player";
 import { draw_background } from "./background";
 import { create_car } from "./car";
 import { create_camera } from "./camera";
-import { create_countdown } from "./countdown";
+import { create_countdown } from "./game_ui";
 import { create_dialogue_controller } from "./dialogue";
 import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";

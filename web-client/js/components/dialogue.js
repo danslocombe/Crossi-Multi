@@ -1,4 +1,5 @@
-import { dan_lerp } from "./utils";
+import { create_winner_ui } from "./game_ui";
+import { dan_lerp, ease_in_quad } from "./utils";
 import { create_whiteout } from "./visual_effects";
 
 const dialogue_sprites = {}
@@ -41,10 +42,6 @@ for (let sound_group of win_sounds) {
 
 let snd_join = new Audio('/sounds/snd_join.wav');
 snd_join.volume = 0.2;
-
-function ease_in_quad(x) {
-    return 1 - (1 - x) * (1 - x);
-}
 
 function create_dialogue(sprite_name, duration = undefined) {
     console.log("Creating dialogue for " + sprite_name);
@@ -176,6 +173,8 @@ function create_dialogue(sprite_name, duration = undefined) {
 export function create_dialogue_controller() {
     return {
         dialogue_instance : undefined,
+        winner_ui_instance : undefined,
+        no_winner_ui_instance : undefined,
 
         lobby_joined_players : {},
         lobby_join_queue : [],
@@ -223,11 +222,18 @@ export function create_dialogue_controller() {
                         simple_entities.push(whiteout);
                         const sprite_name = players[alive_player_id].sprite_name;
                         this.dialogue_instance = create_dialogue(sprite_name);
+                        this.winner_ui_instance = create_winner_ui();
+                        simple_entities.push(this.winner_ui_instance);
                     }
                 }
                 else {
-                    if (this.dialogue_instance && (!alive_player || rule_state.RoundCooldown.remaining_us < 20000)) {
-                        this.dialogue_instance.trigger_close();
+                    if ((!alive_player || rule_state.RoundCooldown.remaining_us < 20000)) {
+                        if (this.winner_ui_instance) {
+                            this.winner_ui_instance.trigger_no_winner();
+                        }
+                        if (this.dialogue_instance) {
+                            this.dialogue_instance.trigger_close();
+                        }
                     }
                 }
             }
