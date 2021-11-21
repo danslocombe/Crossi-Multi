@@ -210,7 +210,7 @@ function create_crown(owning_player, i) {
 
         tick : function() {
             this.x = this.owning_player.x + 1;
-            this.y = this.owning_player.y - (5*this.crown_i + 4);
+            this.y = this.owning_player.y - (5*this.crown_i + 5);
             if (this.t > this.crown_i * 2) {
                 this.visible = true;
             }
@@ -303,15 +303,12 @@ function create_player_def(sprites, move_sound, colour, source) {
 
             if (warmup_state.win_counts && warmup_state.win_counts.inner) {
                 const win_count = warmup_state.win_counts.inner[this.source.player_id];
-                console.log("Win count " + win_count);
                 if (win_count && win_count > 0) {
                     for (let i = 0; i < win_count; i++) {
                         simple_entities.push(create_crown(this, i));
                     }
                 }
             } 
-
-            console.log(warmup_state);
         },
         draw : function(crossy_draw_ctx) {
             // hackyyy

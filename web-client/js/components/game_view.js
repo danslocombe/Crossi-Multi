@@ -8,6 +8,7 @@ import { create_dialogue_controller } from "./dialogue";
 import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";
 import { create_from_ai_overlay } from "./ai_overlay";
+import { create_from_lilly_overlay } from "./lilly_move_hints"
 
 
 const audio_crowd = new Audio('/sounds/snd_win.wav');
@@ -180,6 +181,16 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     {
                         const ai_overlay = JSON.parse(ai_overlay_json);
                         const created = create_from_ai_overlay(ai_overlay);
+                        for (const c of created) {
+                            draw_with_depth.push(c);
+                        }
+                    }
+
+                    const lilly_drawstate_json = this.client.get_lilly_drawstate_json();
+                    if (lilly_drawstate_json && lilly_drawstate_json.length > 0)
+                    {
+                        const lilly_drawstate = JSON.parse(lilly_drawstate_json);
+                        const created = create_from_lilly_overlay(lilly_drawstate);
                         for (const c of created) {
                             draw_with_depth.push(c);
                         }

@@ -400,6 +400,75 @@ impl Client {
             }
         }
     }
+
+    fn get_lilly_drawstate(&self) -> Option<Vec<LillyOverlay>> {
+        self.local_player_info.as_ref().and_then(|x| {
+            let top_state = self.timeline.top_state();
+            top_state.get_player(x.player_id).and_then(|player| {
+                match &player.move_state {
+                    player::MoveState::Stationary => {
+                        let precise_coords = match &player.pos {
+                            Pos::Coord(coord_pos) => {
+                                coord_pos.to_precise()
+                            },
+                            Pos::Lillipad(lilly_id) => {
+                                let x = self.timeline.map.get_lillipad_screen_x(top_state.time_us, &lilly_id);
+                                PreciseCoords {
+                                    x,
+                                    y : lilly_id.y,
+                                }
+                            },
+                        };
+
+                        let lilly_moves = get_lilly_moves(&precise_coords, top_state.get_round_id(), top_state.time_us, &self.timeline.map);
+                        Some(lilly_moves)
+
+                    }
+                    _ => {
+                        None
+                    }
+                }
+            })
+        })
+    }
+
+    pub fn get_lilly_drawstate_json(&self) -> String {
+        match self.get_lilly_drawstate() {
+            Some(x) => {
+                serde_json::to_string(&x).unwrap()
+            }
+            _ => {
+                "".to_owned()
+            }
+        }
+    }
+}
+
+#[derive(serde::Serialize, Debug, Clone)]
+struct LillyOverlay {
+    precise_coords : PreciseCoords,
+    input : Input,
+}
+
+fn get_lilly_moves(initial_pos : &PreciseCoords, round_id : u8, time_us : u32, map : &map::Map) -> Vec<LillyOverlay>
+{
+    let mut moves = vec![];
+
+    for input in &ALL_INPUTS {
+        let applied = initial_pos.apply_input(*input);
+        if let Some(lilly) = map.lillipad_at_pos(round_id, time_us, applied) {
+            let screen_x = map.get_lillipad_screen_x(time_us, &lilly);
+            moves.push(LillyOverlay {
+                precise_coords: PreciseCoords {
+                    x : screen_x,
+                    y : applied.y,
+                },
+                input: *input,
+            });
+        }
+    }
+
+    moves
 }
 
 fn try_deserialize_server_tick(buffer : &[u8]) -> Option<interop::ServerTick>

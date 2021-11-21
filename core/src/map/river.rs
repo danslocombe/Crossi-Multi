@@ -72,7 +72,7 @@ impl River {
             }
         }
 
-        const MARGIN : f64 = LILLIPAD_WIDTH_TILES / 2.0;
+        const MARGIN : f64 = LILLIPAD_WIDTH_TILES / 1.9;
         //debug_log!("Closest {}", closest_dist);
         if (closest_dist < MARGIN) {
             if let Some(id) = closest {

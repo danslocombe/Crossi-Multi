@@ -13,7 +13,7 @@ pub trait AIAgent : std::fmt::Debug
 #[derive(Debug, Serialize, Clone)]
 pub struct AIDrawState
 {
-    draw_objs : Vec<AIDrawObj>
+    pub draw_objs : Vec<AIDrawObj>
 }
 
 impl Default for AIDrawState {
@@ -25,15 +25,15 @@ impl Default for AIDrawState {
 }
 
 #[derive(Debug, Serialize, Clone)]
-struct AIDrawObj
+pub struct AIDrawObj
 {
-    precise_pos : PreciseCoords,
-    draw_type : AIDrawType,
-    colour : AIDrawColour,
+    pub precise_pos : PreciseCoords,
+    pub draw_type : AIDrawType,
+    pub colour : AIDrawColour,
 }
 
 #[derive(Debug, Serialize, Copy, Clone)]
-enum AIDrawType
+pub enum AIDrawType
 {
     Line(PreciseCoords),
     Cross,
@@ -42,8 +42,9 @@ enum AIDrawType
 }
 
 #[derive(Debug, Serialize, Copy, Clone)]
-enum AIDrawColour
+pub enum AIDrawColour
 {
     Green,
     Red,
+    White,
 }

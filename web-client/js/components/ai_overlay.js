@@ -4,7 +4,7 @@ function create_ai_overlay(overlay_obj) {
     return {
         x : overlay_obj.precise_pos.x,
         y : overlay_obj.precise_pos.y,
-        dynamic_depth : overlay_obj.precise_pos.y - 20000,
+        dynamic_depth : overlay_obj.precise_pos.y + 20000,
         type : overlay_obj.draw_type,
         colour : overlay_obj.colour,
         draw : function(froggy_draw_ctx) {
@@ -43,6 +43,17 @@ function create_ai_overlay(overlay_obj) {
                 ctx.beginPath();
                 ctx.moveTo(xx, yy);
                 ctx.lineTo(xx + rr, yy - rr);
+                ctx.stroke()
+                ctx.closePath();
+            }
+            else if (this.type.Line) {
+                ctx.lineWidth = 1
+                ctx.beginPath();
+                ctx.moveTo(xx, yy);
+                const x1 = (this.type.Line.x + 0.5) * SCALE + froggy_draw_ctx.x_off;
+                const y1 = (this.type.Line.y + 0.5) * SCALE + froggy_draw_ctx.y_off;
+                console.log("from " + xx + " " + yy + " | to " + x1 + " " + y1);
+                ctx.lineTo(x1, y1);
                 ctx.stroke()
                 ctx.closePath();
             }

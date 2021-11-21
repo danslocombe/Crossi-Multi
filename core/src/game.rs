@@ -113,6 +113,13 @@ pub enum Input {
     Down = 4,
 }
 
+pub const ALL_INPUTS : [Input; 4] = [
+    Input::Up,
+    Input::Left,
+    Input::Right,
+    Input::Down,
+];
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct PlayerInputs {
     pub inputs: Vec<Input>,
