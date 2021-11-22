@@ -19,7 +19,7 @@ export function get_target_y_from_rule_state(rule_state) {
         return 0;
     }
     else if (rule_state.RoundCooldown) {
-        const x = rule_state.RoundCooldown.round_state.screen_y;
+        //return rule_state.RoundCooldown.round_state.screen_y;
     }
 
     return undefined;

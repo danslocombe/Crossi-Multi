@@ -387,6 +387,12 @@ impl Client {
     }
 
     fn get_ai_drawstate(&self) -> Option<ai::AIDrawState> {
+        if let Some(x) = self.local_player_info.as_ref() {
+            if (!self.player_alive(x.player_id.0 as u32)) {
+                return None;
+            }
+        }
+
         self.ai_agent.as_ref().map(|x| x.borrow().get_drawstate().clone())
     }
 
@@ -403,32 +409,37 @@ impl Client {
 
     fn get_lilly_drawstate(&self) -> Option<Vec<LillyOverlay>> {
         self.local_player_info.as_ref().and_then(|x| {
-            let top_state = self.timeline.top_state();
-            top_state.get_player(x.player_id).and_then(|player| {
-                match &player.move_state {
-                    player::MoveState::Stationary => {
-                        let precise_coords = match &player.pos {
-                            Pos::Coord(coord_pos) => {
-                                coord_pos.to_precise()
-                            },
-                            Pos::Lillipad(lilly_id) => {
-                                let x = self.timeline.map.get_lillipad_screen_x(top_state.time_us, &lilly_id);
-                                PreciseCoords {
-                                    x,
-                                    y : lilly_id.y,
-                                }
-                            },
-                        };
+            if (!self.player_alive(x.player_id.0 as u32)) {
+                None
+            }
+            else {
+                let top_state = self.timeline.top_state();
+                top_state.get_player(x.player_id).and_then(|player| {
+                    match &player.move_state {
+                        player::MoveState::Stationary => {
+                            let precise_coords = match &player.pos {
+                                Pos::Coord(coord_pos) => {
+                                    coord_pos.to_precise()
+                                },
+                                Pos::Lillipad(lilly_id) => {
+                                    let x = self.timeline.map.get_lillipad_screen_x(top_state.time_us, &lilly_id);
+                                    PreciseCoords {
+                                        x,
+                                        y : lilly_id.y,
+                                    }
+                                },
+                            };
 
-                        let lilly_moves = get_lilly_moves(&precise_coords, top_state.get_round_id(), top_state.time_us, &self.timeline.map);
-                        Some(lilly_moves)
+                            let lilly_moves = get_lilly_moves(&precise_coords, top_state.get_round_id(), top_state.time_us, &self.timeline.map);
+                            Some(lilly_moves)
 
+                        }
+                        _ => {
+                            None
+                        }
                     }
-                    _ => {
-                        None
-                    }
-                }
-            })
+                })
+            }
         })
     }
 
