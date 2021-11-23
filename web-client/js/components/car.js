@@ -24,7 +24,7 @@ export function create_car(car) {
     return {
         x : x,
         y : y,
-        dynamic_depth : y,
+        dynamic_depth : y + spr_car_height / 2,
         flipped : flipped,
         frame_id : frame_id,
         spr : spr,
