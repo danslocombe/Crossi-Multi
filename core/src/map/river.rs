@@ -1,4 +1,5 @@
-use crate::rng::FroggyRng;
+use froggy_rand::FroggyRand;
+
 use crate::map::obstacle_row::*;
 use crate::{CoordPos, LillipadId};
 
@@ -15,7 +16,7 @@ const TIME_SCALE : f64 = 18_000_000.0;
 
 impl River {
     pub fn new(seed : u32, round : u8, y : i32, inverted : bool) -> Self {
-        let rng = FroggyRng::from_hash((seed, round, y));
+        let rng = FroggyRand::from_hash((seed, round, y));
 
         let mut obstacles = Vec::with_capacity(16);
         let mut cur = 0.0;

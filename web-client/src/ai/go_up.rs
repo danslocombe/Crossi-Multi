@@ -4,7 +4,8 @@ use std::fmt::Debug;
 use crossy_multi_core::{GameState, PlayerId, Input, CoordPos, PreciseCoords};
 use crossy_multi_core::map::{Map, RowType};
 use crossy_multi_core::player::MoveState;
-use crossy_multi_core::rng::FroggyRng;
+
+use froggy_rand::FroggyRand;
 
 use crate::ai::*;
 
@@ -12,7 +13,7 @@ use crate::ai::*;
 pub struct GoUpAI
 {
     player_id : PlayerId,
-    rng : FroggyRng,
+    rng : FroggyRand,
     rng_t : u64,
     careful_t : i32,
     draw_state : AIDrawState,
@@ -22,7 +23,7 @@ impl GoUpAI {
     pub fn new(player_id : PlayerId) -> Self {
         Self {
             player_id,
-            rng: FroggyRng::new(1234 + 555*(player_id.0 as u64)),
+            rng: FroggyRand::new(1234 + 555*(player_id.0 as u64)),
             rng_t : 0,
             careful_t : 0,
             draw_state : AIDrawState::default(),

@@ -62,8 +62,7 @@ name = "crossy_multi_core"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "deterministic-hash",
- "hashers",
+ "froggy-rand",
  "num-derive",
  "num-traits",
  "serde",
@@ -97,6 +96,16 @@ dependencies = [
  "num_enum",
  "serde",
  "serde_derive",
+]
+
+[[package]]
+name = "froggy-rand"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75ab3d471cc103d7456e9acfc7dacb52c094979d68c475c6a5c82f847ac6daf9"
+dependencies = [
+ "deterministic-hash",
+ "hashers",
 ]
 
 [[package]]
@@ -260,6 +269,7 @@ dependencies = [
  "console_error_panic_hook",
  "crossy_multi_core",
  "flexbuffers",
+ "froggy-rand",
  "futures",
  "js-sys",
  "serde",

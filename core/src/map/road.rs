@@ -1,6 +1,7 @@
 use crate::game::CoordPos;
 use crate::map::obstacle_row::*;
-use crate::rng::FroggyRng;
+
+use froggy_rand::FroggyRand;
 
 #[derive(Debug)]
 pub struct Road {
@@ -20,7 +21,7 @@ const SQUEEZE_SPAWN_DIST_TILES : f64 = CAR_WIDTH * 3.45;
 
 impl Road {
     pub fn new(seed : u32, round : u8, y : i32, inverted : bool) -> Self {
-        let rng = FroggyRng::from_hash((seed, round, y));
+        let rng = FroggyRand::from_hash((seed, round, y));
 
 
         let r_width = rng.gen_froggy("r_width", R_WIDTH_MIN, R_WIDTH_MAX, 4);

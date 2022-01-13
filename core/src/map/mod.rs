@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use serde::{Deserialize, Serialize};
+use froggy_rand::FroggyRand;
 
 pub mod road;
 pub mod river;
@@ -9,7 +10,6 @@ use road::Road;
 use river::River;
 use obstacle_row::{ObstaclePublic, ObstacleRowDescr};
 
-use crate::rng::FroggyRng;
 use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::game::CoordPos;
 use crate::SCREEN_SIZE;
@@ -312,7 +312,7 @@ impl MapRound {
     fn generate_to_y(&mut self, row_id_target : RowId) {
         while self.rows.front().map(|row| row_id_target.0 > row.row_id.0).unwrap_or(true) {
             let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
-            let rng = FroggyRng::from_hash((self.seed, self.round_id, row_id));
+            let rng = FroggyRand::from_hash((self.seed, self.round_id, row_id));
 
             verbose_log!("Generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
 
