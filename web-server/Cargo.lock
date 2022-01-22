@@ -177,8 +177,7 @@ name = "crossy_multi_core"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "deterministic-hash",
- "hashers",
+ "froggy-rand",
  "num-derive",
  "num-traits",
  "serde",
@@ -262,6 +261,16 @@ checksum = "5fc25a87fa4fd2094bffb06925852034d90a17f0d1e05197d4956d3555752191"
 dependencies = [
  "matches",
  "percent-encoding",
+]
+
+[[package]]
+name = "froggy-rand"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75ab3d471cc103d7456e9acfc7dacb52c094979d68c475c6a5c82f847ac6daf9"
+dependencies = [
+ "deterministic-hash",
+ "hashers",
 ]
 
 [[package]]
