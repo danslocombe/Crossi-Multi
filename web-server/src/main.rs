@@ -69,15 +69,23 @@ impl GameDb {
     }
 }
 
+const SERVE_DIR_DEV : &'static str = "C:\\Users\\Dan\\crossy_multi\\web-client\\dist";
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() {
     let games = GameDb::new();
 
+    let serve_dir = if let Some(arg) = std::env::args().nth(1) {
+        String::from(arg)
+    }
+    else {
+        String::from(SERVE_DIR_DEV)
+    };
+
+    println!("Serving from {}", &serve_dir);
+
     crossy_multi_core::set_debug_logger(Box::new(crossy_multi_core::StdoutLogger()));
 
-    println!("Serving...");
-
-    let serve_dir = "C:\\Users\\Dan\\crossy_multi\\web-client\\dist";
     let site = warp::fs::dir(serve_dir).with(warp::compression::gzip()).boxed();
 
     // GET /new
@@ -177,7 +185,7 @@ struct PlayOptions {
 }
 
 async fn play_handler(options: PlayOptions, db: GameDb) -> Result<Response, Rejection>  {
-    println!("Play with options {:?}", options);
+    println!("Play with options {options:?}");
     let dbinner = db.get(options.game_id).await?;
     let hello = interop::ClientHello::new(15_000);
     let init_server_response = dbinner.game.play(&hello, options.socket_id).await;
@@ -215,12 +223,12 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                     match ws_tx.send(Message::binary(serialized)).await
                     {
                         Ok(_) => {},
-                        Err(e) => {println!("Websocket send error {}", e); break;}
+                        Err(e) => {println!("Websocket send error {e}"); break;}
                     }
                 },
                 // Handle dropped so game ended?
                 Err(e) => {
-                    println!("Tick listener dropped {}", e);
+                    println!("Tick listener dropped {e}");
                     break;
                 }
             }
@@ -240,7 +248,7 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                 }
             }
             Err(e) => {
-                println!("Client receive err {}", e);
+                println!("Client receive err {e}");
                 break;
             }
         }
@@ -252,8 +260,8 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
 fn parse_client_message(ws_message : &warp::ws::Message) -> Option<interop::CrossyMessage>
 {
     let bytes = ws_message.as_bytes();
-    let r = flexbuffers::Reader::get_root(bytes).map_err(|e| println!("{}", e)).ok()?;
-    interop::CrossyMessage::deserialize(r).map_err(|e| println!("{}", e)).ok()
+    let r = flexbuffers::Reader::get_root(bytes).map_err(|e| println!("{e}")).ok()?;
+    interop::CrossyMessage::deserialize(r).map_err(|e| println!("{e}")).ok()
 }
 
 async fn ping_handler(ws : ws::Ws) -> Result<Response, Rejection> {
@@ -274,7 +282,7 @@ async fn ping_main(ws: WebSocket) {
                 tx.send(msg).await.unwrap();
             }
             Err(e) => {
-                println!("Error reading print packet: {}", e);
+                println!("Error reading print packet: {e}");
                 break;
             }
         };

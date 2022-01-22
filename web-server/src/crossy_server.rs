@@ -283,7 +283,7 @@ impl ServerInner {
 fn find_spawn_pos(game_state : &crossy_multi_core::game::GameState) -> crossy_multi_core::Pos {
     for x in 7..=13 {
         for y in 7..=13 {
-            let mut spawn_pos = game::Pos::new_coord(x, y);
+            let spawn_pos = game::Pos::new_coord(x, y);
             if (!game_state.space_occupied_with_player(spawn_pos, None))
             {
                 return spawn_pos;
