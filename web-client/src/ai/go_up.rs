@@ -151,7 +151,7 @@ impl AIAgent for GoUpAI
                 else {
                     //log!("Testing {:?} was safe", &test_pos);
                     if (self_pos_safe) {
-                        return if (self.rng.gen_unit(("safe_idle", self.rng_t)) < 0.1)
+                        return if (self.rng.gen_unit(("safe_idle", self.rng_t)) < 0.9)
                         {
                             //self.careful_t -= 1;
                             Input::None

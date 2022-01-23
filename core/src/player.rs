@@ -65,7 +65,7 @@ pub struct Push {
 //pub const MOVE_COOLDOWN_MAX: u32 = 150_000;
 //pub const MOVE_COOLDOWN_MAX: u32 = 7 * (1_000_000 / 60);
 pub const MOVE_COOLDOWN_MAX: u32 = 1;
-pub const MOVE_DUR: u32 = 7 * (1_000_000 / 60);
+pub const MOVE_DUR: u32 = 20 * (1_000_000 / 60);
 
 impl PlayerState {
     pub fn can_move(&self) -> bool {
