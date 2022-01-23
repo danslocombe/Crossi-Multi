@@ -4,9 +4,9 @@ import { create_game_view }  from "./components/game_view.js"
 import { Client } from "../pkg/index.js"
 import ClipboardJS from 'clipboard';
 
-const DEBUG = true;
-const LOCAL_DEBUG = true;
-const DEBUG_PLAY_LINK = true;
+const DEBUG = false;
+const LOCAL_DEBUG = false;
+const DEBUG_PLAY_LINK = false;
 
 const query_string = window.location.search;
 const url_params = new URLSearchParams(query_string);
@@ -35,8 +35,10 @@ else if (DEBUG) {
     ws_endpoint = 'ws://20.90.97.30:8000';
 }
 else {
-    endpoint = 'https://roadtoads.io';
-    ws_endpoint = 'wss://roadtoads.io';
+    //endpoint = 'https://roadtoads.io';
+    //ws_endpoint = 'wss://roadtoads.io';
+    endpoint = "http://20.90.97.30:8000";
+    ws_endpoint = "ws://20.90.97.30:8000";
 }
 
 export function fetch_json(url) {

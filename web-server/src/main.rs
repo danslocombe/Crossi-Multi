@@ -125,7 +125,7 @@ async fn main() {
         }
     });
 
-    let site = warp::fs::dir(serve_dir).with(warp::compression::gzip()).boxed();
+    let site = warp::fs::dir(serve_dir).boxed();
 
     // GET /new
     let get_new = warp::path!("new")
@@ -176,11 +176,9 @@ async fn main() {
         .or(ping)
         .boxed();
 
-    let serve_from = ([127, 0, 0, 1], 8080);
-    println!("Serving from {:?}", serve_from);
 
     warp::serve(routes)
-        .run(serve_from)
+        .run(([0, 0, 0, 0], 8000))
         .await;
 }
 
