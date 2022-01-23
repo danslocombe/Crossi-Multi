@@ -1,11 +1,12 @@
 "use strict";
 
 import { create_game_view }  from "./components/game_view.js"
+import { fetch_json } from "./components/utils.js";
 import { Client } from "../pkg/index.js"
 import ClipboardJS from 'clipboard';
 
 const DEBUG = true;
-const LOCAL_DEBUG = false;
+const LOCAL_DEBUG = true;
 const DEBUG_PLAY_LINK = false;
 
 const query_string = window.location.search;
@@ -37,12 +38,6 @@ else if (DEBUG) {
 else {
     endpoint = 'https://roadtoads.io';
     ws_endpoint = 'wss://roadtoads.io';
-}
-
-function dan_fetch(url) {
-    return fetch(endpoint + url, {
-        headers: {  'Accept': 'application/json' },
-    });
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +103,7 @@ function start_game() {
     }
     else
     {
-        dan_fetch('/new')
+        fetch_json('/new')
         .then(response => response.json())
         .then(x => {
             console.log("Created game ");
@@ -122,7 +117,7 @@ function start_game() {
 
 
 function join() {
-    dan_fetch('/join?game_id=' + game_id + '&name=' + player_name)
+    fetch_json('/join?game_id=' + game_id + '&name=' + player_name)
         .then(response => response.json())
         .then(response => {
             console.log("/join response");
@@ -139,7 +134,7 @@ function join() {
 }
 
 function play() {
-    dan_fetch('/play?game_id=' + game_id + '&socket_id=' + socket_id)
+    fetch_json('/play?game_id=' + game_id + '&socket_id=' + socket_id)
         .then(response => response.json())
         .then(response => {
             console.log("/play response");

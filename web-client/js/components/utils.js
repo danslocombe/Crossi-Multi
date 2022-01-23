@@ -38,3 +38,9 @@ export function get_round_id_from_rule_state(rule_state) {
 
     return -1;
 }
+
+export function fetch_json(url) {
+    return fetch(endpoint + url, {
+        headers: {  'Accept': 'application/json' },
+    });
+}
