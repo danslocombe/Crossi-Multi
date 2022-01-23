@@ -1,7 +1,7 @@
 import { SCALE} from "./constants.js";
 
 // TODO don't replicate this constant
-export const MOVE_T = 20 * (1000 * 1000 / 60);
+export const MOVE_T = 7 * (1000 * 1000 / 60);
 
 function load_sprites(name) {
     let spr = new Image(SCALE, SCALE);
