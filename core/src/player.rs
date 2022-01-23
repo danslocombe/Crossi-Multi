@@ -220,6 +220,12 @@ impl PlayerState {
             _ => false,
         }
     }
+
+    pub fn reset_to_pos(&mut self, pos : Pos) {
+        self.pos = pos;
+        self.move_state = MoveState::Stationary;
+        self.move_cooldown = MOVE_COOLDOWN_MAX;
+    }
 }
 
 // Simple representation to convert to json

@@ -248,7 +248,7 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {
         let x_off_from_count = (player_count_for_offset / 2);
         let x = player_state.id.0 as i32 + 9 - x_off_from_count;
         let y = 17;
-        player_state.pos = Pos::Coord(CoordPos{x, y});
+        player_state.reset_to_pos(Pos::Coord(CoordPos{x, y}));
     }
 }
 
