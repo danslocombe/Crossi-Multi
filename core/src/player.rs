@@ -164,25 +164,28 @@ impl PlayerState {
     {
         if other.pos == candidate_pos {
             // Try to move into some other player
-            match &other.move_state {
-                MoveState::Moving(_ms) => None,
-                MoveState::Stationary => {
-                    if (state.can_push(other.id, dir, state.time_us, &state.ruleset_state, map)) {
-                        pushes.push(Push {
-                            id : other.id,
-                            pushed_by : self.id,
-                            dir,
-                        });
 
-                        // Managed to push
-                        let mut push_info = PushInfo::default();
-                        push_info.pushing = Some(other.id);
-                        Some(push_info)
-                    }
-                    else {
-                        None
-                    }
+            if let MoveState::Moving(ms) = &other.move_state {
+                // Dont allow pushing if theyve just started moving
+                if (ms.remaining_us > MOVE_DUR / 2) {
+                    return None;
                 }
+            }
+
+            if (state.can_push(other.id, dir, state.time_us, &state.ruleset_state, map)) {
+                pushes.push(Push {
+                    id : other.id,
+                    pushed_by : self.id,
+                    dir,
+                });
+
+                // Managed to push
+                let mut push_info = PushInfo::default();
+                push_info.pushing = Some(other.id);
+                Some(push_info)
+            }
+            else {
+                None
             }
         }
         else {
