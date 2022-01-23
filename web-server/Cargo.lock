@@ -265,9 +265,9 @@ dependencies = [
 
 [[package]]
 name = "froggy-rand"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75ab3d471cc103d7456e9acfc7dacb52c094979d68c475c6a5c82f847ac6daf9"
+checksum = "ca1ba1af3610f99543dfe334b3dda363b82f6d250828eccea0ec7edbc4365508"
 dependencies = [
  "deterministic-hash",
  "hashers",
