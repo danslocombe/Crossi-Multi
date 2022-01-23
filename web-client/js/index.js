@@ -5,7 +5,8 @@ import { Client } from "../pkg/index.js"
 import ClipboardJS from 'clipboard';
 
 const DEBUG = true;
-const DEBUG_PLAY_LINK = true;
+const LOCAL_DEBUG = false;
+const DEBUG_PLAY_LINK = false;
 
 const query_string = window.location.search;
 const url_params = new URLSearchParams(query_string);
@@ -21,13 +22,17 @@ var estimated_latency_us = 0;
 var endpoint = "";
 var ws_endpoint = "";
 
-if (DEBUG)
+if (LOCAL_DEBUG)
 {
     // Fetch from specific localhost / port in order to allow better debugging
     // (we host debug build from localhost:8081)
     // NOTE HAVE TO RUN CHROME WITH NO CORS
     endpoint = 'http://localhost:8080';
     ws_endpoint = 'ws://localhost:8080';
+}
+else if (DEBUG) {
+    endpoint = 'http://20.90.97.30:8000';
+    ws_endpoint = 'ws://20.90.97.30:8000';
 }
 else {
     endpoint = 'https://roadtoads.io';
