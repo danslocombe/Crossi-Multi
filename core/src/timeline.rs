@@ -83,7 +83,7 @@ impl Timeline {
     }
 
     pub fn remove_player(&mut self, player_id: PlayerId) {
-        debug_log!("Dropping player {:?}", player_id);
+        debug_log!("Dropping player {player_id:?}");
 
         let new = self.top_state().remove_player(player_id);
         self.push_state(new);
