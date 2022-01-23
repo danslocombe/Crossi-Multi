@@ -1,7 +1,6 @@
 "use strict";
 
 import { create_game_view }  from "./components/game_view.js"
-import { fetch_json } from "./components/utils.js";
 import { Client } from "../pkg/index.js"
 import ClipboardJS from 'clipboard';
 
@@ -38,6 +37,12 @@ else if (DEBUG) {
 else {
     endpoint = 'https://roadtoads.io';
     ws_endpoint = 'wss://roadtoads.io';
+}
+
+export function fetch_json(url) {
+    return fetch(endpoint + url, {
+        headers: {  'Accept': 'application/json' },
+    });
 }
 
 /////////////////////////////////////////////////////////////////////////////////////

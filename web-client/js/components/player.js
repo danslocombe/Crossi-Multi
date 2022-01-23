@@ -289,7 +289,7 @@ function create_player_def(sprites, move_sound, colour, source) {
 
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
-            this.dynamic_depth = this.source.y;
+            this.dynamic_depth = this.y;
 
             if (rule_state && rule_state.Lobby) {
                 this.lobby_ready = rule_state.Lobby.ready_states.inner[this.source.player_id];
