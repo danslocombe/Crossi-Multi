@@ -250,6 +250,6 @@ function sort_depth(a, b) {
         return -1;
     } 
     else {
-        return b.depth - a.depth;
+        return a.depth - b.depth;
     }
 }
