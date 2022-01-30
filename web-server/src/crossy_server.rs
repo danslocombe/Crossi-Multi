@@ -16,7 +16,6 @@ pub struct SocketId(pub u32);
 
 struct PlayerClient {
     id: game::PlayerId,
-    offset_us: u32,
     last_tick_us : u32,
 }
 
@@ -97,11 +96,10 @@ impl Server {
         inner.new_players.push(client_id);
 
         // Fails if socket_id not found
-        // ie client tried to /play without calling /join
-        let mut client = inner.get_client_mut_by_addr(socket_id)?;
+        // In prod version dont crash here?
+        let mut client = inner.get_client_mut_by_addr(socket_id).expect("client tried to /play without calling /join");
         client.player_client = Some(PlayerClient {
             id: client_id,
-            offset_us: 0,
             last_tick_us : 0,
         });
 
@@ -134,8 +132,7 @@ impl Server {
             let mut inner = self.inner.lock().await;
 
             // Fetch + clear list of new players
-            let mut new_players = Vec::new();
-            std::mem::swap(&mut inner.new_players, &mut new_players);
+            let new_players = std::mem::take(&mut inner.new_players);
 
             // Do simulations
             let simulation_time_start = Instant::now();
@@ -148,11 +145,14 @@ impl Server {
             for new_player in new_players {
                 // We need to make sure this gets propagated properly
                 // Weird edge case bugs
+                println!("In run, adding a new player {new_player:?}");
                 let spawn_pos = find_spawn_pos(inner.timeline.top_state());
+                println!("Spawning new player at {spawn_pos:?}");
                 inner.timeline.add_player(new_player, spawn_pos);
             }
 
             for dropped_player in dropped_players {
+                println!("Dropping player {dropped_player:?}");
                 inner.timeline.remove_player(dropped_player);
             }
 
@@ -167,7 +167,7 @@ impl Server {
             for client in (&inner.clients).iter().filter_map(|x| x.player_client.as_ref()) {
                 inner.timeline.get_state_before_eq_us(client.last_tick_us).map(|x| {
                     last_client_sent.set(client.id, RemoteTickState {
-                        time_us: x.time_us - client.offset_us,
+                        time_us: x.time_us,
                         states: x.get_valid_player_states(),
                     });
                 });
@@ -219,7 +219,7 @@ impl Server {
                     Some(client) => {
                         if let Some(player_client) = client.player_client.as_mut()
                         {
-                            let client_time = t.time_us + player_client.offset_us;
+                            let client_time = t.time_us;
                             player_client.last_tick_us = client_time;
 
                             ready_players.push((player_client.id, t.lobby_ready));

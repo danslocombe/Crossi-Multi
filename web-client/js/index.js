@@ -6,7 +6,7 @@ import ClipboardJS from 'clipboard';
 
 const DEBUG = true;
 const LOCAL_DEBUG = true;
-const DEBUG_PLAY_LINK = false;
+const DEBUG_PLAY_LINK = true;
 
 const query_string = window.location.search;
 const url_params = new URLSearchParams(query_string);

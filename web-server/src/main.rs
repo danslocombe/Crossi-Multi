@@ -187,7 +187,7 @@ struct PlayOptions {
 async fn play_handler(options: PlayOptions, db: GameDb) -> Result<Response, Rejection>  {
     println!("Play with options {options:?}");
     let dbinner = db.get(options.game_id).await?;
-    let hello = interop::ClientHello::new(15_000);
+    let hello = interop::ClientHello::default();
     let init_server_response = dbinner.game.play(&hello, options.socket_id).await;
     Ok(reply::json(&init_server_response).into_response())
 }
@@ -279,7 +279,13 @@ async fn ping_main(ws: WebSocket) {
     while let Some(body) = rx.next().await {
         match body {
             Ok(msg) => {
-                tx.send(msg).await.unwrap();
+                let send_result = tx.send(msg).await;
+                match send_result {
+                    Ok(_) => {},
+                    Err(_) => {
+                        // Disconnecting here is fine, dont think we need to do anything else?
+                    },
+                }
             }
             Err(e) => {
                 println!("Error reading print packet: {e}");

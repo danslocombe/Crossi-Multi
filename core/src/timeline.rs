@@ -76,17 +76,27 @@ impl Timeline {
     }
 
     pub fn add_player(&mut self, player_id: PlayerId, pos: Pos) {
-        debug_log!("Adding new player {:?}", player_id);
-
-        let new = self.top_state().add_player(player_id, pos);
-        self.push_state(new);
+        // This is kinda hacky but we add the new player to all the states in memory (lol)
+        // Otherwise we might get input from a state where we have to propagate forward
+        // a state where the player isnt there
+        debug_log!("Adding new player {:?} over {:?} states", player_id, self.states.len());
+        let mut states = VecDeque::with_capacity(self.states.len());
+        std::mem::swap(&mut self.states, &mut states);
+        for state in &states {
+            let new = state.add_player(player_id, pos);
+            self.states.push_back(new);
+        }
     }
 
     pub fn remove_player(&mut self, player_id: PlayerId) {
+        // Same as add_player, hacky
         debug_log!("Dropping player {player_id:?}");
-
-        let new = self.top_state().remove_player(player_id);
-        self.push_state(new);
+        let mut states = VecDeque::with_capacity(self.states.len());
+        std::mem::swap(&mut self.states, &mut states);
+        for state in &states {
+            let new = state.remove_player(player_id);
+            self.states.push_back(new);
+        }
     }
 
     pub fn top_state(&self) -> &GameState {

@@ -23,7 +23,6 @@ pub enum CrossyMessage {
 pub struct ClientHello {
     header: [u8; 4],
     version: u8,
-    pub latency_us: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -48,15 +47,16 @@ pub struct ServerDescription {
 pub const INIT_MESSAGE: &[u8; 4] = b"helo";
 pub const CURRENT_VERSION: u8 = 1;
 
-impl ClientHello {
-    pub fn new(latency_us: u32) -> Self {
+impl Default for ClientHello {
+    fn default() -> Self {
         ClientHello {
             header: *INIT_MESSAGE,
             version: CURRENT_VERSION,
-            latency_us,
         }
     }
+}
 
+impl ClientHello {
     pub fn check(&self, required_version: u8) -> bool {
         self.header == *INIT_MESSAGE && self.version >= required_version
     }
