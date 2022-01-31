@@ -31,7 +31,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         current_input : "None",
         simple_entities : [],
         rule_state : undefined,
-        players : [],
+        players : new Map(),
         camera : create_camera(),
         countdown : create_countdown(),
         dialogue : create_dialogue_controller(),
@@ -90,32 +90,45 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 if (moving_into_warmup) {
                     audio_crowd.play();
                     this.simple_entities = [];
-                    for (const player of this.players) {
+                    for (const [_, player] of this.players) {
                         if (player) {
                             player.new_round(this.rule_state.RoundWarmup, this.simple_entities);
                         }
                     }
                 }
 
+                let players_with_values = new Set();
+
                 const local_player_id = this.client.get_local_player_id();
                 if (local_player_id >= 0) {
                     for (const current_player_state of current_player_states) {
-                        if (!this.players[current_player_state.id]) {
+                        if (!this.players.get(current_player_state.id)) {
                             console.log("creating player");
                             if (current_player_state.id === local_player_id) {
                                 console.log("creating local player");
                                 // Create local player
-                                this.players[current_player_state.id] = create_player_local(this.client, this.key_event_source);
+                                this.players.set(current_player_state.id, create_player_local(this.client, this.key_event_source));
                             }
                             else {
                                 // Create remote player
-                                this.players[current_player_state.id] = create_player_remote(this.client, current_player_state.id);
+                                this.players.set(current_player_state.id, create_player_remote(this.client, current_player_state.id));
                             }
                         }
 
-                        let player = this.players[current_player_state.id];
+                        let player = this.players.get(current_player_state.id);
                         player.tick(current_player_state, this.simple_entities, this.rule_state);
+
+                        players_with_values.add(current_player_state.id);
                     }
+
+                    let filtered_players = new Map();
+                    for (const [player_id, player] of this.players) {
+                        if (players_with_values.has(player_id)) {
+                            filtered_players.set(player_id, player);
+                        }
+                    }
+
+                    this.players = filtered_players;
                 }
 
                 audio_crowd.volume = audio_crowd_max / (1 - 0.25 * this.camera.y);
@@ -197,7 +210,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     }
                 }
 
-                for (const player of this.players) {
+                for (const [_, player] of this.players) {
                     if (player) {
                         draw_with_depth.push(player);
                     }

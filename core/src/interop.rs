@@ -13,6 +13,7 @@ pub enum CrossyMessage {
     HelloResponse(InitServerResponse),
     ServerDecription(ServerDescription),
     ClientTick(ClientTick),
+    ClientDrop(),
     ServerTick(ServerTick),
     OffsetPing(),
     OffsetPong(OffsetPong),

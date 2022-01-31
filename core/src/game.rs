@@ -167,7 +167,7 @@ pub struct GameState {
     // Should be fine
     // Only worry is drift from summing, going to matter?
     pub time_us: u32,
-    pub(crate) player_states: PlayerIdMap<PlayerState>,
+    pub player_states: PlayerIdMap<PlayerState>,
     pub ruleset_state : CrossyRulesetFST,
     pub player_inputs: PlayerInputs,
     pub frame_id: f64,

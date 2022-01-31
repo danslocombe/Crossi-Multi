@@ -211,6 +211,7 @@ impl Server {
         let mut ready_players = Vec::new();
 
         let mut inner = self.inner.lock().await;
+        let mut dropped_players = vec![];
 
         while let Some((message, socket_id)) = queued_messages.pop()
         {
@@ -238,12 +239,20 @@ impl Server {
                         println!("Did not recognise addr {:?}", &socket_id);
                     }
                 },
+                CrossyMessage::ClientDrop() => {
+                    println!("Dropping player a");
+                    if let Some(client) = inner.get_client_mut_by_addr(socket_id) {
+                        println!("Dropping player b");
+                        if let Some(player_client) = client.player_client.as_ref() {
+                            println!("Dropping player c");
+                            dropped_players.push(player_client.id);
+                        }
+                    }
+                },
                 _ => {}
             }
         }
 
-        // TODO dropped players
-        let dropped_players = vec![];
         (client_updates, dropped_players, ready_players)
     }
 }

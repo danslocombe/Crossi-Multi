@@ -187,7 +187,12 @@ impl Client {
 
     fn process_server_message(&mut self, server_tick : &interop::ServerTick)
     {
-        let should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&server_tick.rule_state)).unwrap_or(false);
+        // If we have had a "major change" instead of patching up the current state we perform a full reset
+        // At the moment a major change is either:
+        //   We have moved between game states (eg the round ended)
+        //   A player has joined or left
+        let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&server_tick.rule_state)).unwrap_or(false);
+        should_reset |= self.timeline.top_state().player_states.count_populated() != server_tick.latest.states.len();
 
         if (should_reset) {
             self.timeline = timeline::Timeline::from_server_parts(

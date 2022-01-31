@@ -255,6 +255,7 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
     }
 
     println!("Client disconnected");
+    db.game.queue_message(interop::CrossyMessage::ClientDrop{}, socket_id).await;
 }
 
 fn parse_client_message(ws_message : &warp::ws::Message) -> Option<interop::CrossyMessage>

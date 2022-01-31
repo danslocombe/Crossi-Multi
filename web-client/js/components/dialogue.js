@@ -244,9 +244,8 @@ export function create_dialogue_controller() {
 
         tick_lobby : function(players, simple_entities) {
             if (players) {
-                for (let player of players) {
+                for (let [player_id, player] of players) {
                     if (player) {
-                        const player_id = player.source.player_id;
                         if (!this.lobby_joined_players[player_id]) {
                             this.lobby_joined_players[player_id] = {};
 
