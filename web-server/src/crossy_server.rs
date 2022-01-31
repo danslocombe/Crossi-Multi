@@ -240,11 +240,8 @@ impl Server {
                     }
                 },
                 CrossyMessage::ClientDrop() => {
-                    println!("Dropping player a");
                     if let Some(client) = inner.get_client_mut_by_addr(socket_id) {
-                        println!("Dropping player b");
                         if let Some(player_client) = client.player_client.as_ref() {
-                            println!("Dropping player c");
                             dropped_players.push(player_client.id);
                         }
                     }
