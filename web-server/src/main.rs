@@ -117,6 +117,12 @@ async fn main() {
 
     println!("Serving from {}", &serve_dir);
 
+    let key_path = std::env::args().nth(2).unwrap().to_owned();
+    let cert_path = std::env::args().nth(3).unwrap().to_owned();
+
+    println!("Key path {key_path}");
+    println!("Cert path {cert_path}");
+
     crossy_multi_core::set_debug_logger(Box::new(crossy_multi_core::StdoutLogger()));
 
     let games0 = games.clone();
@@ -180,7 +186,10 @@ async fn main() {
         .boxed();
 
     warp::serve(routes)
-        .run(([0, 0, 0, 0], 8000))
+        .tls()
+        .cert_path(cert_path)
+        .key_path(key_path)
+        .run(([0, 0, 0, 0], 8006))
         .await;
 }
 
