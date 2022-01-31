@@ -209,7 +209,7 @@ export function create_dialogue_controller() {
                 for (let i in rule_state.RoundCooldown.round_state.alive_players.inner) {
                     if (rule_state.RoundCooldown.round_state.alive_players.inner[i]) {
                         alive_player = true;
-                        alive_player_id = i;
+                        alive_player_id = parseInt(i);
                     }
                 }
 
@@ -220,10 +220,12 @@ export function create_dialogue_controller() {
                     {
                         const whiteout = create_whiteout()
                         simple_entities.push(whiteout);
-                        const sprite_name = players[alive_player_id].sprite_name;
-                        this.dialogue_instance = create_dialogue(sprite_name);
-                        this.winner_ui_instance = create_winner_ui();
-                        simple_entities.push(this.winner_ui_instance);
+                        if (players.has(alive_player_id)) {
+                            const sprite_name = players.get(alive_player_id).sprite_name;
+                            this.dialogue_instance = create_dialogue(sprite_name);
+                            this.winner_ui_instance = create_winner_ui();
+                            simple_entities.push(this.winner_ui_instance);
+                        }
                     }
                 }
                 else {
