@@ -97,12 +97,6 @@ impl CrossyRulesetFST
             RoundWarmup(state) => {
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
-                        // HACK hold players in position for some time to enforce
-                        // propagation
-                        if (remaining_us > 2_000_000) {
-                            reset_positions(player_states);
-                        }
-
                         RoundWarmup(WarmupState {
                             remaining_us,
                             in_game : state.in_game.clone(),
