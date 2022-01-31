@@ -35,10 +35,10 @@ else if (DEBUG) {
     ws_endpoint = 'ws://20.90.97.30:8000';
 }
 else {
-    //endpoint = 'https://roadtoads.io';
-    //ws_endpoint = 'wss://roadtoads.io';
-    endpoint = "http://20.90.97.30:8000";
-    ws_endpoint = "ws://20.90.97.30:8000";
+    endpoint = 'https://roadtoads.io';
+    ws_endpoint = 'wss://roadtoads.io';
+    //endpoint = "http://20.90.97.30:8000";
+    //ws_endpoint = "ws://20.90.97.30:8000";
 }
 
 export function fetch_json(url) {
