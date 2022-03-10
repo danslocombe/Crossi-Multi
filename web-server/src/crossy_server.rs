@@ -28,8 +28,7 @@ pub struct Server {
     queued_messages : Mutex<Vec<(CrossyMessage, SocketId)>>,
     inner : Mutex<ServerInner>,
 
-    outbound_tx : tokio::sync::watch::Sender<CrossyMessage>,
-    outbound_rx : tokio::sync::watch::Receiver<CrossyMessage>,
+    outbound_tx : tokio::sync::broadcast::Sender<CrossyMessage>,
 }
 
 pub struct ServerInner {
@@ -45,12 +44,11 @@ impl Server {
     pub fn new(id : u64) -> Self {
         let start = Instant::now();
         let init_message = CrossyMessage::EmptyMessage();
-        let (outbound_tx, outbound_rx) = tokio::sync::watch::channel(init_message);
+        let (outbound_tx, _outbound_rx) = tokio::sync::broadcast::channel(16);
 
         Server {
             queued_messages : Mutex::new(Vec::new()),
             outbound_tx,
-            outbound_rx,
             inner : Mutex::new(ServerInner {
                 clients: Vec::new(),
                 new_players: Vec::new(),
@@ -113,8 +111,8 @@ impl Server {
         })
     }
 
-    pub fn get_listener(&self) -> tokio::sync::watch::Receiver<CrossyMessage> {
-        self.outbound_rx.clone()
+    pub fn get_listener(&self) -> tokio::sync::broadcast::Receiver<CrossyMessage> {
+        self.outbound_tx.subscribe()
     }
 
     pub async fn get_last_frame_time_us(&self) -> u32 {
@@ -124,7 +122,7 @@ impl Server {
 
     pub async fn run(&self) {
         // Still have client listeners
-        while !self.outbound_tx.is_closed() {
+        while self.outbound_tx.receiver_count() > 0 {
 
             let tick_start = Instant::now();
             let (client_updates, dropped_players, ready_players) = self.receive_updates().await;

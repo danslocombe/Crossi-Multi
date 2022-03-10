@@ -217,9 +217,9 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
 
     tokio::task::spawn(async move {
         loop {
-            match tick_listener.changed().await {
-                Ok(_) => {
-                    let serialized = flexbuffers::to_vec(&(*tick_listener.borrow())).unwrap();
+            match tick_listener.recv().await {
+                Ok(v) => {
+                    let serialized = flexbuffers::to_vec(&v).unwrap();
                     match ws_tx.send(Message::binary(serialized)).await
                     {
                         Ok(_) => {},
