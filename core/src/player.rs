@@ -167,6 +167,8 @@ impl PlayerState {
 
             if let MoveState::Moving(ms) = &other.move_state {
                 // Dont allow pushing if theyve just started moving
+                // TODO DAN
+                // Do we want this or should it be reverted to ms.remaining_us > 0 ??
                 if (ms.remaining_us > MOVE_DUR / 2) {
                     return None;
                 }

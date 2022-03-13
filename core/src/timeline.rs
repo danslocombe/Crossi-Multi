@@ -374,16 +374,16 @@ mod tests {
     #[test]
     fn test_split() {
         let mut timeline = Timeline::new();
-        timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        timeline.add_player(PlayerId(0), Pos::new_coord(1, 1));
         timeline.tick_current_time(Some(PlayerInputs::default()), 50_000);
-        assert_eq!(3, timeline.states.len());
+        assert_eq!(2, timeline.states.len());
 
         let index = timeline.split_with_input(PlayerId(0), Input::Left, 10_000);
 
         assert_eq!(Some(1), index);
-        assert_eq!(4, timeline.states.len());
+        assert_eq!(3, timeline.states.len());
         assert_eq!(
-            vec![50, 10, 0, 0],
+            vec![50, 10, 0],
             timeline
                 .states
                 .iter()
@@ -398,7 +398,7 @@ mod tests {
         match (&state.move_state) {
             MoveState::Moving(state) => {
                 assert_eq!(MOVE_DUR, state.remaining_us);
-                assert_eq!(Pos::new_coord(-1, 0), state.target);
+                assert_eq!(Pos::new_coord(0, 1), state.target);
             },
             _ => {
                 panic!("Expected to be moving");
@@ -411,14 +411,14 @@ mod tests {
         let mut timeline = Timeline::new();
         timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
         timeline.tick_current_time(Some(PlayerInputs::default()), 15_000);
-        assert_eq!(3, timeline.states.len());
+        assert_eq!(2, timeline.states.len());
 
         let index = timeline.split_with_input(PlayerId(0), Input::Left, 30_000);
 
         assert_eq!(None, index);
-        assert_eq!(3, timeline.states.len());
+        assert_eq!(2, timeline.states.len());
         assert_eq!(
-            vec![15, 0, 0],
+            vec![15, 0],
             timeline
                 .states
                 .iter()
@@ -432,18 +432,18 @@ mod tests {
         let mut timeline = Timeline::from_server_parts(0, 10_000, Vec::new(), CrossyRulesetFST::start());
         timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
         timeline.tick_current_time(Some(PlayerInputs::default()), 15_000);
-        assert_eq!(3, timeline.states.len());
+        assert_eq!(2, timeline.states.len());
 
         // Before start
         let index = timeline.split_with_input(PlayerId(0), Input::Left, 5_000);
         assert_eq!(None, index);
-        assert_eq!(3, timeline.states.len());
+        assert_eq!(2, timeline.states.len());
     }
 
     #[test]
     fn test_propagate_input() {
         let mut timeline = Timeline::new();
-        timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        timeline.add_player(PlayerId(0), Pos::new_coord(1, 1));
         timeline.add_player(PlayerId(1), Pos::new_coord(5, 5));
 
         timeline.tick_current_time(Some(PlayerInputs::default()), 50_000);
@@ -459,7 +459,7 @@ mod tests {
 
         timeline.propagate_input(&timed_input);
 
-        assert_eq!(7, timeline.states.len());
+        assert_eq!(5, timeline.states.len());
 
         for i in (0..5) {
             let pos = timeline.states[i].get_player(PlayerId(1)).unwrap().pos;
@@ -479,7 +479,7 @@ mod tests {
                 .get_player(PlayerId(0))
                 .unwrap()
                 .move_state;
-            assert_eq!(Pos::new_coord(-1, 0), pos, "i = {}", i);
+            assert_eq!(Pos::new_coord(0, 1), pos, "i = {}", i);
             assert_eq!(MoveState::Stationary, *state);
         }
 
@@ -492,7 +492,7 @@ mod tests {
             match (mv) {
                 MoveState::Moving(state) => {
                     assert_eq!(MOVE_DUR, state.remaining_us);
-                    assert_eq!(Pos::new_coord(-1, 0), state.target);
+                    assert_eq!(Pos::new_coord(0, 1), state.target);
                 },
                 _ => {
                     panic!("Expected to be moving");
@@ -502,7 +502,7 @@ mod tests {
 
         for i in 2..5 {
             let pos = timeline.states[i].get_player(PlayerId(0)).unwrap().pos;
-            assert_eq!(Pos::new_coord(0, 0), pos, "i = {}", i);
+            assert_eq!(Pos::new_coord(1, 1), pos, "i = {}", i);
         }
     }
 
@@ -512,7 +512,7 @@ mod tests {
         // Expect them to be respected and propagated forward
 
         let mut client_timeline = Timeline::new();
-        client_timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        client_timeline.add_player(PlayerId(0), Pos::new_coord(3, 3));
         client_timeline.add_player(PlayerId(1), Pos::new_coord(5, 5));
 
         let mut p0_left = PlayerInputs::default();
@@ -538,14 +538,14 @@ mod tests {
             states: server_timeline.states[1].get_valid_player_states(),
         };
 
-        assert_eq!(6, client_timeline.states.len());
+        assert_eq!(4, client_timeline.states.len());
         {
             let p0 = client_timeline.top_state().get_player(PlayerId(0)).unwrap();
-            assert_eq!(Pos::new_coord(-2, 0), p0.pos);
+            assert_eq!(Pos::new_coord(1, 3), p0.pos);
             match (&p0.move_state) {
                 MoveState::Moving(state) => {
                     assert_eq!(MOVE_DUR, state.remaining_us);
-                    assert_eq!(Pos::new_coord(-3, 0), state.target);
+                    assert_eq!(Pos::new_coord(0, 3), state.target);
                 },
                 _ => {
                     panic!("Expected to be moving");
@@ -572,11 +572,11 @@ mod tests {
         let s = client_timeline.top_state();
         let p0 = s.get_player(PlayerId(0)).unwrap();
         let p1 = s.get_player(PlayerId(1)).unwrap();
-        assert_eq!(Pos::new_coord(-2, 0), p0.pos);
+        assert_eq!(Pos::new_coord(1, 3), p0.pos);
         match (&p0.move_state) {
             MoveState::Moving(state) => {
                 assert_eq!(MOVE_DUR, state.remaining_us);
-                assert_eq!(Pos::new_coord(-3, 0), state.target);
+                assert_eq!(Pos::new_coord(0, 3), state.target);
             },
             _ => {
                 panic!("Expected to be moving");
@@ -591,7 +591,7 @@ mod tests {
         // Propagate server inputs before the server has received input from us.
 
         let mut client_timeline = Timeline::new();
-        client_timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
+        client_timeline.add_player(PlayerId(0), Pos::new_coord(3, 3));
         client_timeline.add_player(PlayerId(1), Pos::new_coord(5, 5));
 
         let mut server_timeline = clone_timeline(&client_timeline);
@@ -613,7 +613,7 @@ mod tests {
         client_timeline.propagate_state(&server_state_latest, None, None, Some(PlayerId(0)));
 
         assert_eq!(
-            vec![1_000, 600, 400, 0, 0, 0],
+            vec![1_000, 600, 400, 0],
             client_timeline
                 .states
                 .iter()
@@ -624,7 +624,7 @@ mod tests {
         let s = client_timeline.top_state();
 
         let p0 = s.get_player(PlayerId(0)).unwrap();
-        assert_eq!(Pos::new_coord(-1, 0), p0.pos);
+        assert_eq!(Pos::new_coord(2, 3), p0.pos);
         assert_eq!(MoveState::Stationary, p0.move_state);
 
         let p1 = s.get_player(PlayerId(1)).unwrap();
@@ -703,8 +703,8 @@ mod tests {
         // Client makes a move that is invalid given new server states
 
         let mut client_timeline = Timeline::new();
-        client_timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
-        client_timeline.add_player(PlayerId(1), Pos::new_coord(2, 2));
+        client_timeline.add_player(PlayerId(0), Pos::new_coord(2, 2));
+        client_timeline.add_player(PlayerId(1), Pos::new_coord(4, 4));
 
         let mut local_inputs = PlayerInputs::new();
         local_inputs.set(PlayerId(0), Input::Right);
@@ -712,8 +712,8 @@ mod tests {
         client_timeline.tick_current_time(Some(local_inputs), 300_000);
 
         let mut server_timeline = Timeline::new();
-        server_timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
-        server_timeline.add_player(PlayerId(1), Pos::new_coord(1, 0));
+        server_timeline.add_player(PlayerId(0), Pos::new_coord(2, 2));
+        server_timeline.add_player(PlayerId(1), Pos::new_coord(3, 2));
 
         // Set player 1 as moving so that player 0 can't move in when
         // inputs synced from server.
@@ -753,11 +753,11 @@ mod tests {
         let s = client_timeline.top_state();
 
         let p0 = s.get_player(PlayerId(0)).unwrap();
-        assert_eq!(Pos::new_coord(0, 0), p0.pos);
+        assert_eq!(Pos::new_coord(2, 2), p0.pos);
         assert_eq!(MoveState::Stationary, p0.move_state);
 
         let p1 = s.get_player(PlayerId(1)).unwrap();
-        assert_eq!(Pos::new_coord(1, -1), p1.pos);
+        assert_eq!(Pos::new_coord(3, 1), p1.pos);
         assert_eq!(MoveState::Stationary, p1.move_state);
     }
 }

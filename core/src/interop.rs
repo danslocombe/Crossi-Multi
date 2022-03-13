@@ -77,20 +77,3 @@ pub struct ServerTick {
     pub last_client_sent : PlayerIdMap<RemoteTickState>,
     pub rule_state : CrossyRulesetFST,
 }
-
-pub fn crossy_send(
-    x: &CrossyMessage,
-    socket: &mut UdpSocket,
-    addr: &SocketAddr,
-) -> std::io::Result<()> {
-    let serialized = bincode::serialize(x).unwrap();
-    socket.send_to(&serialized[..], addr)?;
-    Ok(())
-}
-
-pub fn crossy_receive(socket: &mut UdpSocket) -> std::io::Result<(CrossyMessage, SocketAddr)> {
-    let mut buffer = [0; 2048];
-    let (_, addr) = socket.recv_from(&mut buffer)?;
-    let deserialized = bincode::deserialize(&buffer).unwrap();
-    Ok((deserialized, addr))
-}
