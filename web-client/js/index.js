@@ -144,7 +144,7 @@ function join() {
                     console.log("dt_actual: " + dt_actual);
                     console.log("Previous estimated response.server_time=" + response.server_time_us / 1000 + " estimated_latency=" + estimated_latency_us / 1000);
                     //client = new Client(seed, response.server_time_us, estimated_latency_us);
-                    client = new Client(seed, dt_actual, 0);
+                    client = new Client(seed, dt_actual * 1000, 0);
 
                     play();
                     connect_ws();

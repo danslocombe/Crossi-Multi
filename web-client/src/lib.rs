@@ -71,7 +71,7 @@ impl Client {
         // Estimate server start
         let server_start = WasmInstant::now() - Duration::from_micros((server_time_us + estimated_latency) as u64);
 
-        log!("CONSTRUCTING : Estamated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency);
+        log!("CONSTRUCTING : Estimated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency);
 
         Client {
             timeline,
