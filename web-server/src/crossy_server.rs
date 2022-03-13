@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 use serde::{Serialize, Deserialize};
 use tokio::sync::Mutex;
+use chrono::prelude::*;
 
 use crossy_multi_core::game;
 use crossy_multi_core::timeline::{Timeline, RemoteInput, RemoteTickState};
@@ -35,6 +36,7 @@ pub struct Server {
 pub struct ServerInner {
     new_players : Vec<game::PlayerId>,
     start: Instant,
+    start_utc : DateTime<Utc>,
     prev_tick: Instant,
     clients: Vec<Client>,
     timeline: Timeline,
@@ -44,6 +46,7 @@ pub struct ServerInner {
 impl Server {
     pub fn new(id : u64) -> Self {
         let start = Instant::now();
+        let start_utc = Utc::now(); 
         let init_message = CrossyMessage::EmptyMessage();
         let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(16);
 
@@ -57,6 +60,7 @@ impl Server {
                 timeline: Timeline::from_seed(1000 + id as u32),
                 prev_tick: start,
                 start,
+                start_utc,
                 next_socket_id : SocketId(0),
             }),
         }
@@ -79,6 +83,12 @@ impl Server {
         println!("/join");
         let mut inner = self.inner.lock().await;
         inner.add_client()
+    }
+
+    pub async fn get_start_time_utc(&self) -> String {
+        println!("/start_time_utc");
+        let inner = self.inner.lock().await;
+        inner.start_utc.to_string()
     }
 
     pub async fn play(&self, hello : &ClientHello, socket_id: SocketId) -> Option<InitServerResponse>

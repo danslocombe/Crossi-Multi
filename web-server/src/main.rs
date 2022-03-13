@@ -108,6 +108,13 @@ async fn main() {
         .and(warp::query::<PlayOptions>())
         .and(with_db(games.clone()))
         .and_then(play_handler).boxed();
+
+    // GET /start_time_utc?game_id=1
+    let get_start_time_utc = warp::path!("start_time_utc")
+        .and(warp::get())
+        .and(warp::query::<StartTimeUtcOptions>())
+        .and(with_db(games.clone()))
+        .and_then(start_time_utc_handler).boxed();
      
     // WS /ws?game_id=1&socket_id=1
     let websocket = warp::path!("ws")
@@ -124,9 +131,11 @@ async fn main() {
     let routes = get_new
         .or(get_join)
         .or(get_play)
+        .or(get_start_time_utc)
         .or(site)
         .or(websocket)
-        .or(ping);
+        .or(ping)
+        .boxed();
 
     warp::serve(routes)
         .run(([127, 0, 0, 1], 8080))
@@ -196,6 +205,18 @@ async fn play_handler(options: PlayOptions, db: GameDb) -> Result<Response, Reje
 struct WebSocketJoinOptions {
     pub game_id : GameId, 
     pub socket_id : crossy_server::SocketId, 
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct StartTimeUtcOptions {
+    pub game_id : GameId, 
+}
+
+async fn start_time_utc_handler(options: StartTimeUtcOptions, db: GameDb) -> Result<Response, Rejection>  {
+    println!("Start time with options {options:?}");
+    let dbinner = db.get(options.game_id).await?;
+    let time = dbinner.game.get_start_time_utc().await;
+    Ok(reply::json(&time).into_response())
 }
 
 async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> Result<Response, Rejection> {

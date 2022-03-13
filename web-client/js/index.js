@@ -56,6 +56,7 @@ ping_ws.onclose = evt => {}
 var ping_responses = [];
 var remaining_pings = 5;
 
+
 // t0 - time to send ping
 // t1 - time server receives ping
 // t2 - time server sends pong
@@ -120,21 +121,34 @@ function start_game() {
     }
 }
 
-
 function join() {
-    fetch_json('/join?game_id=' + game_id + '&name=' + player_name)
+
+    fetch_json('/start_time_utc?game_id=' + game_id)
         .then(response => response.json())
         .then(response => {
-            console.log("/join response");
+            console.log("start time utc response");
             console.log(response);
-            socket_id = response.socket_id;
+            let server_start_time = Date.parse(response);
 
-            console.log("Creating client");
-            const seed = 1000 + parseInt(game_id);
-            client = new Client(seed, response.server_time_us, estimated_latency_us);
+            fetch_json('/join?game_id=' + game_id + '&name=' + player_name)
+                .then(response => response.json())
+                .then(response => {
+                    console.log("/join response");
+                    console.log(response);
+                    socket_id = response.socket_id;
 
-            play();
-            connect_ws();
+                    console.log("Creating client");
+                    const seed = 1000 + parseInt(game_id);
+                    var time_now = Date.now();
+                    var dt_actual = time_now - server_start_time;
+                    console.log("dt_actual: " + dt_actual);
+                    console.log("Previous estimated response.server_time=" + response.server_time_us / 1000 + " estimated_latency=" + estimated_latency_us / 1000);
+                    //client = new Client(seed, response.server_time_us, estimated_latency_us);
+                    client = new Client(seed, dt_actual, 0);
+
+                    play();
+                    connect_ws();
+                });
         });
 }
 
