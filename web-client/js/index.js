@@ -80,7 +80,7 @@ function ping(initial_ping) {
     else {
         ping_ws.close();
         
-        ping_responses.sort();
+        ping_responses.sort((a, b) => a - b);
         console.log(ping_responses);
         const estimated_latency_ms = ping_responses[Math.floor(ping_responses.length / 2)];
         estimated_latency_us = estimated_latency_ms * 1000.0;
