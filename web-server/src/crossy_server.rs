@@ -85,6 +85,12 @@ impl Server {
         inner.add_client()
     }
 
+    pub async fn time_since(&self) -> Duration {
+        let mut inner = self.inner.lock().await;
+        let now = Instant::now();
+        now.saturating_duration_since(inner.start)
+    }
+
     pub async fn get_start_time_utc(&self) -> String {
         println!("/start_time_utc");
         let inner = self.inner.lock().await;
