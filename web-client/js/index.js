@@ -84,7 +84,7 @@ function ping(initial_ping) {
         const estimated_latency_ms = ping_responses[Math.floor(ping_responses.length / 2)];
         estimated_latency_us = estimated_latency_ms * 1000.0;
 
-        console.log("Estimated Offset " + estimated_latency_us + "us");
+        console.log("Estimated Offset " + estimated_latency_us / 1000.0 + "ms");
         start_game();
     }
 }

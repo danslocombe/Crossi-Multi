@@ -29,6 +29,7 @@ pub struct Server {
     inner : Mutex<ServerInner>,
 
     outbound_tx : tokio::sync::broadcast::Sender<CrossyMessage>,
+    outbound_rx : tokio::sync::broadcast::Receiver<CrossyMessage>,
 }
 
 pub struct ServerInner {
@@ -44,11 +45,12 @@ impl Server {
     pub fn new(id : u64) -> Self {
         let start = Instant::now();
         let init_message = CrossyMessage::EmptyMessage();
-        let (outbound_tx, _outbound_rx) = tokio::sync::broadcast::channel(16);
+        let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(16);
 
         Server {
             queued_messages : Mutex::new(Vec::new()),
             outbound_tx,
+            outbound_rx,
             inner : Mutex::new(ServerInner {
                 clients: Vec::new(),
                 new_players: Vec::new(),
@@ -122,8 +124,8 @@ impl Server {
 
     pub async fn run(&self) {
         // Still have client listeners
-        while self.outbound_tx.receiver_count() > 0 {
-
+        //while self.outbound_tx.receiver_count() > 0 {
+        loop {
             let tick_start = Instant::now();
             let (client_updates, dropped_players, ready_players) = self.receive_updates().await;
 

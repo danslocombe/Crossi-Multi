@@ -27,5 +27,11 @@ module.exports = {
     new WasmPackPlugin({
       crateDirectory: __dirname,
     }),
-  ]
+  ],
+  performance: {
+      // Disable warning for large wasm modules 
+      hints: false,
+      maxEntrypointSize: 512000,
+      maxAssetSize: 512000
+  }
 };
