@@ -211,9 +211,10 @@ impl Timeline {
 
         if let Some(state) = client_latest_remote_state.as_ref() {
             if let Some(index) = self.split_with_state(&[], &state.states, None, state.time_us) {
-                while self.states.len() > index + 1 {
-                    self.states.pop_back();
-                }
+                // Commented out to fix some glitchy behaviour where client predictions not correctly triggered
+                //while self.states.len() > index + 1 {
+                //    self.states.pop_back();
+                //}
 
                 if (index > 0) {
                     self.simulate_up_to_date(index);
@@ -561,7 +562,7 @@ mod tests {
         );
 
         assert_eq!(
-            vec![1500, 1250, 1000, 500, 500],
+            vec![1500, 1250, 1000, 500, 500, 0],
             client_timeline
                 .states
                 .iter()
@@ -676,7 +677,7 @@ mod tests {
         );
 
         assert_eq!(
-            vec![1_000, 700, 450, 200, 200],
+            vec![1_000, 700, 450, 200, 200, 0],
             client_timeline
                 .states
                 .iter()
@@ -742,7 +743,7 @@ mod tests {
         );
 
         assert_eq!(
-            vec![1_000, 400, 300, 200, 200],
+            vec![1_000, 400, 300, 200, 200, 0],
             client_timeline
                 .states
                 .iter()
