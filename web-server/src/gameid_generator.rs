@@ -3,10 +3,10 @@ use froggy_rand::FroggyRand;
 
 use crate::GameId;
 
-const words_txt : &'static str = include_str!("../wordlist.txt");
+const WORDS_TXT : &'static str = include_str!("../wordlist.txt");
 
 lazy_static! {
-    static ref WORDS : Vec<&'static str> = words_txt.lines().collect();
+    static ref WORDS : Vec<&'static str> = WORDS_TXT.lines().collect();
 }
 
 pub struct GameIdGenerator
