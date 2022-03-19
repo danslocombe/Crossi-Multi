@@ -166,12 +166,7 @@ impl PlayerState {
             // Try to move into some other player
 
             if let MoveState::Moving(ms) = &other.move_state {
-                // Dont allow pushing if theyve just started moving
-                // TODO DAN
-                // Do we want this or should it be reverted to ms.remaining_us > 0 ??
-                if (ms.remaining_us > MOVE_DUR / 2) {
-                    return None;
-                }
+                return None;
             }
 
             if (state.can_push(other.id, dir, state.time_us, &state.ruleset_state, map)) {
