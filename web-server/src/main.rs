@@ -51,7 +51,7 @@ impl GameDb {
             idgen_lock.next()
         };
 
-        let game = Arc::new(crossy_server::Server::new(&id.0));
+        let game = Arc::new(crossy_server::Server::new(&id));
 
         games.push(GameDbInner {
             id: id.clone(),

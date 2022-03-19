@@ -34,6 +34,8 @@ pub struct Server {
 }
 
 pub struct ServerInner {
+    game_id : crate::GameId,
+    empty_ticks : u32,
     new_players : Vec<game::PlayerId>,
     start: Instant,
     start_utc : DateTime<Utc>,
@@ -44,7 +46,7 @@ pub struct ServerInner {
 }
 
 impl Server {
-    pub fn new(id : &str) -> Self {
+    pub fn new(id : &crate::GameId) -> Self {
         let start = Instant::now();
         let start_utc = Utc::now(); 
         let init_message = CrossyMessage::EmptyMessage();
@@ -55,9 +57,11 @@ impl Server {
             outbound_tx,
             outbound_rx,
             inner : Mutex::new(ServerInner {
+                game_id : id.clone(),
+                empty_ticks : 0,
                 clients: Vec::new(),
                 new_players: Vec::new(),
-                timeline: Timeline::from_seed(id),
+                timeline: Timeline::from_seed(&id.0),
                 prev_tick: start,
                 start,
                 start_utc,
@@ -80,13 +84,13 @@ impl Server {
     }
 
     pub async fn join(&self) -> SocketId {
-        println!("/join");
         let mut inner = self.inner.lock().await;
+        println!("[{:?}] /join", inner.game_id);
         inner.add_client()
     }
 
     pub async fn time_since(&self) -> Duration {
-        let mut inner = self.inner.lock().await;
+        let inner = self.inner.lock().await;
         let now = Instant::now();
         now.saturating_duration_since(inner.start)
     }
@@ -99,14 +103,15 @@ impl Server {
 
     pub async fn play(&self, hello : &ClientHello, socket_id: SocketId) -> Option<InitServerResponse>
     {
+        let mut inner = self.inner.lock().await;
+
         println!(
-            "/play {:?} {:?} looks ok: {}",
+            "[{:?}] /play {:?} {:?} looks ok: {}",
+            inner.game_id,
             socket_id,
             &hello,
             hello.check(1)
         );
-
-        let mut inner = self.inner.lock().await;
 
         let client_id = game::PlayerId(inner.clients.len() as u8);
         inner.new_players.push(client_id);
@@ -161,14 +166,14 @@ impl Server {
             for new_player in new_players {
                 // We need to make sure this gets propagated properly
                 // Weird edge case bugs
-                println!("In run, adding a new player {new_player:?}");
+                println!("[{:?}] In run, adding a new player {:?}", inner.game_id, new_player);
                 let spawn_pos = find_spawn_pos(inner.timeline.top_state());
-                println!("Spawning new player at {spawn_pos:?}");
+                println!("[{:?}] Spawning new player at {:?}", inner.game_id, spawn_pos);
                 inner.timeline.add_player(new_player, spawn_pos);
             }
 
             for dropped_player in dropped_players {
-                println!("Dropping player {dropped_player:?}");
+                println!("[{:?}] Dropping player {:?}", inner.game_id, dropped_player);
                 inner.timeline.remove_player(dropped_player);
             }
 
@@ -204,6 +209,23 @@ impl Server {
 
             if top_state.frame_id as usize % 300 == 0 {
                 //println!("Sending tick {:?}", tick);
+            }
+
+            if (self.outbound_tx.receiver_count() <= 1)
+            {
+                inner.empty_ticks += 1;
+            }
+            else
+            {
+                inner.empty_ticks = 0;
+            }
+
+            const EMPTY_TICKS_THERSHOLD : u32 = 60 * 20;
+            if (inner.empty_ticks > EMPTY_TICKS_THERSHOLD)
+            {
+                // Noone left listening, shut down
+                println!("[{:?}] Shutting down game", inner.game_id);
+                return;
             }
 
             self.outbound_tx.send(tick).unwrap();
