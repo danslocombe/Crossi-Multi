@@ -27,7 +27,7 @@ struct Client {
 
 pub struct Server {
     queued_messages : Mutex<Vec<(CrossyMessage, SocketId)>>,
-    inner : Mutex<ServerInner>,
+    pub inner : Mutex<ServerInner>,
 
     outbound_tx : tokio::sync::broadcast::Sender<CrossyMessage>,
     outbound_rx : tokio::sync::broadcast::Receiver<CrossyMessage>,
@@ -43,6 +43,7 @@ pub struct ServerInner {
     clients: Vec<Client>,
     timeline: Timeline,
     next_socket_id : SocketId,
+    pub ended : bool,
 }
 
 impl Server {
@@ -66,6 +67,7 @@ impl Server {
                 start,
                 start_utc,
                 next_socket_id : SocketId(0),
+                ended : false,
             }),
         }
     }
@@ -226,6 +228,7 @@ impl Server {
                 // Noone left listening, shut down
                 println!("[{:?}] Shutting down game", inner.game_id);
                 self.outbound_tx.send(CrossyMessage::GoodBye()).unwrap();
+                inner.ended = true;
                 return;
             }
 

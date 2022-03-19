@@ -65,6 +65,29 @@ impl GameDb {
         id
     }
 
+    async fn cleanup(&self)
+    {
+        println!("Cleanup");
+        let mut games_inner = self.games.lock().await;
+        let mut games_swap = Vec::new();
+
+        for game in &*games_inner
+        {
+            let game_inner = game.game.inner.lock().await;
+            if (!game_inner.ended)
+            {
+                games_swap.push(game.clone());
+            }
+            else {
+                println!("Dropping {:?}", game.id);
+            }
+        }
+
+        println!("Cleanup done new_length = {}", games_swap.len());
+        *games_inner = games_swap;
+        //std::mem::swap(&mut *games_inner, &mut games_swap);
+    }
+
     async fn get(&self, game_id : GameId) -> Result<GameDbInner, Rejection> {
         let games = self.games.lock().await;
         let m_game = games.iter().filter(|x| x.id == game_id).next();
@@ -95,6 +118,15 @@ async fn main() {
     println!("Serving from {}", &serve_dir);
 
     crossy_multi_core::set_debug_logger(Box::new(crossy_multi_core::StdoutLogger()));
+
+    let games0 = games.clone();
+    tokio::task::spawn(async move {
+        const DESIRED_CLEANUP_TIME: std::time::Duration = std::time::Duration::from_millis(5000);
+        loop {
+            games0.cleanup().await;
+            tokio::time::sleep(DESIRED_CLEANUP_TIME).await;
+        }
+    });
 
     let site = warp::fs::dir(serve_dir).with(warp::compression::gzip()).boxed();
 
@@ -253,6 +285,7 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
             match tick_listener.recv().await {
                 Ok(crossy_multi_core::interop::CrossyMessage::GoodBye()) => {
                     println!("Game ended cleaning up WS listener");
+                    break;
                 },
                 Ok(v) => {
                     let serialized = flexbuffers::to_vec(&v).unwrap();
