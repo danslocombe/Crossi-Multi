@@ -18,6 +18,7 @@ pub enum CrossyMessage {
     OffsetPing(),
     OffsetPong(OffsetPong),
     EmptyMessage(),
+    GoodBye(),
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]

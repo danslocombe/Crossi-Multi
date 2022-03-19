@@ -30,6 +30,7 @@ pub struct Server {
     inner : Mutex<ServerInner>,
 
     outbound_tx : tokio::sync::broadcast::Sender<CrossyMessage>,
+    outbound_rx : tokio::sync::broadcast::Receiver<CrossyMessage>,
 }
 
 pub struct ServerInner {
@@ -42,7 +43,6 @@ pub struct ServerInner {
     clients: Vec<Client>,
     timeline: Timeline,
     next_socket_id : SocketId,
-    outbound_rx : Option<tokio::sync::broadcast::Receiver<CrossyMessage>>,
 }
 
 impl Server {
@@ -55,6 +55,7 @@ impl Server {
         Server {
             queued_messages : Mutex::new(Vec::new()),
             outbound_tx,
+            outbound_rx,
             inner : Mutex::new(ServerInner {
                 game_id : id.clone(),
                 empty_ticks : 0,
@@ -65,7 +66,6 @@ impl Server {
                 start,
                 start_utc,
                 next_socket_id : SocketId(0),
-                outbound_rx : Some(outbound_rx),
             }),
         }
     }
@@ -225,12 +225,7 @@ impl Server {
             {
                 // Noone left listening, shut down
                 println!("[{:?}] Shutting down game", inner.game_id);
-
-                // HACK
-                // We keep a copy of outbound_rx in the inner server so we can remove it here
-                // This lets us cleanup the task easily
-                inner.outbound_rx = None;
-
+                self.outbound_tx.send(CrossyMessage::GoodBye()).unwrap();
                 return;
             }
 

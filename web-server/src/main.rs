@@ -251,6 +251,9 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
     tokio::task::spawn(async move {
         loop {
             match tick_listener.recv().await {
+                Ok(crossy_multi_core::interop::CrossyMessage::GoodBye()) => {
+                    println!("Game ended cleaning up WS listener");
+                },
                 Ok(v) => {
                     let serialized = flexbuffers::to_vec(&v).unwrap();
                     match ws_tx.send(Message::binary(serialized)).await
