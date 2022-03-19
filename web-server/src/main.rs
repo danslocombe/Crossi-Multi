@@ -103,6 +103,8 @@ const SERVE_DIR_DEV : &'static str = "C:\\Users\\Dan\\crossy_multi\\web-client\\
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() {
+
+    console_subscriber::init();
     let games = GameDb::new();
 
     let serve_dir = if let Some(arg) = std::env::args().nth(1) {
