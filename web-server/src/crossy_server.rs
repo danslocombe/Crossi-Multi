@@ -44,7 +44,7 @@ pub struct ServerInner {
 }
 
 impl Server {
-    pub fn new(id : u64) -> Self {
+    pub fn new(id : &str) -> Self {
         let start = Instant::now();
         let start_utc = Utc::now(); 
         let init_message = CrossyMessage::EmptyMessage();
@@ -57,7 +57,7 @@ impl Server {
             inner : Mutex::new(ServerInner {
                 clients: Vec::new(),
                 new_players: Vec::new(),
-                timeline: Timeline::from_seed(1000 + id as u32),
+                timeline: Timeline::from_seed(id),
                 prev_tick: start,
                 start,
                 start_utc,

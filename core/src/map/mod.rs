@@ -1,4 +1,6 @@
 use std::collections::VecDeque;
+use std::hash::Hash;
+
 use serde::{Deserialize, Serialize};
 use froggy_rand::FroggyRand;
 
@@ -76,7 +78,12 @@ pub struct Map{
 }
 
 impl Map {
-    pub fn new(seed : u32) -> Self {
+    pub fn new<T : Hash>(seed_key : T) -> Self {
+        let seed = FroggyRand::new(0).gen(seed_key) as u32;
+        Self::exact_seed(seed)
+    }
+
+    pub fn exact_seed(seed : u32) -> Self {
         Self {
             seed,
             inner: std::sync::Arc::new(std::sync::Mutex::new(MapInner::new(seed))),

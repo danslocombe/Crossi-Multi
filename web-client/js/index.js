@@ -138,12 +138,11 @@ function join() {
                     socket_id = response.socket_id;
 
                     console.log("Creating client");
-                    const seed = 1000 + parseInt(game_id);
                     var time_now = Date.now();
                     var dt_actual = time_now - server_start_time;
                     console.log("DT from UTC: " + dt_actual);
                     console.log("DT server_us=" + response.server_time_us / 1000 + " estimated_latency=" + estimated_latency_us / 1000);
-                    client = new Client(seed, response.server_time_us, estimated_latency_us);
+                    client = new Client(game_id, response.server_time_us, estimated_latency_us);
                     //client = new Client(seed, dt_actual * 1000, 0);
 
                     play();

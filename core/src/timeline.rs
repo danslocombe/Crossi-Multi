@@ -36,7 +36,7 @@ impl Timeline {
         }
     }
 
-    pub fn from_seed(seed: u32) -> Self {
+    pub fn from_seed(seed: &str) -> Self {
         let mut states = VecDeque::new();
         states.push_front(GameState::new());
         Timeline {
@@ -46,16 +46,30 @@ impl Timeline {
     }
 
     pub fn from_server_parts(
+        seed: &str,
+        time_us: u32,
+        player_states: Vec<PlayerState>,
+        ruleset_state : CrossyRulesetFST
+    ) -> Self {
+        let mut states = VecDeque::new();
+        states.push_front(GameState::from_server_parts(time_us, player_states, ruleset_state));
+        Timeline {
+            states,
+            map: Map::new(seed),
+        }
+    }
+
+    pub fn from_server_parts_exact_seed(
         seed: u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
         ruleset_state : CrossyRulesetFST
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(seed, time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(time_us, player_states, ruleset_state));
         Timeline {
             states,
-            map: Map::new(seed),
+            map: Map::exact_seed(seed),
         }
     }
 
@@ -430,7 +444,7 @@ mod tests {
 
     #[test]
     fn test_split_out_range() {
-        let mut timeline = Timeline::from_server_parts(0, 10_000, Vec::new(), CrossyRulesetFST::start());
+        let mut timeline = Timeline::from_server_parts("seed", 10_000, Vec::new(), CrossyRulesetFST::start());
         timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
         timeline.tick_current_time(Some(PlayerInputs::default()), 15_000);
         assert_eq!(2, timeline.states.len());

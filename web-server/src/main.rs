@@ -1,6 +1,9 @@
 #![allow(unused_parens)]
 #![allow(dead_code)]
 
+#[macro_use]
+extern crate lazy_static;
+
 use crossy_multi_core::*;
 use std::sync::Arc;
 
@@ -15,9 +18,10 @@ use tokio::sync::Mutex;
 use futures::{SinkExt, StreamExt};
 
 mod crossy_server;
+mod gameid_generator;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GameId(u64);
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct GameId(String);
 
 #[derive(Clone)]
 struct GameDbInner {
@@ -28,23 +32,29 @@ struct GameDbInner {
 #[derive(Clone)]
 struct GameDb {
     games : Arc<Mutex<Vec<GameDbInner>>>,
+    gameid_generator : Arc<Mutex<gameid_generator::GameIdGenerator>>,
 }
 
 impl GameDb {
     fn new() -> Self {
         GameDb {
             games: Arc::new(Mutex::new(Vec::new())),
+            gameid_generator: Arc::new(Mutex::new(gameid_generator::GameIdGenerator::new())),
         }
     }
 
     async fn new_game(&self) -> GameId {
         let mut games = self.games.lock().await;
-        let prev_max_id = games.iter().map(|x| x.id.0).max().unwrap_or(0);
-        let id = GameId(prev_max_id + 1);
 
-        let game = Arc::new(crossy_server::Server::new(id.0));
+        let id = {
+            let mut idgen_lock = self.gameid_generator.lock().await;
+            idgen_lock.next()
+        };
+
+        let game = Arc::new(crossy_server::Server::new(&id.0));
+
         games.push(GameDbInner {
-            id,
+            id: id.clone(),
             game : game.clone(),
         });
 
@@ -225,8 +235,9 @@ async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> 
 
     let game = db.get(options.game_id).await?;
 
+    let socket_id = options.socket_id;
     Ok(ws.on_upgrade(move |socket| {
-        websocket_main(socket, game, options.socket_id)
+        websocket_main(socket, game, socket_id)
     }).into_response())
 }
 

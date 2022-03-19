@@ -184,7 +184,7 @@ impl GameState {
         }
     }
 
-    pub fn from_server_parts(_seed: u32, time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
+    pub fn from_server_parts(time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
         let player_states = PlayerIdMap::from_definition(player_states_def.into_iter().map(|x| (x.id, x)).collect());
         GameState {
             time_us,

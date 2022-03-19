@@ -61,7 +61,7 @@ pub struct Client {
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : u32, server_time_us : u32, estimated_latency : u32) -> Self {
+    pub fn new(seed : &str, server_time_us : u32, estimated_latency : u32) -> Self {
         // Setup statics
         console_error_panic_hook::set_once();
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
@@ -195,7 +195,7 @@ impl Client {
         should_reset |= self.timeline.top_state().player_states.count_populated() != server_tick.latest.states.len();
 
         if (should_reset) {
-            self.timeline = timeline::Timeline::from_server_parts(
+            self.timeline = timeline::Timeline::from_server_parts_exact_seed(
                 self.timeline.map.get_seed(),
                 server_tick.latest.time_us,
                 server_tick.latest.states.clone(),
