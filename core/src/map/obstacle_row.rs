@@ -44,6 +44,20 @@ impl ObstacleRow {
         }
     }
 
+    pub fn filter_object(&self, obstacle : &Obstacle, current_time : u32, row_start_time : u32) -> bool
+    {
+        //let hack_val = 0.75;
+        //let since_start = (hack_val * obstacle.0 as f64 / self.time_scale as f64) as u32;
+        //let spawn_time = row_start_time.saturating_sub(since_start);
+        //current_time > spawn_time
+
+        let t_over = current_time.saturating_sub(row_start_time);
+
+        let x0_over_v = (obstacle.0 as f64 - self.r0) / self.time_scale;
+
+        t_over > x0_over_v as u32
+    }
+
     pub fn realise_obstacle(&self, obstacle : &Obstacle) -> f64 {
         let pos = if (self.inverted) {
             1.0 - obstacle.0
@@ -63,6 +77,14 @@ impl ObstacleRow {
     pub fn get_obstacles_public(&self, time_us : u32) -> Vec<ObstaclePublic> {
         self.get_obstacles_onscreen(time_us)
             .iter()
+            .map(|x| self.transform_car(x))
+            .collect()
+    }
+
+    pub fn get_obstacles_public_filtered(&self, time_us : u32, start_time : u32) -> Vec<ObstaclePublic> {
+        self.get_obstacles_onscreen(time_us)
+            .iter()
+            .filter(|x| self.filter_object(x, time_us, start_time))
             .map(|x| self.transform_car(x))
             .collect()
     }

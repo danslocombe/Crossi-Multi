@@ -1,10 +1,12 @@
 use froggy_rand::FroggyRand;
+use serde::{Deserialize, Serialize};
 
 use crate::map::obstacle_row::*;
 use crate::{CoordPos, LillipadId};
 
 #[derive(Debug)]
 pub struct River {
+    //pub spawn_time : Option<u32>,
     row : ObstacleRow,
 }
 
@@ -46,14 +48,28 @@ impl River {
 
         River {
             row : ObstacleRow::new(y, inverted, TIME_SCALE, obstacles, r_width),
+            //spawn_time: None,
         }
     }
 
-    pub fn get_lillipads_public(&self, time_us : u32) -> Vec<ObstaclePublic> {
-        self.row.get_obstacles_public(time_us)
+    pub fn get_lillipads_public(&self, time_us : u32, spawn_time : Option<u32>) -> Vec<ObstaclePublic> {
+        if let Some(spawn_time) = spawn_time
+        {
+            self.row.get_obstacles_public_filtered(time_us, spawn_time)
+        }
+        else
+        {
+            vec![]
+        }
     }
 
-    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : crate::PreciseCoords) -> Option<LillipadId> {
+    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : crate::PreciseCoords, spawn_time : Option<u32>) -> Option<LillipadId> {
+        if (spawn_time.is_none())
+        {
+            return None;
+        }
+
+        let spawn_time = spawn_time.unwrap();
         if (pos.y != self.row.y) {
             return None;
         }
@@ -63,7 +79,10 @@ impl River {
         let mut closest = None;
         let mut closest_dist = f64::MAX;
 
-        for (id, lillipad) in self.row.get_obstacles_onscreen(time_us).iter().enumerate() {
+        for (id, lillipad) in self.row.get_obstacles_onscreen(time_us)
+            .iter()
+            .filter(|x| self.row.filter_object(x, time_us, spawn_time))
+            .enumerate() {
             let realised = self.row.realise_obstacle(lillipad);
             let dist = (frog_centre - realised).abs();
 
@@ -97,3 +116,32 @@ impl River {
         self.row.realise_obstacle(&lillipad)
     }
 }
+
+#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RiverSpawnTimes
+{
+    spawn_times : Vec<u32>,
+}
+
+impl RiverSpawnTimes
+{
+    pub fn get(&self, i : usize) -> Option<u32>
+    {
+        if (i < self.spawn_times.len())
+        {
+            Some(self.spawn_times[i])
+        }
+        else
+        {
+            None
+        }
+    }
+
+    pub fn set(&mut self, i : usize, val : u32)
+    {
+        assert_eq!(i, self.spawn_times.len());
+        self.spawn_times.push(val);
+    }
+}
+
+pub static EMPTY_RIVER_SPAWN_TIMES : RiverSpawnTimes = RiverSpawnTimes { spawn_times : vec![] };

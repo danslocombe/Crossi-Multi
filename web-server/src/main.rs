@@ -67,9 +67,8 @@ impl GameDb {
 
     async fn cleanup(&self)
     {
-        println!("Cleanup");
         let mut games_inner = self.games.lock().await;
-        let mut games_swap = Vec::new();
+        let mut games_swap = Vec::with_capacity(games_inner.len());
 
         for game in &*games_inner
         {
@@ -83,9 +82,7 @@ impl GameDb {
             }
         }
 
-        println!("Cleanup done new_length = {}", games_swap.len());
         *games_inner = games_swap;
-        //std::mem::swap(&mut *games_inner, &mut games_swap);
     }
 
     async fn get(&self, game_id : GameId) -> Result<GameDbInner, Rejection> {
@@ -179,8 +176,11 @@ async fn main() {
         .or(ping)
         .boxed();
 
+    let serve_from = ([127, 0, 0, 1], 8080);
+    println!("Serving from {:?}", serve_from);
+
     warp::serve(routes)
-        .run(([127, 0, 0, 1], 8080))
+        .run(serve_from)
         .await;
 }
 

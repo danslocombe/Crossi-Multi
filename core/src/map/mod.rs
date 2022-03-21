@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 use std::hash::Hash;
 
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ pub mod river;
 pub mod obstacle_row;
 
 use road::Road;
-use river::River;
+use river::{River, RiverSpawnTimes};
 use obstacle_row::{ObstaclePublic, ObstacleRowDescr};
 
 use crate::crossy_ruleset::CrossyRulesetFST;
@@ -61,6 +61,7 @@ struct MapRound {
     gen_state_wall_width : i32,
     roads : Vec<(i32, Road)>,
     rivers : Vec<(i32, River)>,
+    //river_spawns : HashMap<i32, u32>,
     rows : VecDeque<Row>,
 }
 
@@ -116,9 +117,9 @@ impl Map {
         guard.get(round).get_cars(time_us)
     }
 
-    pub fn get_lillipads(&self, round : u8, time_us : u32) -> Vec<ObstaclePublic> {
+    pub fn get_lillipads(&self, round : u8, time_us : u32, spawn_times : &river::RiverSpawnTimes) -> Vec<ObstaclePublic> {
         let mut guard = self.inner.lock().unwrap();
-        guard.get(round).get_lillipads(time_us)
+        guard.get(round).get_lillipads(time_us, spawn_times)
     }
 
     pub fn collides_car(&self, time_us : u32, round : u8, pos : CoordPos) -> bool {
@@ -153,11 +154,14 @@ impl Map {
         round.get_row(RowId::from_y(pos.y)).solid(time_us, rule_state, pos)
     }
 
-    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : PreciseCoords) -> Option<crate::LillipadId> {
+    pub fn lillipad_at_pos(&self, round_id : u8, spawn_times : &RiverSpawnTimes, time_us : u32, pos : PreciseCoords) -> Option<crate::LillipadId> {
         let mut guard = self.inner.lock().unwrap();
         guard.get_mut(round_id).generate_to_y(RowId::from_y(pos.y));
-        for (_y, river) in &guard.get(round_id).rivers {
-            if let Some(lid) = river.lillipad_at_pos(round_id, time_us, pos) {
+
+        for (i, (_y, river)) in guard.get(round_id).rivers.iter().enumerate() {
+            let spawn_time = spawn_times.get(i);
+
+            if let Some(lid) = river.lillipad_at_pos(round_id, time_us, pos, spawn_time) {
                 return Some(lid);
             }
         }
@@ -197,8 +201,9 @@ impl Map {
         let round_id = rule_state.get_round_id();
         let pos = self.realise_pos(time_us, pos);
         let precise = pos.apply_input(input);
+        let spawn_times = rule_state.get_river_spawn_times();
 
-        if let Some(lillipad_id) = self.lillipad_at_pos(round_id, time_us, precise) {
+        if let Some(lillipad_id) = self.lillipad_at_pos(round_id, spawn_times, time_us, precise) {
             Some(Pos::Lillipad(lillipad_id))
         }
         else {
@@ -210,6 +215,12 @@ impl Map {
                 Some(Pos::Coord(coord_pos))
             }
         }
+    }
+
+    pub fn update_river_spawn_times(&self, time_to_reach_rivers : &RiverSpawnTimes, round_id : u8, time_us : u32, screen_y : i32) -> RiverSpawnTimes
+    {
+        let mut inner = self.inner.lock().unwrap();
+        inner.update_river_spawn_times(time_to_reach_rivers, round_id, time_us, screen_y)
     }
 }
 
@@ -244,6 +255,19 @@ impl MapInner {
         self.gen_to(i);
         &mut self.rounds[round_id as usize]
     }
+
+    fn update_river_spawn_times(&mut self, time_to_reach_rivers : &RiverSpawnTimes, round_id : u8, time_us : u32, screen_y : i32) -> RiverSpawnTimes
+    {
+        if ((round_id as usize) < self.rounds.len())
+        {
+            let round = &mut self.rounds[round_id as usize];
+            round.update_river_spawn_times(time_to_reach_rivers, time_us, screen_y)
+        }
+        else
+        {
+            Default::default()
+        }
+    }
 }
 
 impl MapRound {
@@ -264,6 +288,7 @@ impl MapRound {
             gen_state_wall_width : 0,
             roads : Vec::with_capacity(24),
             rivers : Vec::with_capacity(24),
+            //river_spawns : HashMap::with_capacity(24),
             rows,
         };
 
@@ -314,6 +339,21 @@ impl MapRound {
             row_id : RowId(STANDS_HEIGHT),
             row_type : RowType::StartingBarrier(),
         })
+    }
+
+    fn update_river_spawn_times(&mut self, spawn_times : &RiverSpawnTimes, time_us : u32, screen_y : i32) -> RiverSpawnTimes
+    {
+        let mut new_spawn_times = spawn_times.clone();
+        for (i, (y, _river)) in self.rivers.iter().enumerate()
+        {
+            let spawn_time = spawn_times.get(i);
+            if (*y >= screen_y && spawn_time.is_none())
+            {
+                new_spawn_times.set(i, time_us);
+            }
+        }
+
+        new_spawn_times
     }
 
     fn generate_to_y(&mut self, row_id_target : RowId) {
@@ -406,7 +446,6 @@ impl MapRound {
         }
     }
 
-
     fn get_cars(&self, time_us : u32) -> Vec<ObstaclePublic> {
         let mut cars = Vec::with_capacity(8);
         for (_y, road) in &self.roads {
@@ -416,11 +455,12 @@ impl MapRound {
         cars
     }
 
-    fn get_lillipads(&self, time_us : u32) -> Vec<ObstaclePublic> {
-        let mut lillipads = Vec::with_capacity(8);
-        for (_y, river) in &self.rivers {
+    fn get_lillipads(&self, time_us : u32, spawn_times : &river::RiverSpawnTimes) -> Vec<ObstaclePublic> {
+        let mut lillipads = Vec::with_capacity(32);
+        for (i, (_y, river)) in self.rivers.iter().enumerate() {
             // TODO y offset
-            lillipads.extend(river.get_lillipads_public(time_us));
+            let spawn_time = spawn_times.get(i);
+            lillipads.extend(river.get_lillipads_public(time_us, spawn_time));
         }
         lillipads
     }

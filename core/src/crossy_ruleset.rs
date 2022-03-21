@@ -4,6 +4,7 @@ use crate::game::{PlayerId, Pos, CoordPos};
 use crate::player::PlayerState;
 use crate::player_id_map::PlayerIdMap;
 use crate::map::{Map, RowType};
+use crate::map::river::RiverSpawnTimes;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LobbyState {
@@ -17,6 +18,7 @@ pub struct WarmupState {
     pub in_game : PlayerIdMap<bool>,
     pub win_counts : PlayerIdMap<u8>,
     pub round_id : u8,
+    pub river_spawn_times : RiverSpawnTimes,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -25,6 +27,7 @@ pub struct RoundState {
     pub alive_players : PlayerIdMap<bool>,
     pub win_counts : PlayerIdMap<u8>,
     pub round_id : u8,
+    pub river_spawn_times : RiverSpawnTimes,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -52,6 +55,7 @@ const MIN_PLAYERS : usize = 2;
 const COUNTDOWN_TIME_US : u32 = 3 * 1_000_000;
 const COOLDOWN_TIME_US : u32 = 4 * 1_000_000;
 const REQUIRED_WIN_COUNT : u8 = 25;
+const RIVER_SPAWN_Y_OFFSET : i32 = 4;
 
 use CrossyRulesetFST::*;
 
@@ -88,6 +92,7 @@ impl CrossyRulesetFST
                         in_game,
                         remaining_us : COUNTDOWN_TIME_US,
                         round_id : 1,
+                        river_spawn_times : Default::default(),
                     })
                 }
                 else {
@@ -95,6 +100,11 @@ impl CrossyRulesetFST
                 }
             },
             RoundWarmup(state) => {
+                // TODO only really need to do this once
+                let screen_y = -RIVER_SPAWN_Y_OFFSET;
+                let _ = map.get_row(state.round_id, screen_y);
+                let river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, state.round_id, time_us, screen_y);
+
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
                         RoundWarmup(WarmupState {
@@ -102,6 +112,7 @@ impl CrossyRulesetFST
                             in_game : state.in_game.clone(),
                             win_counts : state.win_counts.clone(),
                             round_id : state.round_id,
+                            river_spawn_times,
                         })
                     }
                     _ => {
@@ -111,6 +122,7 @@ impl CrossyRulesetFST
                             alive_players,
                             win_counts: state.win_counts.clone(),
                             round_id : state.round_id,
+                            river_spawn_times,
                         })
                     }
                 }
@@ -120,9 +132,15 @@ impl CrossyRulesetFST
                 // New player joined?
                 new_state.alive_players.seed_missing(player_states, false);
                 new_state.screen_y = update_screen_y(new_state.screen_y, player_states, &new_state.alive_players);
-                kill_players(time_us, new_state.round_id, &mut new_state.alive_players, map, player_states, new_state.screen_y);
+
+                kill_players(time_us, new_state.round_id, &mut new_state.alive_players, map, player_states, new_state.screen_y - RIVER_SPAWN_Y_OFFSET);
 
                 let alive_player_count = new_state.alive_players.iter().filter(|(_, x)| **x).count();
+
+                // Update spawn times
+                // Force evaluation up to screen top
+                let _ = map.get_row(new_state.round_id, new_state.screen_y - RIVER_SPAWN_Y_OFFSET);
+                new_state.river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, new_state.round_id, time_us, new_state.screen_y);
 
                 if (alive_player_count <= 1) {
                     RoundCooldown(CooldownState {
@@ -173,6 +191,7 @@ impl CrossyRulesetFST
                             win_counts,
                             in_game,
                             round_id : new_state.round_state.round_id + 1,
+                            river_spawn_times: Default::default(),
                         })
                     }
                 }
@@ -184,11 +203,19 @@ impl CrossyRulesetFST
 
     pub fn get_round_id(&self) -> u8 {
         match self {
-            Lobby(_) => 0,
             RoundWarmup(x) => x.round_id,
             Round(x) => x.round_id,
             RoundCooldown(x) => x.round_state.round_id,
-            End(_) => 0,
+            _ => 0,
+        }
+    }
+
+    pub fn get_river_spawn_times(&self) -> &RiverSpawnTimes {
+        match self {
+            RoundWarmup(r) => &r.river_spawn_times,
+            Round(r) => &r.river_spawn_times,
+            RoundCooldown(r) => &r.round_state.river_spawn_times,
+            _ => &crate::map::river::EMPTY_RIVER_SPAWN_TIMES,
         }
     }
 
