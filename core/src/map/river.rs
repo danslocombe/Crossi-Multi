@@ -35,13 +35,22 @@ impl River {
 
         let squeeze_spacing = (1.0 + length as f64) / crate::SCREEN_SIZE as f64;
 
+        let mut group_id = 0;
+
         while ({
+            group_id += 1;
             cur += rng.gen_froggy(("lillipad_spacing", obstacles.len()), min_spacing, max_spacing, 2);
             cur < 1.0 - squeeze_spacing
         })
         {
             for _ in 0..length {
-                obstacles.push(Obstacle(cur));
+                let id = obstacles.len() as u32;
+                obstacles.push(Obstacle {
+                    id,
+                    x : cur,
+                    group_id,
+                });
+                
                 cur += lillipad_width_screen;
             }
         }
@@ -79,16 +88,14 @@ impl River {
         let mut closest = None;
         let mut closest_dist = f64::MAX;
 
-        for (id, lillipad) in self.row.get_obstacles_onscreen(time_us)
-            .iter()
-            .filter(|x| self.row.filter_object(x, time_us, spawn_time))
-            .enumerate() {
-            let realised = self.row.realise_obstacle(lillipad);
+        for lillipad in self.row.get_obstacles_onscreen_filtered(time_us, spawn_time)
+        {
+            let realised = self.row.realise_obstacle(&lillipad);
             let dist = (frog_centre - realised).abs();
 
             if (dist < closest_dist) {
                 closest_dist = dist;
-                closest = Some(id);
+                closest = Some(lillipad.id);
             }
         }
 

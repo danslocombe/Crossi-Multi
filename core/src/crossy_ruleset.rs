@@ -55,7 +55,7 @@ const MIN_PLAYERS : usize = 2;
 const COUNTDOWN_TIME_US : u32 = 3 * 1_000_000;
 const COOLDOWN_TIME_US : u32 = 4 * 1_000_000;
 const REQUIRED_WIN_COUNT : u8 = 25;
-const RIVER_SPAWN_Y_OFFSET : i32 = 4;
+const RIVER_SPAWN_Y_OFFSET : i32 = 12;
 
 use CrossyRulesetFST::*;
 
@@ -101,9 +101,9 @@ impl CrossyRulesetFST
             },
             RoundWarmup(state) => {
                 // TODO only really need to do this once
-                let screen_y = -RIVER_SPAWN_Y_OFFSET;
-                let _ = map.get_row(state.round_id, screen_y);
-                let river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, state.round_id, time_us, screen_y);
+                let river_spawn_to_y = -RIVER_SPAWN_Y_OFFSET;
+                let _ = map.get_row(state.round_id, river_spawn_to_y);
+                let river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, state.round_id, time_us, river_spawn_to_y);
 
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
@@ -133,14 +133,15 @@ impl CrossyRulesetFST
                 new_state.alive_players.seed_missing(player_states, false);
                 new_state.screen_y = update_screen_y(new_state.screen_y, player_states, &new_state.alive_players);
 
-                kill_players(time_us, new_state.round_id, &mut new_state.alive_players, map, player_states, new_state.screen_y - RIVER_SPAWN_Y_OFFSET);
+                kill_players(time_us, new_state.round_id, &mut new_state.alive_players, map, player_states, new_state.screen_y);
 
                 let alive_player_count = new_state.alive_players.iter().filter(|(_, x)| **x).count();
 
                 // Update spawn times
                 // Force evaluation up to screen top
-                let _ = map.get_row(new_state.round_id, new_state.screen_y - RIVER_SPAWN_Y_OFFSET);
-                new_state.river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, new_state.round_id, time_us, new_state.screen_y);
+                let spawn_to_y = new_state.screen_y - RIVER_SPAWN_Y_OFFSET;
+                let _ = map.get_row(new_state.round_id, spawn_to_y);
+                new_state.river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, new_state.round_id, time_us, spawn_to_y);
 
                 if (alive_player_count <= 1) {
                     RoundCooldown(CooldownState {

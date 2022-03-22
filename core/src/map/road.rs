@@ -38,9 +38,16 @@ impl Road {
 
         // Make sure that there is at least one space at the end of the cycle large enough to go through
         // Make sure we never produce an impossible level
+        let mut group_id = 0;
         while (cur < 1.0 - squeeze_spacing)
         {
-            obstacles.push(Obstacle(cur));
+            group_id += 1;
+            let id = obstacles.len() as u32;
+            obstacles.push(Obstacle {
+                id,
+                x : cur,
+                group_id
+            });
             cur += rng.gen_froggy(("car_spacing", obstacles.len()), min_spacing, max_spacing, 2);
         }
 

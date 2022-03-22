@@ -7,7 +7,13 @@ pub struct ObstacleRowDescr {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Obstacle(pub f64);
+pub struct Obstacle
+{
+    pub id : u32,
+    pub group_id : u32,
+    // TODO can this be f32?
+    pub x : f64,
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ObstaclePublic(pub f64, pub i32, pub bool);
@@ -47,23 +53,23 @@ impl ObstacleRow {
     pub fn filter_object(&self, obstacle : &Obstacle, current_time : u32, row_start_time : u32) -> bool
     {
         //let hack_val = 0.75;
-        //let since_start = (hack_val * obstacle.0 as f64 / self.time_scale as f64) as u32;
+        //let since_start = (hack_val * obstacle.x as f64 / self.time_scale as f64) as u32;
         //let spawn_time = row_start_time.saturating_sub(since_start);
         //current_time > spawn_time
 
         let t_over = current_time.saturating_sub(row_start_time);
 
-        let x0_over_v = (obstacle.0 as f64 - self.r0) / self.time_scale;
+        let x0_over_v = (obstacle.x as f64 - self.r0) / self.time_scale;
 
         t_over > x0_over_v as u32
     }
 
     pub fn realise_obstacle(&self, obstacle : &Obstacle) -> f64 {
         let pos = if (self.inverted) {
-            1.0 - obstacle.0
+            1.0 - obstacle.x
         }
         else {
-            obstacle.0
+            obstacle.x
         };
 
         let x_over = pos - self.r0;
@@ -82,11 +88,31 @@ impl ObstacleRow {
     }
 
     pub fn get_obstacles_public_filtered(&self, time_us : u32, start_time : u32) -> Vec<ObstaclePublic> {
-        self.get_obstacles_onscreen(time_us)
+        self.get_obstacles_onscreen_filtered(time_us, start_time)
             .iter()
-            .filter(|x| self.filter_object(x, time_us, start_time))
             .map(|x| self.transform_car(x))
             .collect()
+    }
+
+    pub fn get_obstacles_onscreen_filtered(&self, time_us: u32, start_time : u32) -> Vec<Obstacle>
+    {
+        // TODO IMPROVE
+        let mut cars = Vec::with_capacity(self.obstacles0.len());
+        let mut groups_to_remove = Vec::new();
+        for car in &self.obstacles0 {
+            let driven_car = car.at_time(self.time_scale * time_us as f64);
+            if (self.filter_object(&driven_car, time_us, start_time))
+            {
+                cars.push(driven_car);
+            }
+            else
+            {
+                groups_to_remove.push(driven_car.group_id);
+            }
+        }
+
+        //cars.retain(|x| !groups_to_remove.contains(&x.group_id));
+        cars
     }
 
     pub fn get_obstacles_onscreen(&self, time_us : u32) -> Vec<Obstacle> {
@@ -106,6 +132,10 @@ impl ObstacleRow {
 
 impl Obstacle {
     fn at_time(self, time : f64 ) -> Self {
-        Obstacle(f64::fract(self.0 + time))
+        Obstacle {
+            id : self.id,
+            x : f64::fract(self.x + time),
+            group_id : self.group_id,
+        }
     }
 }
