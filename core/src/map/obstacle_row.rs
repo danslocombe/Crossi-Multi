@@ -111,7 +111,7 @@ impl ObstacleRow {
             }
         }
 
-        //cars.retain(|x| !groups_to_remove.contains(&x.group_id));
+        cars.retain(|x| !groups_to_remove.contains(&x.group_id));
         cars
     }
 

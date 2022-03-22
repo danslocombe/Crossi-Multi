@@ -349,7 +349,16 @@ impl MapRound {
             let spawn_time = spawn_times.get(i);
             if (*y >= screen_y && spawn_time.is_none())
             {
-                new_spawn_times.set(i, time_us);
+                if (*y > 0)
+                {
+                    // HACK
+                    // We want to pre-spawn some logs at the start to avoid being boring
+                    new_spawn_times.set(i, time_us.saturating_sub(8_000_000));
+                }
+                else
+                {
+                    new_spawn_times.set(i, time_us);
+                }
             }
         }
 
