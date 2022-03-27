@@ -74,6 +74,7 @@ impl CrossyRulesetFST
 
                 // Ensure all players have an entry in ready_states.
                 new_lobby.ready_states.seed_missing(player_states, false);
+                new_lobby.ready_states.intersect(player_states);
 
                 let enough_players = new_lobby.ready_states.count_populated() >= MIN_PLAYERS;
                 let all_ready = new_lobby.ready_states.iter().all(|(_, x)| *x);
@@ -81,6 +82,8 @@ impl CrossyRulesetFST
                 if (enough_players && all_ready) {
 
                     debug_log!("Starting Game! ...");
+                    debug_log!("Player States {:?}", player_states);
+                    debug_log!("Ready States {:?}", new_lobby.ready_states);
 
                     // Initialize to all zero
                     let win_counts = PlayerIdMap::seed_from(player_states, 0);
@@ -100,10 +103,12 @@ impl CrossyRulesetFST
                 }
             },
             RoundWarmup(state) => {
-                // TODO only really need to do this once
-                let river_spawn_to_y = -RIVER_SPAWN_Y_OFFSET;
-                let _ = map.get_row(state.round_id, river_spawn_to_y);
-                let river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, state.round_id, time_us, river_spawn_to_y);
+                let river_spawn_times = {
+                    // TODO only really need to do this once
+                    let river_spawn_to_y = -RIVER_SPAWN_Y_OFFSET;
+                    let _ = map.get_row(state.round_id, river_spawn_to_y);
+                    map.update_river_spawn_times(&state.river_spawn_times, state.round_id, time_us, river_spawn_to_y)
+                };
 
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {

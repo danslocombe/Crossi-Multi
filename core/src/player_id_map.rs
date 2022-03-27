@@ -131,6 +131,14 @@ impl<T> PlayerIdMap<T> where T : Clone {
             }
         }
     }
+
+    pub fn intersect<U>(&mut self, other : &PlayerIdMap<U>) {
+        for i in 0..self.inner.len() {
+            if (!other.contains(PlayerId(i as u8))) {
+                self.inner[i] = None;
+            }
+        }
+    }
 }
 
 impl<T> PlayerIdMap<T> where T : Copy {
