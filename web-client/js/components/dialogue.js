@@ -206,8 +206,8 @@ export function create_dialogue_controller() {
                 let alive_player_id = 0;
 
                 // Up to one alive player
-                for (let i in rule_state.RoundCooldown.round_state.alive_players.inner) {
-                    if (rule_state.RoundCooldown.round_state.alive_players.inner[i]) {
+                for (let i in rule_state.RoundCooldown.round_state.alive_states.inner) {
+                    if (rule_state.RoundCooldown.round_state.alive_states.inner[i] === 'Alive') {
                         alive_player = true;
                         alive_player_id = parseInt(i);
                     }

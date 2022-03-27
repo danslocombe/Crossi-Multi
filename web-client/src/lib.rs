@@ -21,6 +21,7 @@ use serde::Deserialize;
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
 use crossy_multi_core::map::river::RiverSpawnTimes;
+use crossy_multi_core::crossy_ruleset::AliveState;
 
 struct ConsoleDebugLogger();
 impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
@@ -342,7 +343,12 @@ impl Client {
         serde_json::to_string(&lillipads).unwrap()
     }
 
-    pub fn player_alive(&self, player_id : u32) -> bool {
+    pub fn player_alive_state_json(&self, player_id : u32) -> String {
+        serde_json::to_string(&self.player_alive_state(player_id)).unwrap()
+    }
+
+    fn player_alive_state(&self, player_id : u32) -> AliveState
+    {
         // We have to be careful here.
         // We dont want to tell the client a player is dead if they could possibly "come back alive".
         // For remote players we want to wait for confirmation from the server.
@@ -350,7 +356,7 @@ impl Client {
 
         self.get_latest_server_rule_state().map(|x| {
             x.get_player_alive(PlayerId(player_id as u8))
-        }).unwrap_or(false)
+        }).unwrap_or(AliveState::Unknown)
     }
 
     pub fn is_river(&self, y : f64) -> bool {
@@ -398,7 +404,7 @@ impl Client {
 
     fn get_ai_drawstate(&self) -> Option<ai::AIDrawState> {
         if let Some(x) = self.local_player_info.as_ref() {
-            if (!self.player_alive(x.player_id.0 as u32)) {
+            if (self.player_alive_state(x.player_id.0 as u32) != AliveState::Alive) {
                 return None;
             }
         }
@@ -419,7 +425,7 @@ impl Client {
 
     fn get_lilly_drawstate(&self) -> Option<Vec<LillyOverlay>> {
         self.local_player_info.as_ref().and_then(|x| {
-            if (!self.player_alive(x.player_id.0 as u32)) {
+            if (self.player_alive_state(x.player_id.0 as u32) != AliveState::Alive) {
                 None
             }
             else {

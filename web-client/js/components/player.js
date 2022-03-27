@@ -256,7 +256,8 @@ function create_player_def(sprites, move_sound, colour, source) {
 
         tick : function(state, simple_entities, rule_state) {
             this.t += 1;
-            if (!this.source.client.player_alive(this.source.player_id)) {
+            const alive_state = this.source.client.player_alive_state_json(this.source.player_id);
+            if (alive_state === '"Dead"') {
                 if (!this.created_corpse) {
                     this.created_corpse = true;
                     const is_river = this.source.client.is_river(state.y);
@@ -312,7 +313,8 @@ function create_player_def(sprites, move_sound, colour, source) {
         },
         draw : function(crossy_draw_ctx) {
             // hackyyy
-            if (!this.source.client.player_alive(this.source.player_id)) {
+            const alive_state = this.source.client.player_alive_state_json(this.source.player_id);
+            if (alive_state !== '"Alive"') {
                 return;
             }
 
