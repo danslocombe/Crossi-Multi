@@ -95,9 +95,13 @@ function ping(initial_ping) {
 function write_join_link(game_id) {
     if (DEBUG && DEBUG_PLAY_LINK)
     {
-        document.getElementById("debug_join").innerHTML = '<a href="' + '/?game_id=' + game_id.toString() + '"> GameId: ' + game_id.toString() + '</a>';
+        document.getElementById("debug_join").innerHTML = '<a href="' + '/?game_id=' + game_id + '"> GameId: ' + game_id + '</a>';
+        document.getElementById("joinlink").value = '/?game_id=' + game_id;
     }
-    document.getElementById("joinlink").value = endpoint + '/?game_id=' + game_id.toString();
+    else
+    {
+        document.getElementById("joinlink").value = endpoint + '/?game_id=' + game_id;
+    }
 }
 
 function start_game() {
