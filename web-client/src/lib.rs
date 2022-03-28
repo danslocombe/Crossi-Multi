@@ -202,6 +202,13 @@ impl Client {
                 server_tick.latest.time_us,
                 server_tick.latest.states.clone(),
                 server_tick.rule_state.clone());
+
+            // Reset ready state when we are not in the lobby
+            match (server_tick.rule_state)
+            {
+                crossy_ruleset::CrossyRulesetFST::Lobby(_) => {},
+                _ => {self.ready_state = false}
+            }
         }
         else
         {

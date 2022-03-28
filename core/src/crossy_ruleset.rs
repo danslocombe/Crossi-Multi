@@ -6,6 +6,19 @@ use crate::player_id_map::PlayerIdMap;
 use crate::map::{Map, RowType};
 use crate::map::river::RiverSpawnTimes;
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct GameConfig {
+    required_win_count : u8,
+}
+
+impl GameConfig {
+    pub fn new() -> Self {
+        Self {
+            required_win_count : 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LobbyState {
     pub ready_states : PlayerIdMap<bool>,
@@ -28,6 +41,7 @@ pub struct WarmupState {
     pub win_counts : PlayerIdMap<u8>,
     pub round_id : u8,
     pub river_spawn_times : RiverSpawnTimes,
+    pub game_config : GameConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -37,6 +51,7 @@ pub struct RoundState {
     pub win_counts : PlayerIdMap<u8>,
     pub round_id : u8,
     pub river_spawn_times : RiverSpawnTimes,
+    pub game_config : GameConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -48,6 +63,7 @@ pub struct CooldownState {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EndState {
     pub winner_id : PlayerId,
+    pub remaining_us : u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -63,7 +79,7 @@ pub enum CrossyRulesetFST
 const MIN_PLAYERS : usize = 2;
 const COUNTDOWN_TIME_US : u32 = 3 * 1_000_000;
 const COOLDOWN_TIME_US : u32 = 4 * 1_000_000;
-const REQUIRED_WIN_COUNT : u8 = 25;
+const WINNER_TIME_US : u32 = 3 * 1_000_000;
 const RIVER_SPAWN_Y_OFFSET : i32 = 12;
 
 use CrossyRulesetFST::*;
@@ -97,7 +113,9 @@ impl CrossyRulesetFST
                     // Initialize to all zero
                     let win_counts = PlayerIdMap::seed_from(player_states, 0);
                     let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
-                    reset_positions(player_states);
+                    reset_positions(player_states, true);
+
+                    let game_config = GameConfig::new();
 
                     RoundWarmup(WarmupState {
                         win_counts,
@@ -105,6 +123,7 @@ impl CrossyRulesetFST
                         remaining_us : COUNTDOWN_TIME_US,
                         round_id : 1,
                         river_spawn_times : Default::default(),
+                        game_config,
                     })
                 }
                 else {
@@ -127,6 +146,7 @@ impl CrossyRulesetFST
                             win_counts : state.win_counts.clone(),
                             round_id : state.round_id,
                             river_spawn_times,
+                            game_config : state.game_config,
                         })
                     }
                     _ => {
@@ -137,6 +157,7 @@ impl CrossyRulesetFST
                             win_counts: state.win_counts.clone(),
                             round_id : state.round_id,
                             river_spawn_times,
+                            game_config : state.game_config,
                         })
                     }
                 }
@@ -188,9 +209,13 @@ impl CrossyRulesetFST
 
                         if let Some(winner_id) = winner {
                             let new_count = win_counts.get(winner_id).copied().unwrap_or(0) + 1;
-                            if (new_count >= REQUIRED_WIN_COUNT) {
+                            debug_log!("Going to next round, winner player={:?} count={}", winner_id, new_count);
+                            if (new_count >= state.round_state.game_config.required_win_count) {
+                                debug_log!("Going to end state");
+                                reset_positions(player_states, true);
                                 return End(EndState {
                                     winner_id,
+                                    remaining_us : WINNER_TIME_US,
                                 })
                             }
                             win_counts.set(winner_id, new_count);
@@ -199,7 +224,7 @@ impl CrossyRulesetFST
                         // Take into account all players that have joined during the round
                         let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
                         win_counts.seed_missing(player_states, 0);
-                        reset_positions(player_states);
+                        reset_positions(player_states, false);
 
                         RoundWarmup(WarmupState {
                             remaining_us : COUNTDOWN_TIME_US,
@@ -207,12 +232,28 @@ impl CrossyRulesetFST
                             alive_states,
                             round_id : new_state.round_state.round_id + 1,
                             river_spawn_times: Default::default(),
+                            game_config : new_state.round_state.game_config,
+                        })
+                    }
+                }
+            },
+            End(state) => {
+                match state.remaining_us.checked_sub(dt) {
+                    Some(remaining_us) => {
+                        End(EndState {
+                            remaining_us,
+                            winner_id : state.winner_id,
+                        })
+                    }
+                    _ => {
+                        // Reset to lobby
+                        let ready_states = PlayerIdMap::seed_from(player_states, false);
+                        Lobby(LobbyState {
+                            ready_states,
                         })
                     }
                 }
             }
-                    
-            _ => {todo!("Unknown state type {:?}", self)},
         }
     }
 
@@ -282,7 +323,7 @@ impl CrossyRulesetFST
     }
 }
 
-fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {
+fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>, race_starting_positions: bool) {
     let player_count_for_offset = player_states.iter().map(|(id, _)| id.0 as i32).max().unwrap_or(0);
 
     for id in player_states.valid_ids() {
@@ -290,7 +331,7 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>) {
 
         let x_off_from_count = (player_count_for_offset / 2);
         let x = player_state.id.0 as i32 + 9 - x_off_from_count;
-        let y = 17;
+        let y = if race_starting_positions { 17 } else { 11 };
         player_state.reset_to_pos(Pos::Coord(CoordPos{x, y}));
     }
 }

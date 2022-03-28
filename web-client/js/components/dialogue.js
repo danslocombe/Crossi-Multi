@@ -229,13 +229,12 @@ export function create_dialogue_controller() {
                     }
                 }
                 else {
-                    if ((!alive_player || rule_state.RoundCooldown.remaining_us < 20000)) {
-                        if (this.winner_ui_instance) {
-                            this.winner_ui_instance.trigger_no_winner();
-                        }
-                        if (this.dialogue_instance) {
-                            this.dialogue_instance.trigger_close();
-                        }
+                    if (this.winner_ui_instance && !alive_player) {
+                        this.winner_ui_instance.trigger_no_winner();
+                    }
+
+                    if (this.dialogue_instance && (!alive_player || rule_state.RoundCooldown.remaining_us < 20000)) {
+                        this.dialogue_instance.trigger_close();
                     }
                 }
             }

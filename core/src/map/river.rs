@@ -2,7 +2,7 @@ use froggy_rand::FroggyRand;
 use serde::{Deserialize, Serialize};
 
 use crate::map::obstacle_row::*;
-use crate::{CoordPos, LillipadId};
+use crate::{LillipadId};
 
 #[derive(Debug)]
 pub struct River {

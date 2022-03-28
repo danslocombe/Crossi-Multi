@@ -165,7 +165,7 @@ impl PlayerState {
         if other.pos == candidate_pos {
             // Try to move into some other player
 
-            if let MoveState::Moving(ms) = &other.move_state {
+            if let MoveState::Moving(_) = &other.move_state {
                 return None;
             }
 
@@ -247,7 +247,7 @@ pub struct PlayerStatePublic
 }
 
 impl PlayerState {
-    pub fn to_public(&self, round_id : u8, time_us : u32, map : &Map) -> PlayerStatePublic {
+    pub fn to_public(&self, _round_id : u8, time_us : u32, map : &Map) -> PlayerStatePublic {
         let mut player_state_public = PlayerStatePublic::default();
 
         player_state_public.id = self.id.0;

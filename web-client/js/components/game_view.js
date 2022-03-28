@@ -74,11 +74,16 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 const rule_state_json = this.client.get_rule_state_json()
                 let moving_into_warmup = false;
+                let moving_into_end = false;
                 if (rule_state_json) {
                     const rule_state = JSON.parse(rule_state_json);
 
                     if (this.rule_state && rule_state.RoundWarmup && !this.rule_state.RoundWarmup) {
                         moving_into_warmup = true;
+                    }
+
+                    if (this.rule_state && rule_state.End && !this.rule_state.End) {
+                        moving_into_end = true;
                     }
 
                     this.rule_state = rule_state;
@@ -95,6 +100,10 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                             player.new_round(this.rule_state.RoundWarmup, this.simple_entities);
                         }
                     }
+                }
+                else if (moving_into_end)
+                {
+                    this.simple_entities = [];
                 }
 
                 let players_with_values = new Set();
@@ -166,7 +175,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         },
 
         draw : function() {
-            const in_lobby = !this.rule_state || this.rule_state.Lobby;
+            const in_lobby = !this.rule_state || this.rule_state.Lobby || this.rule_state.End;
             const in_warmup = this.rule_state && this.rule_state.RoundWarmup;
             draw_background(this.froggy_draw_ctx, in_lobby, in_warmup, this.client)
 

@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, HashMap};
+use std::collections::{VecDeque};
 use std::hash::Hash;
 
 use serde::{Deserialize, Serialize};

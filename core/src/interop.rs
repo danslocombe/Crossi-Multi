@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use std::net::{SocketAddr, UdpSocket};
 
 use crate::game::Input;
 use crate::timeline::RemoteTickState;
