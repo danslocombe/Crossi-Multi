@@ -20,7 +20,7 @@ export function create_spectator(x, y, flipped) {
 
         dynamic_depth : y,
         frame : 0,
-        flipped : flipped,
+        flipped: flipped,
 
         jump_t : 0,
         jump_t_max : 10,
@@ -48,8 +48,10 @@ export function create_spectator(x, y, flipped) {
             let y0 = this.y0 + froggy_draw_ctx.y_off;
             let y = this.y + froggy_draw_ctx.y_off;
             let spr = sprites_list[i].spr;
+            froggy_draw_ctx.ctx.save();
             if (this.flipped) {
-                spr = sprites_list[i].spr_flipped;
+                x = -x - 8;
+                froggy_draw_ctx.ctx.scale(-1, 1);
             }
 
             froggy_draw_ctx.ctx.drawImage(spr_shadow, x, y0 + 2);
@@ -65,6 +67,7 @@ export function create_spectator(x, y, flipped) {
                 SCALE,
                 SCALE);
 
+            froggy_draw_ctx.ctx.restore();
         }
     }
 }

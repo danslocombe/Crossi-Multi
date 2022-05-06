@@ -6,14 +6,11 @@ export const MOVE_T = 7 * (1000 * 1000 / 60);
 function load_sprites(name) {
     let spr = new Image(SCALE, SCALE);
     spr.src = '/sprites/spr_' + name + ".png";
-    let spr_flipped = new Image(SCALE, SCALE);
-    spr_flipped.src = '/sprites/spr_' + name + "_flipped.png";
     let spr_dead = new Image(SCALE, SCALE);
     spr_dead.src = '/sprites/spr_' + name + "_dead.png";
 
     return {
         spr : spr,
-        spr_flipped : spr_flipped,
         spr_dead : spr_dead,
         spr_name : name,
     }

@@ -241,7 +241,6 @@ function create_crown(owning_player, i) {
 function create_player_def(sprites, move_sound, colour, source) {
     return {
         sprite : sprites.spr,
-        sprite_flipped : sprites.spr_flipped,
         sprite_dead : sprites.spr_dead,
         sprite_name : sprites.spr_name,
         colour : colour,
@@ -311,41 +310,47 @@ function create_player_def(sprites, move_sound, colour, source) {
                 }
             } 
         },
-        draw : function(crossy_draw_ctx) {
+        draw : function(froggy_draw_ctx) {
             // hackyyy
             const alive_state = this.source.client.player_alive_state_json(this.source.player_id);
             if (alive_state !== '"Alive"') {
                 return;
             }
 
-            let sprite = this.sprite;
-            if (this.source.x_flip == -1) {
-                sprite = this.sprite_flipped;
-            }
+            froggy_draw_ctx.ctx.save();
 
-            const x = this.x + crossy_draw_ctx.x_off;
-            const y = this.y + crossy_draw_ctx.y_off - 1;
+            let sprite = this.sprite;
+
+            let x = this.x + froggy_draw_ctx.x_off;
+            const y = this.y + froggy_draw_ctx.y_off - 1;
             const frame_id = this.source.frame_id;
 
+            if (this.source.x_flip == -1) {
+                x = -x - 8;
+                froggy_draw_ctx.ctx.scale(-1, 1);
+            }
+
             if (this.lobby_ready) {
-                crossy_draw_ctx.ctx.strokeStyle = this.colour;
-                crossy_draw_ctx.ctx.beginPath();
+                froggy_draw_ctx.ctx.strokeStyle = this.colour;
+                froggy_draw_ctx.ctx.beginPath();
                 const tt = this.t + 100 * this.source.player_id;
                 const xx = x + 4 + Math.round(Math.sin(tt / 13));
                 const yy = y - 1 + Math.round(Math.sin(tt / 7));
-                crossy_draw_ctx.ctx.moveTo(xx, yy - 1);
-                crossy_draw_ctx.ctx.lineTo(xx, yy - 3);
-                crossy_draw_ctx.ctx.stroke();
-                crossy_draw_ctx.ctx.moveTo(xx, yy - 4);
-                crossy_draw_ctx.ctx.lineTo(xx, yy - 9);
-                crossy_draw_ctx.ctx.stroke();
+                froggy_draw_ctx.ctx.moveTo(xx, yy - 1);
+                froggy_draw_ctx.ctx.lineTo(xx, yy - 3);
+                froggy_draw_ctx.ctx.stroke();
+                froggy_draw_ctx.ctx.moveTo(xx, yy - 4);
+                froggy_draw_ctx.ctx.lineTo(xx, yy - 9);
+                froggy_draw_ctx.ctx.stroke();
             }
 
             // TODO make transparent
             // do in sprite
-            crossy_draw_ctx.ctx.drawImage(spr_shadow, x, y + 2);
+            froggy_draw_ctx.ctx.drawImage(spr_shadow, x, y + 2);
 
-            crossy_draw_ctx.ctx.drawImage(sprite, SCALE*frame_id, 0, SCALE, SCALE, x, y, SCALE, SCALE);
+            froggy_draw_ctx.ctx.drawImage(sprite, SCALE*frame_id, 0, SCALE, SCALE, x, y, SCALE, SCALE);
+
+            froggy_draw_ctx.ctx.restore();
         },
     }
 }
