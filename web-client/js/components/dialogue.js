@@ -14,6 +14,9 @@ dialogue_sprites.mouse.src = "sprites/spr_mouse_dialogue_cute.png";
 dialogue_sprites.bird = new Image(60, 64);
 dialogue_sprites.bird.src = "sprites/spr_bird_dialogue_cute.png";
 
+dialogue_sprites.duck = new Image(60, 64);
+dialogue_sprites.duck.src = "sprites/spr_duck_dialogue.png";
+
 dialogue_sprites.snake = new Image(90, 72);
 dialogue_sprites.snake.src = "sprites/spr_snake_dialogue.png";
 

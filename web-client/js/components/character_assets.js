@@ -21,6 +21,7 @@ spr_shadow.src = '/sprites/spr_shadow.png';
 
 export const sprites_list = [
     load_sprites('frog'),
+    load_sprites('duck'),
     load_sprites('mouse'),
     load_sprites('bird'),
     load_sprites('snake'),
@@ -30,6 +31,7 @@ export const sprites_list = [
 
 export const colours_list = [
     "#4aef5c",
+    "#d9a066",
     "#884835",
     "#fb3c3c",
     "#80ffff",
