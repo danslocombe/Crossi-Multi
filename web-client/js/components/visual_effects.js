@@ -109,3 +109,27 @@ export function create_corpse(x, y, spr_dead) {
         }
     }
 }
+
+/*
+export function create_pinwheel(x, y, depth_info) {
+    const angle_vel_fast = 0.0825;
+    const angle_vel_base = 0.0125;
+    return {
+        x : x,
+        y : y,
+        theta : 0,
+        angle_vel : angle_vel_base,
+        dynamic_depth : depth_info.dynamic_depth,
+        dynamic_depth : depth_info.foreground_depth,
+        depth : depth_info.depth,
+
+        tick : function() {
+            this.theta += this.angle_vel;
+        },
+        alive : () => true,
+        draw : function(froggy_draw_ctx) {
+            // TODO
+        }
+    }
+}
+*/
