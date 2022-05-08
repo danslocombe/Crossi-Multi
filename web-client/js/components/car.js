@@ -22,8 +22,10 @@ export function create_car(car) {
         frame_id : frame_id,
         spr : spr,
         draw : function(froggy_draw_ctx) {
-            const xx = this.x - spr_car_width / 2 + froggy_draw_ctx.x_off;
+            let xx = this.x - spr_car_width / 2 + froggy_draw_ctx.x_off;
             const yy = this.y - spr_car_height / 2 + froggy_draw_ctx.y_off;
+
+            froggy_draw_ctx.ctx.save();
 
             if (this.flipped) {
                 xx = -xx - 24;

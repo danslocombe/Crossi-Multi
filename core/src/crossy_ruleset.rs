@@ -14,7 +14,7 @@ pub struct GameConfig {
 impl GameConfig {
     pub fn new() -> Self {
         Self {
-            required_win_count : 1,
+            required_win_count : 3,
         }
     }
 }
@@ -212,7 +212,7 @@ impl CrossyRulesetFST
                             debug_log!("Going to next round, winner player={:?} count={}", winner_id, new_count);
                             if (new_count >= state.round_state.game_config.required_win_count) {
                                 debug_log!("Going to end state");
-                                reset_positions(player_states, true);
+                                reset_positions(player_states, false);
                                 return End(EndState {
                                     winner_id,
                                     remaining_us : WINNER_TIME_US,
@@ -224,7 +224,7 @@ impl CrossyRulesetFST
                         // Take into account all players that have joined during the round
                         let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
                         win_counts.seed_missing(player_states, 0);
-                        reset_positions(player_states, false);
+                        reset_positions(player_states, true);
 
                         RoundWarmup(WarmupState {
                             remaining_us : COUNTDOWN_TIME_US,
