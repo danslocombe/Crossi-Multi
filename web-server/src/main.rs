@@ -176,7 +176,7 @@ async fn main() {
         .or(ping)
         .boxed();
 
-    let serve_from = ([127, 0, 0, 1], 8080);
+    let serve_from = ([0, 0, 0, 0], 8081);
     println!("Serving from {:?}", serve_from);
 
     warp::serve(routes)
@@ -279,16 +279,15 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
     let mut tick_listener = db.game.get_listener();
     let (mut ws_tx, mut ws_rx) = ws.split();
 
-
     tokio::task::spawn(async move {
         loop {
-            match tick_listener.recv().await {
-                Ok(crossy_multi_core::interop::CrossyMessage::GoodBye()) => {
-                    println!("Game ended cleaning up WS listener");
-                    break;
-                },
-                Ok(v) => {
-                    let serialized = flexbuffers::to_vec(&v).unwrap();
+            match tick_listener.changed().await {
+                Ok(_) => {
+                    //if (*tick_listener.borrow() == crossy_multi_core::interop::CrossyMessage::GoodBye()) {
+                        //break;
+                    //}
+
+                    let serialized = flexbuffers::to_vec(&(*tick_listener.borrow())).unwrap();
                     match ws_tx.send(Message::binary(serialized)).await
                     {
                         Ok(_) => {},

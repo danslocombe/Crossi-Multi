@@ -27,8 +27,13 @@ if (LOCAL_DEBUG)
     // Fetch from specific localhost / port in order to allow better debugging
     // (we host debug build from localhost:8081)
     // NOTE HAVE TO RUN CHROME WITH NO CORS
-    endpoint = 'http://localhost:8080';
-    ws_endpoint = 'ws://localhost:8080';
+    let ip = "51.6.233.191";
+    //let ip = "localhost";
+    let port = "8081";
+    endpoint = "http://" + ip + ":" + port;
+    ws_endpoint = "ws://" + ip + ":" + port;
+    //endpoint = 'http://localhost:8080';
+    //ws_endpoint = 'ws://localhost:8080';
 }
 else if (DEBUG) {
     endpoint = 'http://20.90.97.30:8000';

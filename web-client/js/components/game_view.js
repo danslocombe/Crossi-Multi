@@ -234,6 +234,9 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 this.dialogue.draw(this.froggy_draw_ctx);
                 this.countdown.draw(this.froggy_draw_ctx);
             }
+
+            const server_time_us = Number(this.client.get_server_us());
+            this.froggy_draw_ctx.ctx.strokeText("Time + " + (Math.floor(server_time_us / 1000)).toString() + "ms", 10, 10)
         }
     }
 

@@ -476,6 +476,10 @@ impl Client {
             }
         }
     }
+
+    pub fn get_server_us(&self) -> u64 {
+        WasmInstant::now().duration_since(self.server_start).as_micros() as u64
+    }
 }
 
 #[derive(serde::Serialize, Debug, Clone)]
