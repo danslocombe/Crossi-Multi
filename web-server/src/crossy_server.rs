@@ -163,6 +163,15 @@ impl Server {
             inner.prev_tick = simulation_time_start;
 
             inner.timeline.tick(None, dt_simulation.as_micros() as u32);
+
+            for update in &client_updates {
+                if (update.input != game::Input::None)
+                {
+                    let delta = (update.time_us as i32 - inner.timeline.top_state().time_us as i32) / 1000;
+                    println!("[{:?}] Update - {:?} at client time {}ms, delta {}ms", update.player_id, update.input, update.time_us / 1000, delta);
+                }
+            }
+
             inner.timeline.propagate_inputs(client_updates);
 
             for new_player in new_players {
