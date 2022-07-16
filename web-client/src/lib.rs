@@ -197,11 +197,22 @@ impl Client {
     fn process_server_message(&mut self, server_tick : &interop::ServerTick)
     {
         // DAN HACK 
+        // from branch "latency-approximation"
         if let Some(last_send_state) = server_tick.last_client_sent.get(crate::PlayerId(self.get_local_player_id() as u8)) {
-            let new_estimated_latency = server_tick.latest.time_us.saturating_sub(last_send_state.time_us);
-            self.estimated_latency = dan_lerp(self.estimated_latency, new_estimated_latency as f32, 100.);
+            //let new_estimated_latency = server_tick.latest.time_us.saturating_sub(last_send_state.time_us);
+            let estimated_server_time_prev_us = WasmInstant::now().duration_since(self.server_start).as_micros() as u32;
+
+            let server_time_at_tick_send_us = server_tick.exact_time_sent_us;
+            let server_time_now_approx_us = self.estimated_latency as u32 + server_time_at_tick_send_us;
+
+            let delta_us = server_time_now_approx_us as i32 - estimated_server_time_prev_us as i32;
+
+            self.estimated_latency = dan_lerp(self.estimated_latency, estimated_server_time_prev_us as f32 - server_time_at_tick_send_us as f32, 100.);
+            //self.estimated_latency += delta_us.signum() as f32;
+
+            //self.estimated_latency = dan_lerp(self.estimated_latency, new_estimated_latency as f32, 100.);
             self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.latest.time_us + self.estimated_latency as u32) as u64);
-            log!("Estimated latency {}ms", self.estimated_latency / 1000.);
+            log!("Estimated latency {}ms | delta_ms {}", self.estimated_latency / 1000., delta_us as f32 / 1000.);
         }
 
         // If we have had a "major change" instead of patching up the current state we perform a full reset

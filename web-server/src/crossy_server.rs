@@ -206,6 +206,7 @@ impl Server {
             }
 
             let tick = CrossyMessage::ServerTick(ServerTick {
+                exact_time_sent_us : Instant::now().saturating_duration_since(inner.start).as_micros() as u32,
                 latest: RemoteTickState {
                     time_us: top_state.time_us,
                     states: top_state.get_valid_player_states(),
@@ -217,6 +218,8 @@ impl Server {
                 // Do we need some lookback period here? 
                 rule_state : top_state.get_rule_state().clone(),
             });
+
+            self.outbound_tx.send(tick).unwrap();
 
             if top_state.frame_id as usize % 300 == 0 {
                 //println!("Sending tick {:?}", tick);
@@ -240,8 +243,6 @@ impl Server {
                 inner.ended = true;
                 return;
             }
-
-            self.outbound_tx.send(tick).unwrap();
 
             let now = Instant::now();
             let elapsed_time = now.saturating_duration_since(tick_start);
