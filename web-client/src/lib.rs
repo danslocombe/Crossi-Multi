@@ -207,12 +207,14 @@ impl Client {
 
             let delta_us = server_time_now_approx_us as i32 - estimated_server_time_prev_us as i32;
 
-            self.estimated_latency = dan_lerp(self.estimated_latency, estimated_server_time_prev_us as f32 - server_time_at_tick_send_us as f32, 100.);
+            let lerp_target = estimated_server_time_prev_us as f32 - server_time_at_tick_send_us as f32;
+            self.estimated_latency = dan_lerp(self.estimated_latency, lerp_target, 50.);
             //self.estimated_latency += delta_us.signum() as f32;
 
             //self.estimated_latency = dan_lerp(self.estimated_latency, new_estimated_latency as f32, 100.);
             self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.latest.time_us + self.estimated_latency as u32) as u64);
-            log!("Estimated latency {}ms | delta_ms {}", self.estimated_latency / 1000., delta_us as f32 / 1000.);
+            //log!("Estimated latency {}ms | delta_ms {}", self.estimated_latency / 1000., delta_us as f32 / 1000.);
+            log!("Estimated latency {}ms | lerping_towards {}", self.estimated_latency / 1000., lerp_target as f32 / 1000.);
         }
 
         // If we have had a "major change" instead of patching up the current state we perform a full reset
