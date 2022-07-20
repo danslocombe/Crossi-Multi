@@ -184,12 +184,14 @@ async fn main() {
         .or(ping)
         .boxed();
 
+    let serve_from = ([0, 0, 0, 0], 8080);
+    println!("Serving from {:?}", serve_from);
 
     warp::serve(routes)
         .tls()
         .cert_path(cert_path)
         .key_path(key_path)
-        .run(([0, 0, 0, 0], 8006))
+        .run(serve_from)
         .await;
 }
 

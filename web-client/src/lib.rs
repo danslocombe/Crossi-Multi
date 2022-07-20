@@ -43,8 +43,10 @@ pub struct LocalPlayerInfo {
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Client {
-    timeline: timeline::Timeline,
     server_start: WasmInstant,
+    estimated_latency : f32,
+
+    timeline: timeline::Timeline,
     last_tick: u32,
     // The last server tick we received
     last_server_tick: Option<u32>,
@@ -80,6 +82,7 @@ impl Client {
             last_tick : server_time_us,
             last_server_tick : None,
             server_start,
+            estimated_latency : estimated_latency as f32,
             local_player_info : None,
             // TODO proper ready state
             ready_state : false,
@@ -189,6 +192,27 @@ impl Client {
 
     fn process_server_message(&mut self, server_tick : &interop::ServerTick)
     {
+        // DAN HACK
+        // from branch "latency-approximation"
+        if let Some(last_send_state) = server_tick.last_client_sent.get(crate::PlayerId(self.get_local_player_id() as u8)) {
+            //let new_estimated_latency = server_tick.latest.time_us.saturating_sub(last_send_state.time_us);
+            let estimated_server_time_prev_us = WasmInstant::now().duration_since(self.server_start).as_micros() as u32;
+
+            let server_time_at_tick_send_us = server_tick.exact_send_server_time_us;
+            let server_time_now_approx_us = self.estimated_latency as u32 + server_time_at_tick_send_us;
+
+            let delta_us = server_time_now_approx_us as i32 - estimated_server_time_prev_us as i32;
+
+            let lerp_target = estimated_server_time_prev_us as f32 - server_time_at_tick_send_us as f32;
+            self.estimated_latency = dan_lerp(self.estimated_latency, lerp_target, 50.);
+            //self.estimated_latency += delta_us.signum() as f32;
+
+            //self.estimated_latency = dan_lerp(self.estimated_latency, new_estimated_latency as f32, 100.);
+            self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.latest.time_us + self.estimated_latency as u32) as u64);
+            //log!("Estimated latency {}ms | delta_ms {}", self.estimated_latency / 1000., delta_us as f32 / 1000.);
+            log!("Estimated latency {}ms | lerping_towards {}", self.estimated_latency / 1000., lerp_target as f32 / 1000.);
+        }
+
         // If we have had a "major change" instead of patching up the current state we perform a full reset
         // At the moment a major change is either:
         //   We have moved between game states (eg the round ended)
@@ -513,4 +537,8 @@ fn try_deserialize_server_tick(buffer : &[u8]) -> Option<interop::ServerTick>
         interop::CrossyMessage::ServerTick(tick) => Some(tick),
         _ => None
     }
+}
+
+fn dan_lerp(x0 : f32, x : f32, k : f32) -> f32 {
+    (x0 * (k-1.0) + x) / k
 }
