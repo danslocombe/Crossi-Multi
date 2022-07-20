@@ -176,7 +176,7 @@ async fn main() {
         .or(ping)
         .boxed();
 
-    let serve_from = ([127, 0, 0, 1], 8080);
+    let serve_from = ([0, 0, 0, 0], 8080);
     println!("Serving from {:?}", serve_from);
 
     warp::serve(routes)

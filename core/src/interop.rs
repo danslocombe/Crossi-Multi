@@ -73,6 +73,7 @@ pub struct ClientTick {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ServerTick {
+    pub exact_send_server_time_us : u32,
     pub latest : RemoteTickState,
     pub last_client_sent : PlayerIdMap<RemoteTickState>,
     pub rule_state : CrossyRulesetFST,

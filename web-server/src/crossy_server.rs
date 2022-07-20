@@ -197,6 +197,8 @@ impl Server {
             }
 
             let tick = CrossyMessage::ServerTick(ServerTick {
+                exact_send_server_time_us : Instant::now().saturating_duration_since(inner.start).as_micros() as u32,
+
                 latest: RemoteTickState {
                     time_us: top_state.time_us,
                     states: top_state.get_valid_player_states(),
