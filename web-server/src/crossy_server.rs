@@ -163,6 +163,20 @@ impl Server {
             inner.prev_tick = simulation_time_start;
 
             inner.timeline.tick(None, dt_simulation.as_micros() as u32);
+
+
+            {
+                // TMP Assertion
+
+                let current_time = inner.timeline.top_state().time_us;
+                for update in &client_updates {
+                    if (update.time_us > current_time) {
+                        println!("Update from the future from {:?} - ahead {}us", update.player_id, update.time_us.saturating_sub(current_time));
+                    }
+                }
+
+            }
+
             inner.timeline.propagate_inputs(client_updates);
 
             for new_player in new_players {
