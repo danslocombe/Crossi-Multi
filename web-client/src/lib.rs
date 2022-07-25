@@ -189,7 +189,7 @@ impl Client {
         }
 
         if let Some(time_request_end) = self.queued_time_info.take() {
-            println!("{:#?}", time_request_end);
+            log!("{:#?}", time_request_end);
         }
 
         if (self.timeline.top_state().frame_id.floor() as u32 % 15) == 0
@@ -306,6 +306,8 @@ impl Client {
                     server_receive_time_us : time_info.server_receive_time_us,
                     server_send_time_us : time_info.server_send_time_us,
                 });
+
+                log!("Got time response, {:#?}", self.queued_time_info);
             },
             interop::CrossyMessage::ServerTick(server_tick) => {
                 self.queued_server_messages.push_front(server_tick);

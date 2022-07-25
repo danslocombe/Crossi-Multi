@@ -5,7 +5,6 @@
 extern crate lazy_static;
 
 use crossy_multi_core::*;
-use crossy_multi_core::interop::TimeRequestPacket;
 use std::sync::Arc;
 
 use warp::Filter;
@@ -275,7 +274,7 @@ async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> 
 }
 
 async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_server::SocketId) {
-    println!("Websocket conencted");
+    println!("Websocket connected");
 
     let mut tick_listener = db.game.get_listener();
     let game_start = db.game.get_start_time().await;
@@ -293,6 +292,7 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
 
                     // Special case handling for time request responses
                     if let interop::CrossyMessage::TimeRequestIntermediate(time_request_state) = &to_send {
+                        //println!("Time request packet {:#?}", time_request_state);
                         if (time_request_state.socket_id != socket_id.0)
                         {
                             // Not for us

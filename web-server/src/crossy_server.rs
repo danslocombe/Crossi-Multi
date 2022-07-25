@@ -336,6 +336,10 @@ impl Server {
                         }
                     }
                 },
+                CrossyMessage::TimeRequestIntermediate(time_request) => {
+                    // Just forward straight over
+                    self.outbound_tx.send(CrossyMessage::TimeRequestIntermediate(time_request)).unwrap();
+                }
                 _ => {}
             }
         }
