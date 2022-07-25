@@ -70,6 +70,9 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 {
                     const client_tick = this.client.get_client_message();
                     this.ws.send(client_tick);
+
+                    const time_request = this.client.get_time_request();
+                    this.ws.send(time_request);
                 }
 
                 const rule_state_json = this.client.get_rule_state_json()

@@ -50,7 +50,6 @@ impl Server {
     pub fn new(id : &crate::GameId) -> Self {
         let start = Instant::now();
         let start_utc = Utc::now(); 
-        let init_message = CrossyMessage::EmptyMessage();
         let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(16);
 
         Server {
@@ -73,8 +72,29 @@ impl Server {
     }
 
     pub async fn queue_message(&self, message : CrossyMessage, player : SocketId) {
-        let mut guard = self.queued_messages.lock().await;
-        guard.push((message, player));
+        match message {
+            CrossyMessage::TimeRequestPacket(time_request) => {
+                // Special case hanling for time requests to track the exact time we received the message.
+
+                let now = Instant::now();
+                let inner_guard = self.inner.lock().await;
+                let server_receive_time_us = now.saturating_duration_since(inner_guard.start).as_micros() as u32;
+                drop(inner_guard);
+
+                let new_message = CrossyMessage::TimeRequestIntermediate(TimeRequestIntermediate {
+                    server_receive_time_us,
+                    client_send_time_us: time_request.client_send_time_us,
+                    socket_id : player.0,
+                });
+
+                let mut queue_guard = self.queued_messages.lock().await;
+                queue_guard.push((new_message, player));
+            },
+            _ => {
+                let mut guard = self.queued_messages.lock().await;
+                guard.push((message, player));
+            },
+        }
     }
 
     pub async fn get_server_description(&self) -> ServerDescription {
@@ -138,6 +158,11 @@ impl Server {
 
     pub fn get_listener(&self) -> tokio::sync::broadcast::Receiver<CrossyMessage> {
         self.outbound_tx.subscribe()
+    }
+
+    pub async fn get_start_time(&self) -> Instant {
+        let inner = self.inner.lock().await;
+        inner.start
     }
 
     pub async fn get_last_frame_time_us(&self) -> u32 {
@@ -218,7 +243,7 @@ impl Server {
             }
 
             let tick = CrossyMessage::ServerTick(ServerTick {
-                exact_send_server_time_us : Instant::now().saturating_duration_since(inner.start).as_micros() as u32,
+                //exact_send_server_time_us : Instant::now().saturating_duration_since(inner.start).as_micros() as u32,
 
                 latest: RemoteTickState {
                     time_us: top_state.time_us,
