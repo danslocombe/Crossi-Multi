@@ -188,10 +188,6 @@ impl Client {
             self.process_server_message(&server_tick);
         }
 
-        if let Some(time_request_end) = self.queued_time_info.take() {
-            log!("{:#?}", time_request_end);
-        }
-
         if (self.timeline.top_state().frame_id.floor() as u32 % 15) == 0
         {
             //log!("{:?}", self.timeline.top_state().get_rule_state());
@@ -218,6 +214,25 @@ impl Client {
             //log!("Estimated latency {}ms | lerping_towards {}", self.estimated_latency / 1000., lerp_target as f32 / 1000.);
             */
         }
+
+        if let Some(time_request_end) = self.queued_time_info.take() {
+            log!("Applying time ease {:?}", time_request_end);
+            let t0 = time_request_end.client_send_time_us as i64;
+            let t1 = time_request_end.server_receive_time_us as i64;
+            let t2 = time_request_end.server_send_time_us as i64;
+            let t3 = time_request_end.client_receive_time_us as i64;
+
+            let ed = ((t1 - t0) + (t3 - t2)) / 2;
+            log!("ed {}", ed);
+            self.estimated_latency = dan_lerp(self.estimated_latency, ed as f32, 50.);
+            log!("estimated latency {}", self.estimated_latency);
+            //let lerp_target = estimated_server_time_prev_us as f32 - server_tick.exact_send_server_time_us as f32;
+            self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.exact_send_server_time_us + self.estimated_latency as u32) as u64);
+            log!("{:?}", self.server_start);
+            //log!("{:#?}", time_request_end);
+            //let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency) as u64);
+        }
+
 
         // If we have had a "major change" instead of patching up the current state we perform a full reset
         // At the moment a major change is either:
@@ -307,7 +322,7 @@ impl Client {
                     server_send_time_us : time_info.server_send_time_us,
                 });
 
-                log!("Got time response, {:#?}", self.queued_time_info);
+                //log!("Got time response, {:#?}", self.queued_time_info);
             },
             interop::CrossyMessage::ServerTick(server_tick) => {
                 self.queued_server_messages.push_front(server_tick);
