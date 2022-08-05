@@ -45,7 +45,7 @@ pub struct LocalPlayerInfo {
 pub struct Client {
     client_start : WasmInstant,
     server_start: WasmInstant,
-    estimated_latency : f32,
+    estimated_latency_us : f32,
 
     timeline: timeline::Timeline,
     last_tick: u32,
@@ -57,7 +57,7 @@ pub struct Client {
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
 
-    queued_server_messages : VecDeque<interop::ServerTick>,
+    queued_server_messages : VecDeque<interop::ReceivedServerTick>,
     queued_time_info : Option<interop::TimeRequestEnd>,
 
     ai_agent : Option<RefCell<Box<dyn ai::AIAgent>>>,
@@ -67,7 +67,7 @@ pub struct Client {
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : &str, server_time_us : u32, estimated_latency : u32) -> Self {
+    pub fn new(seed : &str, server_time_us : u32, estimated_latency_us : u32) -> Self {
         // Setup statics
         console_error_panic_hook::set_once();
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
@@ -76,9 +76,9 @@ impl Client {
 
         // Estimate server start
         let client_start = WasmInstant::now();
-        let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency) as u64);
+        let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
 
-        log!("CONSTRUCTING : Estimated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency);
+        log!("CONSTRUCTING : Estimated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency_us);
 
         Client {
             timeline,
@@ -86,7 +86,7 @@ impl Client {
             last_server_tick : None,
             client_start,
             server_start,
-            estimated_latency : estimated_latency as f32,
+            estimated_latency_us : estimated_latency_us as f32,
             local_player_info : None,
             // TODO proper ready state
             ready_state : false,
@@ -168,14 +168,21 @@ impl Client {
 
         // Tick 
         let current_time_us = current_time.as_micros() as u32;
-        self.timeline
-            .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
+        if (self.timeline.top_state().time_us > current_time_us)
+        {
+            log!("OH NO WE ARE IN THE PAST!");
+        }
+        else
+        {
+            self.timeline
+                .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
+        }
 
         // BIGGEST hack
         // dont have the energy to explain, but the timing is fucked and just want to demo something.
         let mut server_tick_it = None;
         while  {
-            self.queued_server_messages.back().map(|x| x.latest.time_us < current_time_us).unwrap_or(false)
+            self.queued_server_messages.back().map(|x| x.server_tick.latest.time_us < current_time_us).unwrap_or(false)
         }
         {server_tick_it = self.queued_server_messages.pop_back();}
 
@@ -195,8 +202,9 @@ impl Client {
         }
     }
 
-    fn process_server_message(&mut self, server_tick : &interop::ServerTick)
+    fn process_server_message(&mut self, server_tick_rec : &interop::ReceivedServerTick)
     {
+        let server_tick = &server_tick_rec.server_tick;
         // DAN HACK
         // from branch "latency-approximation"
         {
@@ -205,32 +213,39 @@ impl Client {
             let current_approx_server_time_at_receive = received_time.duration_since(self.server_start).as_micros() as u32;
 
             let new_latency_measurement = received_time.saturating_duration_since(server_tick.exact_send_server_time_us);
-            self.estimated_latency = dan_lerp(self.estimated_latency, new_latency_measurement, 50.);
+            self.estimated_latency_us = dan_lerp(self.estimated_latency_us, new_latency_measurement, 50.);
 
             let delta_us = server_time_now_approx_us as i32 - estimated_server_time_prev_us as i32;
 
             let lerp_target = estimated_server_time_prev_us as f32 - server_tick.exact_send_server_time_us as f32;
-            self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.exact_send_server_time_us + self.estimated_latency as u32) as u64);
-            //log!("Estimated latency {}ms | lerping_towards {}", self.estimated_latency / 1000., lerp_target as f32 / 1000.);
+            self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.exact_send_server_time_us + self.estimated_latency_us as u32) as u64);
+            //log!("Estimated latency {}ms | lerping_towards {}", self.estimated_latency_us / 1000., lerp_target as f32 / 1000.);
             */
         }
 
         if let Some(time_request_end) = self.queued_time_info.take() {
-            log!("Applying time ease {:?}", time_request_end);
+            //log!("Applying time ease {:?}", time_request_end);
             let t0 = time_request_end.client_send_time_us as i64;
             let t1 = time_request_end.server_receive_time_us as i64;
             let t2 = time_request_end.server_send_time_us as i64;
             let t3 = time_request_end.client_receive_time_us as i64;
 
-            let ed = ((t1 - t0) + (t3 - t2)) / 2;
-            log!("ed {}", ed);
-            self.estimated_latency = dan_lerp(self.estimated_latency, ed as f32, 50.);
-            log!("estimated latency {}", self.estimated_latency);
-            //let lerp_target = estimated_server_time_prev_us as f32 - server_tick.exact_send_server_time_us as f32;
-            self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.exact_send_server_time_us + self.estimated_latency as u32) as u64);
-            log!("{:?}", self.server_start);
+            let total_time_in_flight = t3 - t0;
+            let total_time_on_server = t2 - t1;
+            let ed = (total_time_in_flight - total_time_on_server) / 2;
+            //let ed = ((t1 - t0).abs() + (t3 - t2).abs()) / 2;
+            //log!("ed {} - time_in_flight {} - time_on_server {}", ed, total_time_in_flight, total_time_on_server);
+            self.estimated_latency_us = dan_lerp(self.estimated_latency_us, ed as f32, 50.);
+            //log!("estimated latency {}us", self.estimated_latency_us);
+
+            let estimated_server_time_us = server_tick.exact_send_server_time_us + self.estimated_latency_us as u32;
+
+            self.server_start = self.client_start + Duration::from_micros(server_tick_rec.client_receive_time_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
+
+
+            //self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.exact_send_server_time_us + self.estimated_latency_us as u32) as u64);
             //log!("{:#?}", time_request_end);
-            //let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency) as u64);
+            //let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
         }
 
 
@@ -312,9 +327,9 @@ impl Client {
 
     fn recv_internal(&mut self, message : interop::CrossyMessage)
     {
+        let client_receive_time_us = WasmInstant::now().saturating_duration_since(self.client_start).as_micros() as u32;
         match message {
             interop::CrossyMessage::TimeResponsePacket(time_info) => {
-                let client_receive_time_us = WasmInstant::now().saturating_duration_since(self.client_start).as_micros() as u32;
                 self.queued_time_info = Some(interop::TimeRequestEnd {
                     client_receive_time_us,
                     client_send_time_us : time_info.client_send_time_us,
@@ -325,7 +340,12 @@ impl Client {
                 //log!("Got time response, {:#?}", self.queued_time_info);
             },
             interop::CrossyMessage::ServerTick(server_tick) => {
-                self.queued_server_messages.push_front(server_tick);
+                let with_time = interop::ReceivedServerTick {
+                    client_receive_time_us,
+                    server_tick,
+                };
+
+                self.queued_server_messages.push_front(with_time);
             }
             _ => {},
         }

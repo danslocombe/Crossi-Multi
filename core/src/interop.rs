@@ -81,6 +81,12 @@ pub struct ServerTick {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct ReceivedServerTick {
+    pub client_receive_time_us : u32,
+    pub server_tick : ServerTick,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct TimeRequestPacket
 {
     pub client_send_time_us : u32,

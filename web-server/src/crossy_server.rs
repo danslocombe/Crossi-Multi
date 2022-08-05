@@ -203,7 +203,7 @@ impl Server {
                 let current_time = inner.timeline.top_state().time_us;
                 for update in &client_updates {
                     if (update.time_us > current_time) {
-                        println!("Update from the future from {:?} - ahead {}us", update.player_id, update.time_us.saturating_sub(current_time));
+                        println!("Update from the future from {:?} - ahead {}us - client time {}us server time {}us", update.player_id, update.time_us.saturating_sub(current_time), update.time_us, current_time);
                     }
                 }
 
