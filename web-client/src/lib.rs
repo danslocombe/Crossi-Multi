@@ -240,7 +240,8 @@ impl Client {
 
             let estimated_server_time_us = server_tick.exact_send_server_time_us + self.estimated_latency_us as u32;
 
-            self.server_start = self.client_start + Duration::from_micros(server_tick_rec.client_receive_time_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
+            let new_server_start = self.client_start + Duration::from_micros(server_tick_rec.client_receive_time_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
+            self.server_start = WasmInstant(dan_lerp(self.server_start.0 as f32, new_server_start.0 as f32, 50.) as i128);
 
 
             //self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.exact_send_server_time_us + self.estimated_latency_us as u32) as u64);

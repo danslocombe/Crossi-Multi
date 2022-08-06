@@ -22,7 +22,7 @@ extern "C" {
 // But we want to be able to represent times from before the start of pageload
 // So store the number of microseconds as an i128.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct WasmInstant(i128);
+pub struct WasmInstant(pub i128);
 
 const MS_TO_US : f64 = 1000.0;
 
