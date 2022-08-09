@@ -238,7 +238,7 @@ impl Client {
             let latency_lerp_k = 50. / TIME_REQUEST_INTERVAL as f32;
             //self.estimated_latency_us = dan_lerp_snap_thresh(self.estimated_latency_us, ed as f32, latency_lerp_k, 10.);
             self.estimated_latency_us = dan_lerp(self.estimated_latency_us, ed as f32, latency_lerp_k);
-            log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
+            //log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
 
             //let estimated_server_time_us = server_tick.exact_send_server_time_us + self.estimated_latency_us as u32;
             //let new_server_start = self.client_start + Duration::from_micros(server_tick_rec.client_receive_time_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
@@ -249,7 +249,7 @@ impl Client {
             let server_start_lerp_k = 500. / TIME_REQUEST_INTERVAL as f32;
             self.server_start = WasmInstant(dan_lerp(self.server_start.0 as f32, new_server_start.0 as f32, server_start_lerp_k) as i128);
             //self.server_start = WasmInstant(dan_lerp_snap_thresh(self.server_start.0 as f32, new_server_start.0 as f32, server_start_lerp_k, 1000.0) as i128);
-            log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
+            //log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
         }
 
 
