@@ -9,6 +9,7 @@ import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";
 import { create_from_ai_overlay } from "./ai_overlay";
 import { create_from_lilly_overlay } from "./lilly_move_hints"
+import { create_font_controller } from "./font"
 
 
 const audio_crowd = new Audio('/sounds/snd_win.wav');
@@ -36,6 +37,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         countdown : create_countdown(),
         dialogue : create_dialogue_controller(),
         prop_controller : create_prop_controller(),
+        font_controller : create_font_controller(),
 
         tick : function()
         {
@@ -239,6 +241,8 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 this.dialogue.draw(this.froggy_draw_ctx);
                 this.countdown.draw(this.froggy_draw_ctx);
+
+                this.font_controller.text(this.froggy_draw_ctx, "hello", 10, 10);
             }
         }
     }
