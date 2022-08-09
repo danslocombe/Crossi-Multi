@@ -285,9 +285,10 @@ async fn ws_handler(ws : ws::Ws, options: WebSocketJoinOptions, db : GameDb) -> 
 }
 
 async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_server::SocketId) {
-    println!("Websocket conencted");
+    println!("Websocket connected");
 
     let mut tick_listener = db.game.get_listener();
+    let game_start = db.game.get_start_time().await;
     let (mut ws_tx, mut ws_rx) = ws.split();
 
 
@@ -298,8 +299,27 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                     println!("Game ended cleaning up WS listener");
                     break;
                 },
-                Ok(v) => {
-                    let serialized = flexbuffers::to_vec(&v).unwrap();
+                Ok(mut to_send) => {
+
+                    // Special case handling for time request responses
+                    if let interop::CrossyMessage::TimeRequestIntermediate(time_request_state) = &to_send {
+                        //println!("Time request packet {:#?}", time_request_state);
+                        if (time_request_state.socket_id != socket_id.0)
+                        {
+                            // Not for us
+                            // this kinda sucks, todo improve
+                            continue;
+                        }
+
+                        let server_send_time_us = std::time::Instant::now().saturating_duration_since(game_start).as_micros() as u32;
+                        to_send = interop::CrossyMessage::TimeResponsePacket(interop::TimeResponsePacket{
+                            client_send_time_us : time_request_state.client_send_time_us,
+                            server_receive_time_us : time_request_state.server_receive_time_us,
+                            server_send_time_us,
+                        });
+                    }
+
+                    let serialized = flexbuffers::to_vec(&to_send).unwrap();
                     match ws_tx.send(Message::binary(serialized)).await
                     {
                         Ok(_) => {},
@@ -319,12 +339,9 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
         match result {
             Ok(msg) =>
             {
-                match parse_client_message(&msg)
+                if let Some(message) = parse_client_message(&msg)
                 {
-                    Some(message) => {
-                        db.game.queue_message(message, socket_id).await;
-                    }
-                    _ => {},
+                    db.game.queue_message(message, socket_id).await;
                 }
             }
             Err(e) => {

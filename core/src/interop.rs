@@ -14,21 +14,20 @@ pub enum CrossyMessage {
     ClientTick(ClientTick),
     ClientDrop(),
     ServerTick(ServerTick),
-    OffsetPing(),
-    OffsetPong(OffsetPong),
-    EmptyMessage(),
+
+    TimeRequestPacket(TimeRequestPacket),
+    TimeRequestIntermediate(TimeRequestIntermediate),
+    TimeResponsePacket(TimeResponsePacket),
+
     GoodBye(),
+
+    EmptyMessage(),
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ClientHello {
     header: [u8; 4],
     version: u8,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct OffsetPong {
-    pub us_server: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -73,8 +72,48 @@ pub struct ClientTick {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ServerTick {
+    // Removing as we are setting up a proper route
     pub exact_send_server_time_us : u32,
+
     pub latest : RemoteTickState,
     pub last_client_sent : PlayerIdMap<RemoteTickState>,
     pub rule_state : CrossyRulesetFST,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct ReceivedServerTick {
+    pub client_receive_time_us : u32,
+    pub server_tick : ServerTick,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct TimeRequestPacket
+{
+    pub client_send_time_us : u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct TimeRequestIntermediate
+{
+    pub client_send_time_us : u32,
+    pub server_receive_time_us : u32,
+    // HACKY only server understands this type
+    pub socket_id : u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct TimeResponsePacket
+{
+    pub client_send_time_us : u32,
+    pub server_receive_time_us : u32,
+    pub server_send_time_us : u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct TimeRequestEnd
+{
+    pub client_send_time_us : u32,
+    pub client_receive_time_us : u32,
+    pub server_receive_time_us : u32,
+    pub server_send_time_us : u32,
 }

@@ -31,8 +31,8 @@ if (LOCAL_DEBUG)
     ws_endpoint = 'ws://localhost:8080';
 }
 else if (DEBUG) {
-    endpoint = 'http://51.6.233.191:8000';
-    ws_endpoint = 'ws://51.6.233.191:8000';
+    endpoint = 'http://51.6.233.191:8080';
+    ws_endpoint = 'ws://51.6.233.191:8080';
 }
 else {
     endpoint = 'https://roadtoads.io';

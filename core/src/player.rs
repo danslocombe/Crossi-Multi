@@ -3,7 +3,6 @@ use crate::map::Map;
 use crate::game::*;
 
 
-// TODO change these times to u32 from f64 micros
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct PlayerState {
     pub id: PlayerId,
