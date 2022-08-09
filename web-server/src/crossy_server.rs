@@ -26,7 +26,7 @@ struct Client {
 }
 
 pub struct Server {
-    queued_messages : Mutex<Vec<(CrossyMessage, SocketId)>>,
+    queued_messages : Mutex<Vec<(CrossyMessage, SocketId, Instant)>>,
     pub inner : Mutex<ServerInner>,
 
     outbound_tx : tokio::sync::broadcast::Sender<CrossyMessage>,
@@ -72,11 +72,11 @@ impl Server {
     }
 
     pub async fn queue_message(&self, message : CrossyMessage, player : SocketId) {
+        let now = Instant::now();
         match message {
             CrossyMessage::TimeRequestPacket(time_request) => {
                 // Special case hanling for time requests to track the exact time we received the message.
 
-                let now = Instant::now();
                 let inner_guard = self.inner.lock().await;
                 let server_receive_time_us = now.saturating_duration_since(inner_guard.start).as_micros() as u32;
                 drop(inner_guard);
@@ -88,11 +88,11 @@ impl Server {
                 });
 
                 let mut queue_guard = self.queued_messages.lock().await;
-                queue_guard.push((new_message, player));
+                queue_guard.push((new_message, player, now));
             },
             _ => {
                 let mut guard = self.queued_messages.lock().await;
-                guard.push((message, player));
+                guard.push((message, player, now));
             },
         }
     }
@@ -189,11 +189,13 @@ impl Server {
 
             inner.timeline.tick(None, dt_simulation.as_micros() as u32);
 
-            for update in &client_updates {
+            for (update, receive_time) in &client_updates {
                 if (update.input != game::Input::None)
                 {
-                    let delta = (update.time_us as i32 - inner.timeline.top_state().time_us as i32) / 1000;
-                    println!("[{:?}] Update - {:?} at client time {}ms, delta {}ms", update.player_id, update.input, update.time_us / 1000, delta);
+                    let receive_time_us = receive_time.saturating_duration_since(inner.start).as_micros() as u32;
+                    let delta = (update.time_us as f32 - receive_time_us as f32) / 1000.;
+                    //let delta = (update.time_us as i32 - inner.timeline.top_state().time_us as i32) / 1000;
+                    println!("[{:?}] Update - {:?} at client time {}ms, receive_time {}ms, delta {}ms", update.player_id, update.input, update.time_us / 1000, receive_time_us as f32 / 1000., delta);
                 }
             }
 
@@ -201,7 +203,7 @@ impl Server {
                 // TMP Assertion
 
                 let current_time = inner.timeline.top_state().time_us;
-                for update in &client_updates {
+                for (update, _) in &client_updates {
                     if (update.time_us > current_time) {
                         println!("Update from the future from {:?} - ahead {}us - client time {}us server time {}us", update.player_id, update.time_us.saturating_sub(current_time), update.time_us, current_time);
                     }
@@ -209,7 +211,7 @@ impl Server {
 
             }
 
-            inner.timeline.propagate_inputs(client_updates);
+            inner.timeline.propagate_inputs(client_updates.into_iter().map(|(x, _)| x).collect());
 
             for new_player in new_players {
                 // We need to make sure this gets propagated properly
@@ -290,7 +292,7 @@ impl Server {
         }
     }
 
-    async fn receive_updates(&self) -> (Vec<RemoteInput>, Vec<game::PlayerId>, Vec<(game::PlayerId, bool)>) {
+    async fn receive_updates(&self) -> (Vec<(RemoteInput, Instant)>, Vec<game::PlayerId>, Vec<(game::PlayerId, bool)>) {
         let mut queued_messages = Vec::with_capacity(8);
 
         let mut guard = self.queued_messages.lock().await;
@@ -303,7 +305,7 @@ impl Server {
         let mut inner = self.inner.lock().await;
         let mut dropped_players = vec![];
 
-        while let Some((message, socket_id)) = queued_messages.pop()
+        while let Some((message, socket_id, receive_time)) = queued_messages.pop()
         {
             match message {
                 CrossyMessage::ClientTick(t) => match inner.get_client_mut_by_addr(socket_id) {
@@ -315,11 +317,11 @@ impl Server {
 
                             ready_players.push((player_client.id, t.lobby_ready));
 
-                            client_updates.push(RemoteInput {
+                            client_updates.push((RemoteInput {
                                 time_us: client_time,
                                 input: t.input,
                                 player_id: player_client.id,
-                            });
+                            }, receive_time));
                         }
                         else {
                             println!("Received client update from client who has not called /play");

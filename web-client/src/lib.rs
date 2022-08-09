@@ -40,6 +40,8 @@ pub struct LocalPlayerInfo {
     buffered_input : Input,
 }
 
+const TIME_REQUEST_INTERVAL : u32 = 13;
+
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Client {
@@ -224,7 +226,6 @@ impl Client {
         }
 
         if let Some(time_request_end) = self.queued_time_info.take() {
-            //log!("Applying time ease {:?}", time_request_end);
             let t0 = time_request_end.client_send_time_us as i64;
             let t1 = time_request_end.server_receive_time_us as i64;
             let t2 = time_request_end.server_send_time_us as i64;
@@ -233,20 +234,22 @@ impl Client {
             let total_time_in_flight = t3 - t0;
             let total_time_on_server = t2 - t1;
             let ed = (total_time_in_flight - total_time_on_server) / 2;
-            //let ed = ((t1 - t0).abs() + (t3 - t2).abs()) / 2;
-            //log!("ed {} - time_in_flight {} - time_on_server {}", ed, total_time_in_flight, total_time_on_server);
-            self.estimated_latency_us = dan_lerp(self.estimated_latency_us, ed as f32, 50.);
-            //log!("estimated latency {}us", self.estimated_latency_us);
 
-            let estimated_server_time_us = server_tick.exact_send_server_time_us + self.estimated_latency_us as u32;
+            let latency_lerp_k = 50. / TIME_REQUEST_INTERVAL as f32;
+            //self.estimated_latency_us = dan_lerp_snap_thresh(self.estimated_latency_us, ed as f32, latency_lerp_k, 10.);
+            self.estimated_latency_us = dan_lerp(self.estimated_latency_us, ed as f32, latency_lerp_k);
+            log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
 
-            let new_server_start = self.client_start + Duration::from_micros(server_tick_rec.client_receive_time_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
-            self.server_start = WasmInstant(dan_lerp(self.server_start.0 as f32, new_server_start.0 as f32, 50.) as i128);
+            //let estimated_server_time_us = server_tick.exact_send_server_time_us + self.estimated_latency_us as u32;
+            //let new_server_start = self.client_start + Duration::from_micros(server_tick_rec.client_receive_time_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
 
+            let estimated_server_time_us = t2 as u32 + self.estimated_latency_us as u32;
+            let new_server_start = self.client_start + Duration::from_micros(t3 as u64) - Duration::from_micros(estimated_server_time_us as u64);
 
-            //self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.exact_send_server_time_us + self.estimated_latency_us as u32) as u64);
-            //log!("{:#?}", time_request_end);
-            //let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
+            let server_start_lerp_k = 500. / TIME_REQUEST_INTERVAL as f32;
+            self.server_start = WasmInstant(dan_lerp(self.server_start.0 as f32, new_server_start.0 as f32, server_start_lerp_k) as i128);
+            //self.server_start = WasmInstant(dan_lerp_snap_thresh(self.server_start.0 as f32, new_server_start.0 as f32, server_start_lerp_k, 1000.0) as i128);
+            log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
         }
 
 
@@ -369,6 +372,11 @@ impl Client {
             input: input,
             lobby_ready : self.ready_state,
         })
+    }
+
+    pub fn should_get_time_request(&self) -> bool {
+        let frame_id = self.timeline.top_state().frame_id;
+        frame_id.floor() as u32 % TIME_REQUEST_INTERVAL == 0
     }
 
     pub fn get_time_request(&self) -> Vec<u8>
@@ -610,4 +618,14 @@ fn try_deserialize_message(buffer : &[u8]) -> Option<interop::CrossyMessage>
 
 fn dan_lerp(x0 : f32, x : f32, k : f32) -> f32 {
     (x0 * (k-1.0) + x) / k
+}
+
+fn dan_lerp_snap_thresh(x0 : f32, x : f32, k : f32, snap_thresh : f32) -> f32 {
+    if (x0 - x).abs() > snap_thresh {
+        x
+    }
+    else
+    {
+        dan_lerp(x0, x, k)
+    }
 }
