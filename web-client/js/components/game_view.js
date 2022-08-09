@@ -242,7 +242,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 this.dialogue.draw(this.froggy_draw_ctx);
                 this.countdown.draw(this.froggy_draw_ctx);
 
-                this.font_controller.text(this.froggy_draw_ctx, "hello", 10, 10);
+                this.font_controller.text(this.froggy_draw_ctx, "press space to ready", 10, 100);
             }
         }
     }

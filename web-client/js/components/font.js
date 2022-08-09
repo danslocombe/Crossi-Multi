@@ -1,6 +1,11 @@
 
-let spr_font = new Image(16 * 26, 22);
-spr_font.src = '/sprites/spr_font_blob.png';
+//let spr_font = new Image(16 * 26, 22);
+//spr_font.src = '/sprites/spr_font_blob.png';
+
+let font_width = 10;
+let font_height = 12;
+let spr_font = new Image(font_width * 26, font_height);
+spr_font.src = '/sprites/spr_font_small.png';
 
 export function create_font_controller() {
     return {
@@ -23,12 +28,12 @@ export function create_font_controller() {
                     // Invalid char
                 }
 
-                x += 16;
-
-                if (frame_id > 0)
+                if (frame_id >= 0)
                 {
-                    ctx.ctx.drawImage(spr_font, 16 * frame_id, 0, 16, 22, x, y, 16, 22);
+                    ctx.ctx.drawImage(spr_font, font_width * frame_id, 0, font_width, font_height, x, y, font_width, font_height);
                 }
+
+                x += font_width;
             }
 
         }
