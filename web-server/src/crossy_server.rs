@@ -175,7 +175,7 @@ impl Server {
         //while self.outbound_tx.receiver_count() > 0 {
         loop {
             let tick_start = Instant::now();
-            let (client_updates, dropped_players, ready_players) = self.receive_updates().await;
+            let (mut client_updates, dropped_players, ready_players) = self.receive_updates().await;
 
             let mut inner = self.inner.lock().await;
 
@@ -189,29 +189,53 @@ impl Server {
 
             inner.timeline.tick(None, dt_simulation.as_micros() as u32);
 
-            for (update, receive_time) in &client_updates {
-                if (update.input != game::Input::None)
-                {
-                    let receive_time_us = receive_time.saturating_duration_since(inner.start).as_micros() as u32;
-                    let delta = (update.time_us as f32 - receive_time_us as f32) / 1000.;
-                    //let delta = (update.time_us as i32 - inner.timeline.top_state().time_us as i32) / 1000;
-                    println!("[{:?}] Update - {:?} at client time {}ms, receive_time {}ms, delta {}ms", update.player_id, update.input, update.time_us / 1000, receive_time_us as f32 / 1000., delta);
-                }
-            }
-
             {
                 // TMP Assertion
 
                 let current_time = inner.timeline.top_state().time_us;
-                for (update, _) in &client_updates {
+                for (update, _) in &mut client_updates {
                     if (update.time_us > current_time) {
                         println!("Update from the future from {:?} - ahead {}us - client time {}us server time {}us", update.player_id, update.time_us.saturating_sub(current_time), update.time_us, current_time);
+                        // HACK this shitttt
+                        update.time_us = current_time - 1;
                     }
                 }
 
             }
 
-            inner.timeline.propagate_inputs(client_updates.into_iter().map(|(x, _)| x).collect());
+            let nonempty_updates : Vec<_> = client_updates.iter().filter(|(x, _)| x.input != game::Input::None).cloned().collect();
+
+            for (update, receive_time) in &nonempty_updates {
+                let receive_time_us = receive_time.saturating_duration_since(inner.start).as_micros() as u32;
+                let delta = (update.time_us as f32 - receive_time_us as f32) / 1000.;
+                //let delta = (update.time_us as i32 - inner.timeline.top_state().time_us as i32) / 1000;
+                println!("[{:?}] Update - {:?} at client time {}ms, receive_time {}ms, delta {}ms", update.player_id, update.input, update.time_us / 1000, receive_time_us as f32 / 1000., delta);
+            }
+
+
+            if (nonempty_updates.len() > 0)
+            {
+                let top_state_before = inner.timeline.top_state().clone();
+                inner.timeline.propagate_inputs(nonempty_updates.into_iter().map(|(x, _)| x).collect());
+                let top_state_after = inner.timeline.top_state();
+
+                if (top_state_before.player_states.count_populated() != top_state_after.player_states.count_populated())
+                {
+                    println!("Different player counts");
+                }
+                else
+                {
+                    for (pid, before_state) in top_state_before.player_states.iter() {
+                        if let Some(new) = top_state_after.get_player(pid)
+                        {
+                            //if (before_state.pos != new.pos)
+                            {
+                                println!("Player {:?} {:?} -> {:?}", pid, before_state, new);
+                            }
+                        }
+                    }
+                }
+            }
 
             for new_player in new_players {
                 // We need to make sure this gets propagated properly
