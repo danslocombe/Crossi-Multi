@@ -142,6 +142,12 @@ impl Timeline {
             if (index > 0) {
                 self.simulate_up_to_date(index);
             }
+            else {
+                println!("propagate_input ERROR - bad index");
+            }
+        }
+        else {
+            println!("propagate_input ERROR - no split");
         }
     }
 

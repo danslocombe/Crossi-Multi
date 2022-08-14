@@ -9,6 +9,8 @@ import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";
 import { create_from_ai_overlay } from "./ai_overlay";
 import { create_from_lilly_overlay } from "./lilly_move_hints"
+import { create_font_controller } from "./font"
+import { create_intro_ui } from "./intro_ui"
 
 
 const audio_crowd = new Audio('/sounds/snd_win.wav');
@@ -22,6 +24,8 @@ audio_crowd.addEventListener('timeupdate', function(){
 });
 
 export function create_game_view(ctx, client, ws, key_event_source) {
+    let font_controller = create_font_controller();
+
     let view = {
         client : client,
         ws : ws,
@@ -36,6 +40,8 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         countdown : create_countdown(),
         dialogue : create_dialogue_controller(),
         prop_controller : create_prop_controller(),
+        intro_ui : create_intro_ui(font_controller, client),
+        font_controller : font_controller,
 
         tick : function()
         {
@@ -83,6 +89,15 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 let moving_into_end = false;
                 if (rule_state_json) {
                     const rule_state = JSON.parse(rule_state_json);
+
+                    if (this.rule_state && rule_state.Lobby)
+                    {
+                        this.intro_ui.set_in_lobby();
+                    }
+                    else
+                    {
+                        this.intro_ui.set_in_game();
+                    }
 
                     if (this.rule_state && rule_state.RoundWarmup && !this.rule_state.RoundWarmup) {
                         moving_into_warmup = true;
@@ -175,8 +190,10 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 this.countdown.tick(this.rule_state);
                 this.dialogue.tick(this.rule_state, this.players, this.simple_entities);
+                this.intro_ui.tick(this.players);
 
                 this.prop_controller.tick(this.rule_state, this.simple_entities, this.client);
+                this.font_controller.tick();
             }
         },
 
@@ -239,6 +256,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 this.dialogue.draw(this.froggy_draw_ctx);
                 this.countdown.draw(this.froggy_draw_ctx);
+                this.intro_ui.draw(this.froggy_draw_ctx);
             }
         }
     }
