@@ -1,6 +1,6 @@
 import { SCALE} from "./constants.js";
 import { dan_lerp, diff} from "./utils.js";
-import { create_whiteout, create_dust, create_corpse, create_bubble } from "./visual_effects.js";
+import { create_whiteout, create_dust, create_corpse, create_bubble, create_pinwheel } from "./visual_effects.js";
 import { MOVE_T, spr_shadow, sprites_list, colours_list, move_sounds_list } from "./character_assets.js";
 
 let spr_crown = new Image(8, 6);
@@ -252,6 +252,7 @@ function create_player_def(sprites, move_sound, colour, source) {
         created_corpse : false,
         t : 0,
         lobby_ready : false,
+        pinwheel : null,
 
         tick : function(state, simple_entities, rule_state) {
             this.t += 1;
@@ -296,6 +297,19 @@ function create_player_def(sprites, move_sound, colour, source) {
             }
             else {
                 this.lobby_ready = false;
+            }
+
+            if (this.t == 1)
+            {
+                this.pinwheel = create_pinwheel(this.x + 4, this.y + 4, {depth: 1000});
+                simple_entities.push(this.pinwheel);
+            }
+
+            if (this.pinwheel)
+            {
+                this.pinwheel.set_pos(this.x + 4, this.y + 4);
+                this.pinwheel.tick();
+                this.pinwheel.set_vel(Math.max(0, 1 - (this.pinwheel.t / 120)));
             }
         },
         new_round : function(warmup_state, simple_entities) {

@@ -110,26 +110,65 @@ export function create_corpse(x, y, spr_dead) {
     }
 }
 
-/*
 export function create_pinwheel(x, y, depth_info) {
     const angle_vel_fast = 0.0825;
     const angle_vel_base = 0.0125;
     return {
         x : x,
         y : y,
+        t: 0,
+        alive : true,
         theta : 0,
         angle_vel : angle_vel_base,
         dynamic_depth : depth_info.dynamic_depth,
-        dynamic_depth : depth_info.foreground_depth,
+        foreground_depth : depth_info.foreground_depth,
         depth : depth_info.depth,
 
         tick : function() {
             this.theta += this.angle_vel;
+            this.t += 1;
         },
-        alive : () => true,
+        set_vel : function(x) {
+            this.angle_vel = x * (angle_vel_fast - angle_vel_base) + angle_vel_base;
+        },
+        set_pos : function(x, y) {
+            this.x = x;
+            this.y = y;
+        },
+        kill : function() {
+            this.alive = false;
+        },
+        alive : function() {
+            return this.alive;
+        },
         draw : function(froggy_draw_ctx) {
+            const n = 8;
+            //const len = Math.sqrt(160*160 + 160*160);
+            const len = 227;
+
+            let angle = this.theta;
+
+            for (let i = 0; i < n; i++)
+            {
+                const x1 = this.x + len * Math.cos(angle);
+                const y1 = this.y + len * Math.sin(angle);
+
+                angle += 6.282 / n;
+
+                const x2 = this.x + len * Math.cos(angle);
+                const y2 = this.y + len * Math.sin(angle);
+
+                angle += 6.282 / n;
+
+                froggy_draw_ctx.ctx.beginPath();
+                froggy_draw_ctx.ctx.moveTo(x1, y1);
+                froggy_draw_ctx.ctx.lineTo(this.x, this.y);
+                froggy_draw_ctx.ctx.lineTo(x2, y2);
+                froggy_draw_ctx.ctx.fillStyle = '#00000060';
+                froggy_draw_ctx.ctx.fill();
+            }
+
             // TODO
         }
     }
 }
-*/
