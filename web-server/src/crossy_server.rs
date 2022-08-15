@@ -191,7 +191,6 @@ impl Server {
 
             {
                 // TMP Assertion
-
                 let current_time = inner.timeline.top_state().time_us;
                 for (update, _) in &mut client_updates {
                     if (update.time_us > current_time) {
@@ -209,14 +208,15 @@ impl Server {
                 let receive_time_us = receive_time.saturating_duration_since(inner.start).as_micros() as u32;
                 let delta = (update.time_us as f32 - receive_time_us as f32) / 1000.;
                 //let delta = (update.time_us as i32 - inner.timeline.top_state().time_us as i32) / 1000;
-                println!("[{:?}] Update - {:?} at client time {}ms, receive_time {}ms, delta {}ms", update.player_id, update.input, update.time_us / 1000, receive_time_us as f32 / 1000., delta);
+                println!("[{:?}] Update - {:?} at client time {}ms, receive_time {}ms, delta {}ms", update.player_id, update.input, update.time_us / 1000, receive_time_us / 1000, delta.floor());
             }
 
 
             if (nonempty_updates.len() > 0)
             {
-                let top_state_before = inner.timeline.top_state().clone();
+                //let top_state_before = inner.timeline.top_state().clone();
                 inner.timeline.propagate_inputs(nonempty_updates.into_iter().map(|(x, _)| x).collect());
+                /*
                 let top_state_after = inner.timeline.top_state();
 
                 if (top_state_before.player_states.count_populated() != top_state_after.player_states.count_populated())
@@ -235,6 +235,7 @@ impl Server {
                         }
                     }
                 }
+                */
             }
 
             for new_player in new_players {

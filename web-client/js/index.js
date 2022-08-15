@@ -5,7 +5,7 @@ import { Client } from "../pkg/index.js"
 import ClipboardJS from 'clipboard';
 
 const DEBUG = true;
-const LOCAL_DEBUG = false;
+const LOCAL_DEBUG = true;
 const DEBUG_PLAY_LINK = true;
 
 const query_string = window.location.search;
