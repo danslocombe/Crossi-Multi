@@ -1,8 +1,8 @@
-use num_derive::FromPrimitive;
-use serde::{Deserialize, Serialize};
-use crate::player_id_map::PlayerIdMap;
 use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::map::Map;
+use crate::player_id_map::PlayerIdMap;
+use num_derive::FromPrimitive;
+use serde::{Deserialize, Serialize};
 
 use crate::player::*;
 
@@ -57,8 +57,8 @@ impl CoordPos {
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct PreciseCoords {
-    pub x : f64,
-    pub y : i32,
+    pub x: f64,
+    pub y: i32,
 }
 
 impl PreciseCoords {
@@ -96,11 +96,10 @@ impl PreciseCoords {
 pub struct PlayerId(pub u8);
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
-pub struct LillipadId
-{
-    pub id : u8,
-    pub y : i32,
-    pub round_id : u8,
+pub struct LillipadId {
+    pub id: u8,
+    pub y: i32,
+    pub round_id: u8,
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
@@ -113,12 +112,7 @@ pub enum Input {
     Down = 4,
 }
 
-pub const ALL_INPUTS : [Input; 4] = [
-    Input::Up,
-    Input::Left,
-    Input::Right,
-    Input::Down,
-];
+pub const ALL_INPUTS: [Input; 4] = [Input::Up, Input::Left, Input::Right, Input::Down];
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct PlayerInputs {
@@ -140,8 +134,7 @@ impl PlayerInputs {
 
     pub fn set(&mut self, id: PlayerId, input: Input) {
         let index = id.0 as usize;
-        if (index >= self.inputs.len())
-        {
+        if (index >= self.inputs.len()) {
             self.inputs.resize(index + 1, Input::None);
         }
 
@@ -150,12 +143,9 @@ impl PlayerInputs {
 
     pub fn get(&self, id: PlayerId) -> Input {
         let index = id.0 as usize;
-        if index < self.inputs.len()
-        {
+        if index < self.inputs.len() {
             self.inputs[index]
-        }
-        else
-        {
+        } else {
             Input::None
         }
     }
@@ -168,7 +158,7 @@ pub struct GameState {
     // Only worry is drift from summing, going to matter?
     pub time_us: u32,
     pub player_states: PlayerIdMap<PlayerState>,
-    pub ruleset_state : CrossyRulesetFST,
+    pub ruleset_state: CrossyRulesetFST,
     pub player_inputs: PlayerInputs,
     pub frame_id: f64,
 }
@@ -184,8 +174,14 @@ impl GameState {
         }
     }
 
-    pub fn from_server_parts(time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
-        let player_states = PlayerIdMap::from_definition(player_states_def.into_iter().map(|x| (x.id, x)).collect());
+    pub fn from_server_parts(
+        time_us: u32,
+        player_states_def: Vec<PlayerState>,
+        ruleset_state: CrossyRulesetFST,
+    ) -> Self {
+        let player_states = PlayerIdMap::from_definition(
+            player_states_def.into_iter().map(|x| (x.id, x)).collect(),
+        );
         GameState {
             time_us,
             player_states,
@@ -237,13 +233,13 @@ impl GameState {
         new
     }
 
-    pub fn set_player_ready(&self, id : PlayerId, ready : bool) -> Self {
+    pub fn set_player_ready(&self, id: PlayerId, ready: bool) -> Self {
         let mut new = self.clone();
         match &mut new.ruleset_state {
             CrossyRulesetFST::Lobby(state) => {
                 state.ready_states.set(id, ready);
-            },
-            _ => {},
+            }
+            _ => {}
         };
 
         new
@@ -255,17 +251,44 @@ impl GameState {
         new
     }
 
-    pub fn simulate(&self, input: Option<PlayerInputs>, dt_us: u32, map : &crate::map::Map) -> Self {
+    pub fn simulate(&self, input: Option<PlayerInputs>, dt_us: u32, map: &crate::map::Map) -> Self {
         let mut new = self.clone();
         new.simulate_mut(input, dt_us, map);
         new
     }
 
-    fn simulate_mut(&mut self, player_inputs: Option<PlayerInputs>, dt_us: u32, map : &crate::map::Map) {
+    fn simulate_mut(
+        &mut self,
+        player_inputs: Option<PlayerInputs>,
+        dt_us: u32,
+        map: &crate::map::Map,
+    ) {
         self.time_us += dt_us;
         self.frame_id += 1.0;
 
         self.player_inputs = player_inputs.unwrap_or_default();
+        /*
+
+        let hack_copy = player_inputs.clone();
+        let mut has_an_input = false;
+        for (i) in &self.player_inputs.inputs {
+            if (*i != Input::None) {
+                has_an_input = true;
+                break;
+            }
+        }
+
+        if (has_an_input) {
+            println!("Simulate mut with an input!");
+            println!("{:?}", self.player_states);
+        }
+
+        if (dan_hack && !has_an_input) {
+            println!("======= DAN THIS IS THE PROBLEM ======");
+            println!("Inputs {:?}", hack_copy);
+            println!("{:#?}", self);
+        }
+        */
 
         for id in self.player_states.valid_ids() {
             let mut pushes = Vec::new();
@@ -284,68 +307,108 @@ impl GameState {
             }
         }
 
-        self.ruleset_state = self.ruleset_state.tick(dt_us, self.time_us, &mut self.player_states, map);
+        self.ruleset_state =
+            self.ruleset_state
+                .tick(dt_us, self.time_us, &mut self.player_states, map);
     }
 
-    pub fn space_occupied_with_player(&self, pos : Pos, ignore_id : Option<PlayerId>) -> bool {
-        for (_, player) in self.player_states.iter().filter(|(id, _)| Some(*id) != ignore_id) {
+    pub fn space_occupied_with_player(&self, pos: Pos, ignore_id: Option<PlayerId>) -> bool {
+        for (_, player) in self
+            .player_states
+            .iter()
+            .filter(|(id, _)| Some(*id) != ignore_id)
+        {
             if player.pos == pos {
                 return true;
-            }
-            else {
+            } else {
                 match &player.move_state {
                     MoveState::Moving(moving_state) => {
                         if moving_state.target == pos {
                             return true;
                         }
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         }
 
-        false 
+        false
     }
 
-    pub(crate) fn can_push(&self, id : PlayerId, dir : Input, time_us : u32, rule_state : &CrossyRulesetFST, map : &Map) -> bool {
+    pub(crate) fn can_push(
+        &self,
+        id: PlayerId,
+        dir: Input,
+        time_us: u32,
+        rule_state: &CrossyRulesetFST,
+        map: &Map,
+    ) -> bool {
         let player = self.get_player(id).unwrap();
 
-        match map.try_apply_input(time_us, &rule_state, &player.pos, dir)
-        {
-            Some(new_pos) => {
-                !self.space_occupied_with_player(new_pos, Some(id))
-            }
+        match map.try_apply_input(time_us, &rule_state, &player.pos, dir) {
+            Some(new_pos) => !self.space_occupied_with_player(new_pos, Some(id)),
             _ => false,
         }
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn make_gamestate(states : Vec<PlayerState>) -> GameState {
-        let player_states = PlayerIdMap::from_definition(states.into_iter().map(|x| (x.id, x)).collect());
+    fn make_gamestate(states: Vec<PlayerState>) -> GameState {
+        let player_states =
+            PlayerIdMap::from_definition(states.into_iter().map(|x| (x.id, x)).collect());
         GameState {
-            time_us : 0,
-            frame_id : 0.,
+            time_us: 0,
+            frame_id: 0.,
             player_states,
             player_inputs: PlayerInputs::default(),
-            ruleset_state : CrossyRulesetFST::start(),
+            ruleset_state: CrossyRulesetFST::start(),
         }
     }
-
 
     #[test]
     fn move_success() {
+        let players = vec![PlayerState {
+            id: PlayerId(0),
+            move_state: MoveState::Stationary,
+            move_cooldown: 0,
+            pos: Pos::new_coord(0, 0),
+        }];
+
+        let mut inputs = PlayerInputs::default();
+        inputs.set(PlayerId(0), Input::Down);
+
+        let world = make_gamestate(players);
+        let map = Map::new(0);
+        let new = world.simulate(Some(inputs), 100_000, &map);
+
+        let new_player = new.get_player(PlayerId(0)).unwrap();
+        match &new_player.move_state {
+            MoveState::Moving(state) => {
+                assert_eq!(state.target, Pos::new_coord(0, 1));
+                assert_eq!(state.remaining_us, MOVE_DUR);
+            }
+            _ => panic!("Not moving"),
+        }
+    }
+
+    #[test]
+    fn move_not_blocked() {
         let players = vec![
             PlayerState {
-                id : PlayerId(0),
-                move_state : MoveState::Stationary,
-                move_cooldown : 0,
-                pos : Pos::new_coord(0, 0),
-            }
+                id: PlayerId(0),
+                move_state: MoveState::Stationary,
+                move_cooldown: 0,
+                pos: Pos::new_coord(0, 0),
+            },
+            PlayerState {
+                id: PlayerId(1),
+                move_state: MoveState::Stationary,
+                move_cooldown: 0,
+                pos: Pos::new_coord(1, 0),
+            },
         ];
 
         let mut inputs = PlayerInputs::default();
@@ -366,55 +429,19 @@ mod tests {
     }
 
     #[test]
-    fn move_not_blocked()
-    {
+    fn move_blocked_other_moving() {
         let players = vec![
             PlayerState {
-                id : PlayerId(0),
-                move_state : MoveState::Stationary,
-                move_cooldown : 0,
-                pos : Pos::new_coord(0, 0),
+                id: PlayerId(0),
+                move_state: MoveState::Stationary,
+                move_cooldown: 0,
+                pos: Pos::new_coord(0, 0),
             },
             PlayerState {
-                id : PlayerId(1),
-                move_state : MoveState::Stationary,
-                move_cooldown : 0,
-                pos : Pos::new_coord(1, 0),
-            },
-        ];
-
-        let mut inputs = PlayerInputs::default();
-        inputs.set(PlayerId(0), Input::Down);
-
-        let world = make_gamestate(players);
-        let map = Map::new(0);
-        let new = world.simulate(Some(inputs), 100_000, &map);
-
-        let new_player = new.get_player(PlayerId(0)).unwrap();
-        match &new_player.move_state {
-            MoveState::Moving(state) => {
-                assert_eq!(state.target, Pos::new_coord(0, 1));
-                assert_eq!(state.remaining_us, MOVE_DUR);
-            }
-            _ => panic!("Not moving"),
-        }
-    }
-
-    #[test]
-    fn move_blocked_other_moving()
-    {
-        let players = vec![
-            PlayerState {
-                id : PlayerId(0),
-                move_state : MoveState::Stationary,
-                move_cooldown : 0,
-                pos : Pos::new_coord(0, 0),
-            },
-            PlayerState {
-                id : PlayerId(1),
-                move_state : MoveState::Moving(MovingState::new(Pos::new_coord(1, 1))),
-                move_cooldown : 0,
-                pos : Pos::new_coord(0, 1),
+                id: PlayerId(1),
+                move_state: MoveState::Moving(MovingState::new(Pos::new_coord(1, 1))),
+                move_cooldown: 0,
+                pos: Pos::new_coord(0, 1),
             },
         ];
 
@@ -430,25 +457,24 @@ mod tests {
             MoveState::Moving(_) => {
                 panic!("Not expected to be moving")
             }
-            _ => {},
+            _ => {}
         }
     }
 
     #[test]
-    fn move_blocked_other_moving_to_pos()
-    {
+    fn move_blocked_other_moving_to_pos() {
         let players = vec![
             PlayerState {
-                id : PlayerId(0),
-                move_state : MoveState::Stationary,
-                move_cooldown : 0,
-                pos : Pos::new_coord(0, 0),
+                id: PlayerId(0),
+                move_state: MoveState::Stationary,
+                move_cooldown: 0,
+                pos: Pos::new_coord(0, 0),
             },
             PlayerState {
-                id : PlayerId(1),
-                move_state : MoveState::Moving(MovingState::new(Pos::new_coord(0, 1))),
-                move_cooldown : 0,
-                pos : Pos::new_coord(1, 1),
+                id: PlayerId(1),
+                move_state: MoveState::Moving(MovingState::new(Pos::new_coord(0, 1))),
+                move_cooldown: 0,
+                pos: Pos::new_coord(1, 1),
             },
         ];
 
@@ -464,7 +490,7 @@ mod tests {
             MoveState::Moving(_) => {
                 panic!("Not expected to be moving")
             }
-            _ => {},
+            _ => {}
         }
     }
 }

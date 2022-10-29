@@ -1,38 +1,38 @@
-use std::collections::{VecDeque};
+use std::collections::VecDeque;
 use std::hash::Hash;
 
-use serde::{Deserialize, Serialize};
 use froggy_rand::FroggyRand;
+use serde::{Deserialize, Serialize};
 
-pub mod road;
-pub mod river;
 pub mod obstacle_row;
+pub mod river;
+pub mod road;
 
-use road::Road;
-use river::{River, RiverSpawnTimes};
 use obstacle_row::{ObstaclePublic, ObstacleRowDescr};
+use river::{River, RiverSpawnTimes};
+use road::Road;
 
 use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::game::CoordPos;
 use crate::SCREEN_SIZE;
-use crate::{Pos, PreciseCoords, Input};
+use crate::{Input, Pos, PreciseCoords};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash)]
 pub struct RowId(u32);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Row {
-   pub row_id : RowId,
-   pub row_type : RowType,
+    pub row_id: RowId,
+    pub row_type: RowType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RowType {
-  River(ObstacleRowDescr),
-  Path(PathDescr),
-  Road(ObstacleRowDescr),
-  StartingBarrier(),
-  Stands(),
+    River(ObstacleRowDescr),
+    Path(PathDescr),
+    Road(ObstacleRowDescr),
+    StartingBarrier(),
+    Stands(),
 }
 
 impl RowType {
@@ -47,44 +47,44 @@ impl RowType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiverDescr {
-    seed : u32,
+    seed: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PathDescr {
-    wall_width : u32,
+    wall_width: u32,
 }
 #[derive(Debug)]
 struct MapRound {
-    seed : u32,
-    round_id : u8,
-    gen_state_wall_width : i32,
-    roads : Vec<(i32, Road)>,
-    rivers : Vec<(i32, River)>,
+    seed: u32,
+    round_id: u8,
+    gen_state_wall_width: i32,
+    roads: Vec<(i32, Road)>,
+    rivers: Vec<(i32, River)>,
     //river_spawns : HashMap<i32, u32>,
-    rows : VecDeque<Row>,
+    rows: VecDeque<Row>,
 }
 
 #[derive(Debug)]
 pub struct MapInner {
     // todo better structure
-    seed : u32,
-    rounds : Vec<MapRound>,
+    seed: u32,
+    rounds: Vec<MapRound>,
 }
 
 #[derive(Debug)]
-pub struct Map{
-   seed : u32,
-   inner : std::sync::Arc<std::sync::Mutex<MapInner>>,
+pub struct Map {
+    seed: u32,
+    inner: std::sync::Arc<std::sync::Mutex<MapInner>>,
 }
 
 impl Map {
-    pub fn new<T : Hash>(seed_key : T) -> Self {
+    pub fn new<T: Hash>(seed_key: T) -> Self {
         let seed = FroggyRand::new(0).gen(seed_key) as u32;
         Self::exact_seed(seed)
     }
 
-    pub fn exact_seed(seed : u32) -> Self {
+    pub fn exact_seed(seed: u32) -> Self {
         Self {
             seed,
             inner: std::sync::Arc::new(std::sync::Mutex::new(MapInner::new(seed))),
@@ -107,22 +107,27 @@ impl Map {
     }
     */
 
-    pub fn get_row(&self, round : u8, y : i32) -> Row {
+    pub fn get_row(&self, round: u8, y: i32) -> Row {
         let mut guard = self.inner.lock().unwrap();
         guard.get_mut(round).get_row(RowId::from_y(y))
     }
 
-    pub fn get_cars(&self, round : u8, time_us : u32) -> Vec<ObstaclePublic> {
+    pub fn get_cars(&self, round: u8, time_us: u32) -> Vec<ObstaclePublic> {
         let mut guard = self.inner.lock().unwrap();
         guard.get(round).get_cars(time_us)
     }
 
-    pub fn get_lillipads(&self, round : u8, time_us : u32, spawn_times : &river::RiverSpawnTimes) -> Vec<ObstaclePublic> {
+    pub fn get_lillipads(
+        &self,
+        round: u8,
+        time_us: u32,
+        spawn_times: &river::RiverSpawnTimes,
+    ) -> Vec<ObstaclePublic> {
         let mut guard = self.inner.lock().unwrap();
         guard.get(round).get_lillipads(time_us, spawn_times)
     }
 
-    pub fn collides_car(&self, time_us : u32, round : u8, pos : CoordPos) -> bool {
+    pub fn collides_car(&self, time_us: u32, round: u8, pos: CoordPos) -> bool {
         let mut guard = self.inner.lock().unwrap();
         guard.get_mut(round).generate_to_y(RowId::from_y(pos.y));
         for (_y, road) in &guard.get(round).roads {
@@ -134,7 +139,7 @@ impl Map {
         false
     }
 
-    pub fn solid(&self, time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
+    pub fn solid(&self, time_us: u32, rule_state: &CrossyRulesetFST, pos: CoordPos) -> bool {
         if pos.x < 0 || pos.x >= SCREEN_SIZE {
             return true;
         }
@@ -151,10 +156,18 @@ impl Map {
             return true;
         }
 
-        round.get_row(RowId::from_y(pos.y)).solid(time_us, rule_state, pos)
+        round
+            .get_row(RowId::from_y(pos.y))
+            .solid(time_us, rule_state, pos)
     }
 
-    pub fn lillipad_at_pos(&self, round_id : u8, spawn_times : &RiverSpawnTimes, time_us : u32, pos : PreciseCoords) -> Option<crate::LillipadId> {
+    pub fn lillipad_at_pos(
+        &self,
+        round_id: u8,
+        spawn_times: &RiverSpawnTimes,
+        time_us: u32,
+        pos: PreciseCoords,
+    ) -> Option<crate::LillipadId> {
         let mut guard = self.inner.lock().unwrap();
         guard.get_mut(round_id).generate_to_y(RowId::from_y(pos.y));
 
@@ -169,35 +182,44 @@ impl Map {
         None
     }
 
-    pub fn get_lillipad_screen_x(&self, time_us : u32, lillipad : &crate::LillipadId) -> f64 {
+    pub fn get_lillipad_screen_x(&self, time_us: u32, lillipad: &crate::LillipadId) -> f64 {
         let mut guard = self.inner.lock().unwrap();
         let round_id = lillipad.round_id;
 
         // Do we need this gen to?
-        guard.get_mut(round_id).generate_to_y(RowId::from_y(lillipad.y));
+        guard
+            .get_mut(round_id)
+            .generate_to_y(RowId::from_y(lillipad.y));
 
         for (y, river) in &guard.get(round_id).rivers {
             if (*y == lillipad.y) {
-                return river.get_lillipad_screen_x(time_us, lillipad)
+                return river.get_lillipad_screen_x(time_us, lillipad);
             }
         }
 
-        panic!("Error, could not find a lillipad from lillipad_id {:?}", lillipad);
+        panic!(
+            "Error, could not find a lillipad from lillipad_id {:?}",
+            lillipad
+        );
     }
 
-    pub fn realise_pos(&self, time_us : u32, pos : &crate::Pos) -> PreciseCoords {
+    pub fn realise_pos(&self, time_us: u32, pos: &crate::Pos) -> PreciseCoords {
         match pos {
-            crate::Pos::Coord(coord) => {
-                coord.to_precise()
-            },
+            crate::Pos::Coord(coord) => coord.to_precise(),
             crate::Pos::Lillipad(lilli_id) => {
                 let x = self.get_lillipad_screen_x(time_us, lilli_id);
-                PreciseCoords{x, y: lilli_id.y}
-            },
+                PreciseCoords { x, y: lilli_id.y }
+            }
         }
     }
 
-    pub fn try_apply_input(&self, time_us : u32, rule_state : &crate::crossy_ruleset::CrossyRulesetFST, pos : &crate::Pos, input : Input) -> Option<Pos> {
+    pub fn try_apply_input(
+        &self,
+        time_us: u32,
+        rule_state: &crate::crossy_ruleset::CrossyRulesetFST,
+        pos: &crate::Pos,
+        input: Input,
+    ) -> Option<Pos> {
         let round_id = rule_state.get_round_id();
         let pos = self.realise_pos(time_us, pos);
         let precise = pos.apply_input(input);
@@ -205,89 +227,90 @@ impl Map {
 
         if let Some(lillipad_id) = self.lillipad_at_pos(round_id, spawn_times, time_us, precise) {
             Some(Pos::Lillipad(lillipad_id))
-        }
-        else {
+        } else {
             let coord_pos = precise.to_coords();
             if (self.solid(time_us, &rule_state, coord_pos)) {
+                println!("Hit wall");
                 return None;
-            }
-            else {
+            } else {
                 Some(Pos::Coord(coord_pos))
             }
         }
     }
 
-    pub fn update_river_spawn_times(&self, time_to_reach_rivers : &RiverSpawnTimes, round_id : u8, time_us : u32, screen_y : i32) -> RiverSpawnTimes
-    {
+    pub fn update_river_spawn_times(
+        &self,
+        time_to_reach_rivers: &RiverSpawnTimes,
+        round_id: u8,
+        time_us: u32,
+        screen_y: i32,
+    ) -> RiverSpawnTimes {
         let mut inner = self.inner.lock().unwrap();
         inner.update_river_spawn_times(time_to_reach_rivers, round_id, time_us, screen_y)
     }
 }
 
 impl MapInner {
-    fn new(seed : u32) -> Self {
+    fn new(seed: u32) -> Self {
         let mut rounds = Vec::with_capacity(8);
 
         // Always set first map seed to zero
         rounds.push(MapRound::new(0, 0));
 
-        Self {
-            seed,
-            rounds,
-        }
+        Self { seed, rounds }
     }
 
-    fn gen_to(&mut self, i : usize) {
+    fn gen_to(&mut self, i: usize) {
         while i >= self.rounds.len() {
             let rid = self.rounds.len() as u8;
             self.rounds.push(MapRound::new(self.seed, rid));
         }
     }
 
-    fn get(&mut self, round_id : u8) -> &MapRound {
+    fn get(&mut self, round_id: u8) -> &MapRound {
         let i = round_id as usize;
         self.gen_to(i);
         &self.rounds[round_id as usize]
     }
 
-    fn get_mut(&mut self, round_id : u8) -> &mut MapRound {
+    fn get_mut(&mut self, round_id: u8) -> &mut MapRound {
         let i = round_id as usize;
         self.gen_to(i);
         &mut self.rounds[round_id as usize]
     }
 
-    fn update_river_spawn_times(&mut self, time_to_reach_rivers : &RiverSpawnTimes, round_id : u8, time_us : u32, screen_y : i32) -> RiverSpawnTimes
-    {
-        if ((round_id as usize) < self.rounds.len())
-        {
+    fn update_river_spawn_times(
+        &mut self,
+        time_to_reach_rivers: &RiverSpawnTimes,
+        round_id: u8,
+        time_us: u32,
+        screen_y: i32,
+    ) -> RiverSpawnTimes {
+        if ((round_id as usize) < self.rounds.len()) {
             let round = &mut self.rounds[round_id as usize];
             round.update_river_spawn_times(time_to_reach_rivers, time_us, screen_y)
-        }
-        else
-        {
+        } else {
             Default::default()
         }
     }
 }
 
 impl MapRound {
-    fn new(seed : u32, round_id : u8) -> Self {
+    fn new(seed: u32, round_id: u8) -> Self {
         let mut rows = VecDeque::with_capacity(64);
         for i in 0..12 {
             rows.push_front(Row {
-                row_id : RowId(i),
-                row_type : RowType::Path(PathDescr {
-                    wall_width : 0,
-                }),
+                row_id: RowId(i),
+                row_type: RowType::Path(PathDescr { wall_width: 0 }),
             });
         }
 
         let mut round = Self {
             seed,
             round_id,
-            gen_state_wall_width : 0,
-            roads : Vec::with_capacity(24),
-            rivers : Vec::with_capacity(24),
+            gen_state_wall_width: 0,
+            roads: Vec::with_capacity(24),
+            rivers: Vec::with_capacity(24),
             //river_spawns : HashMap::with_capacity(24),
             rows,
         };
@@ -310,8 +333,12 @@ impl MapRound {
     }
     */
 
-    fn get_row(&mut self, row_id : RowId) -> Row {
-        let need_to_generate = self.rows.front().map(|row| row_id.0 > row.row_id.0).unwrap_or(true);
+    fn get_row(&mut self, row_id: RowId) -> Row {
+        let need_to_generate = self
+            .rows
+            .front()
+            .map(|row| row_id.0 > row.row_id.0)
+            .unwrap_or(true);
 
         if need_to_generate {
             self.generate_to_y(row_id);
@@ -320,43 +347,42 @@ impl MapRound {
         self.get_row_unchecked(row_id)
     }
 
-    fn get_row_unchecked(&mut self, row_id : RowId) -> Row {
+    fn get_row_unchecked(&mut self, row_id: RowId) -> Row {
         let head_row_id = self.rows.front().unwrap().row_id;
         let diff = head_row_id.0 - row_id.0;
         self.rows[diff as usize].clone()
     }
 
     fn initial_generate(&mut self) {
-        const STANDS_HEIGHT : u32 = 8;
+        const STANDS_HEIGHT: u32 = 8;
         for i in 0..8 {
             self.rows.push_front(Row {
-                row_id : RowId(i),
-                row_type : RowType::Stands(),
+                row_id: RowId(i),
+                row_type: RowType::Stands(),
             });
         }
 
         self.rows.push_front(Row {
-            row_id : RowId(STANDS_HEIGHT),
-            row_type : RowType::StartingBarrier(),
+            row_id: RowId(STANDS_HEIGHT),
+            row_type: RowType::StartingBarrier(),
         })
     }
 
-    fn update_river_spawn_times(&mut self, spawn_times : &RiverSpawnTimes, time_us : u32, screen_y : i32) -> RiverSpawnTimes
-    {
+    fn update_river_spawn_times(
+        &mut self,
+        spawn_times: &RiverSpawnTimes,
+        time_us: u32,
+        screen_y: i32,
+    ) -> RiverSpawnTimes {
         let mut new_spawn_times = spawn_times.clone();
-        for (i, (y, _river)) in self.rivers.iter().enumerate()
-        {
+        for (i, (y, _river)) in self.rivers.iter().enumerate() {
             let spawn_time = spawn_times.get(i);
-            if (*y >= screen_y && spawn_time.is_none())
-            {
-                if (*y > 0)
-                {
+            if (*y >= screen_y && spawn_time.is_none()) {
+                if (*y > 0) {
                     // HACK
                     // We want to pre-spawn some logs at the start to avoid being boring
                     new_spawn_times.set(i, time_us.saturating_sub(8_000_000));
-                }
-                else
-                {
+                } else {
                     new_spawn_times.set(i, time_us);
                 }
             }
@@ -365,12 +391,22 @@ impl MapRound {
         new_spawn_times
     }
 
-    fn generate_to_y(&mut self, row_id_target : RowId) {
-        while self.rows.front().map(|row| row_id_target.0 > row.row_id.0).unwrap_or(true) {
+    fn generate_to_y(&mut self, row_id_target: RowId) {
+        while self
+            .rows
+            .front()
+            .map(|row| row_id_target.0 > row.row_id.0)
+            .unwrap_or(true)
+        {
             let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
             let rng = FroggyRand::from_hash((self.seed, self.round_id, row_id));
 
-            verbose_log!("Generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
+            verbose_log!(
+                "Generating at {:?}, y={} | {:?}",
+                row_id,
+                row_id.to_y(),
+                &rng
+            );
 
             // Seed 0 is reserved for lobbies
             // We shouldnt generate any roads / rivers
@@ -397,7 +433,8 @@ impl MapRound {
                             row_type: RowType::Road(ObstacleRowDescr {
                                 seed: self.seed,
                                 inverted: initial_direction,
-                        })});
+                            }),
+                        });
                     }
                     for i in 0..lanes {
                         let rid = RowId(row_id.0 + lanes + i);
@@ -411,10 +448,10 @@ impl MapRound {
                             row_type: RowType::Road(ObstacleRowDescr {
                                 seed: self.seed,
                                 inverted: !initial_direction,
-                        })});
+                            }),
+                        });
                     }
-                }
-                else {
+                } else {
                     verbose_log!("Generating river");
 
                     let lanes = *rng.choose("river_lanes", &[2, 2, 3, 4]);
@@ -435,27 +472,28 @@ impl MapRound {
                             row_type: RowType::River(ObstacleRowDescr {
                                 seed: self.seed,
                                 inverted: river_direction,
-                        })});
+                            }),
+                        });
                     }
                 }
-            }
-            else {
-                const WALL_WIDTH_MAX : i32 = 4;
-                const WALL_WIDTH_MIN : i32 = 1;
-                let new_wall_width = self.gen_state_wall_width + rng.choose("wall_width", &[-1, 0, 0, 1]);
+            } else {
+                const WALL_WIDTH_MAX: i32 = 4;
+                const WALL_WIDTH_MIN: i32 = 1;
+                let new_wall_width =
+                    self.gen_state_wall_width + rng.choose("wall_width", &[-1, 0, 0, 1]);
                 self.gen_state_wall_width = new_wall_width.min(WALL_WIDTH_MAX).max(WALL_WIDTH_MIN);
 
                 self.rows.push_front(Row {
                     row_id,
                     row_type: RowType::Path(PathDescr {
-                        wall_width : self.gen_state_wall_width as u32,
+                        wall_width: self.gen_state_wall_width as u32,
                     }),
                 });
             }
         }
     }
 
-    fn get_cars(&self, time_us : u32) -> Vec<ObstaclePublic> {
+    fn get_cars(&self, time_us: u32) -> Vec<ObstaclePublic> {
         let mut cars = Vec::with_capacity(8);
         for (_y, road) in &self.roads {
             // TODO y offset
@@ -464,7 +502,11 @@ impl MapRound {
         cars
     }
 
-    fn get_lillipads(&self, time_us : u32, spawn_times : &river::RiverSpawnTimes) -> Vec<ObstaclePublic> {
+    fn get_lillipads(
+        &self,
+        time_us: u32,
+        spawn_times: &river::RiverSpawnTimes,
+    ) -> Vec<ObstaclePublic> {
         let mut lillipads = Vec::with_capacity(32);
         for (i, (_y, river)) in self.rivers.iter().enumerate() {
             // TODO y offset
@@ -477,7 +519,7 @@ impl MapRound {
 
 impl RowId {
     // Hackkyyyyy because we hardcode screen size.
-    pub fn from_y(y : i32) -> Self {
+    pub fn from_y(y: i32) -> Self {
         Self((SCREEN_SIZE - y) as u32)
     }
 
@@ -486,13 +528,12 @@ impl RowId {
     }
 }
 
-
-fn outside_walls(x : i32, wall_width : i32) -> bool {
+fn outside_walls(x: i32, wall_width: i32) -> bool {
     x <= wall_width as i32 || x >= (SCREEN_SIZE - 1 - wall_width as i32)
 }
 
 impl Row {
-    pub fn solid(&self, _time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
+    pub fn solid(&self, _time_us: u32, rule_state: &CrossyRulesetFST, pos: CoordPos) -> bool {
         //debug_log!("Checking {:?} solid, assert value self.row_id.to_y() = {}", pos, self.row_id.to_y());
         assert!(self.row_id.to_y() == pos.y);
         let x = pos.x;
@@ -502,23 +543,18 @@ impl Row {
             return false;
         }
 
-        const STANDS_WIDTH : i32 = 6;
+        const STANDS_WIDTH: i32 = 6;
         match &self.row_type {
-            RowType::Path(s) => {
-                outside_walls(x, s.wall_width as i32)
-            },
+            RowType::Path(s) => outside_walls(x, s.wall_width as i32),
             RowType::StartingBarrier() => {
                 if let CrossyRulesetFST::RoundWarmup(_) = rule_state {
                     // Whole row solid while barrier is up
                     true
-                }
-                else{
+                } else {
                     outside_walls(x, STANDS_WIDTH)
                 }
             }
-            RowType::Stands() => {
-                outside_walls(x, STANDS_WIDTH)
-            },
+            RowType::Stands() => outside_walls(x, STANDS_WIDTH),
             _ => false,
         }
     }

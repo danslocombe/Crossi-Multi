@@ -1,9 +1,9 @@
+use crate::crossy_ruleset::CrossyRulesetFST;
+use crate::game::*;
+use crate::map::Map;
+use crate::player::PlayerState;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use crate::crossy_ruleset::CrossyRulesetFST;
-use crate::map::Map;
-use crate::game::*;
-use crate::player::PlayerState;
 
 const STATE_BUFFER_SIZE: usize = 128;
 
@@ -23,7 +23,7 @@ pub struct RemoteTickState {
 #[derive(Debug)]
 pub struct Timeline {
     states: VecDeque<GameState>,
-    pub map : Map,
+    pub map: Map,
 }
 
 impl Timeline {
@@ -32,7 +32,7 @@ impl Timeline {
         states.push_front(GameState::new());
         Timeline {
             states,
-            map : Map::new(0),
+            map: Map::new(0),
         }
     }
 
@@ -41,7 +41,7 @@ impl Timeline {
         states.push_front(GameState::new());
         Timeline {
             states,
-            map : Map::new(seed),
+            map: Map::new(seed),
         }
     }
 
@@ -49,10 +49,14 @@ impl Timeline {
         seed: &str,
         time_us: u32,
         player_states: Vec<PlayerState>,
-        ruleset_state : CrossyRulesetFST
+        ruleset_state: CrossyRulesetFST,
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(
+            time_us,
+            player_states,
+            ruleset_state,
+        ));
         Timeline {
             states,
             map: Map::new(seed),
@@ -63,10 +67,14 @@ impl Timeline {
         seed: u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
-        ruleset_state : CrossyRulesetFST
+        ruleset_state: CrossyRulesetFST,
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(
+            time_us,
+            player_states,
+            ruleset_state,
+        ));
         Timeline {
             states,
             map: Map::exact_seed(seed),
@@ -93,7 +101,11 @@ impl Timeline {
         // This is kinda hacky but we add the new player to all the states in memory (lol)
         // Otherwise we might get input from a state where we have to propagate forward
         // a state where the player isnt there
-        debug_log!("Adding new player {:?} over {:?} states", player_id, self.states.len());
+        debug_log!(
+            "Adding new player {:?} over {:?} states",
+            player_id,
+            self.states.len()
+        );
         let mut states = VecDeque::with_capacity(self.states.len());
         std::mem::swap(&mut self.states, &mut states);
         for state in &states {
@@ -117,7 +129,7 @@ impl Timeline {
         self.states.get(0).unwrap()
     }
 
-    pub fn set_player_ready(&mut self, player_id : PlayerId, ready_state : bool) {
+    pub fn set_player_ready(&mut self, player_id: PlayerId, ready_state: bool) {
         let new = self.top_state().set_player_ready(player_id, ready_state);
         self.push_state(new);
     }
@@ -141,12 +153,10 @@ impl Timeline {
             // TODO handle index == 0
             if (index > 0) {
                 self.simulate_up_to_date(index);
-            }
-            else {
+            } else {
                 println!("propagate_input ERROR - bad index");
             }
-        }
-        else {
+        } else {
             println!("propagate_input ERROR - no split");
         }
     }
@@ -199,7 +209,7 @@ impl Timeline {
     pub fn propagate_state(
         &mut self,
         latest_remote_state: &RemoteTickState,
-        rule_state : Option<&CrossyRulesetFST>,
+        rule_state: Option<&CrossyRulesetFST>,
         client_latest_remote_state: Option<&RemoteTickState>,
         local_player: Option<PlayerId>,
     ) {
@@ -227,7 +237,7 @@ impl Timeline {
         //
         // /////////////////////////////////////////////////////////////
 
-        let mut use_client_predictions : Vec<PlayerId> = local_player.into_iter().collect();
+        let mut use_client_predictions: Vec<PlayerId> = local_player.into_iter().collect();
 
         if let Some(state) = client_latest_remote_state.as_ref() {
             if let Some(index) = self.split_with_state(&[], &state.states, None, state.time_us) {
@@ -242,7 +252,7 @@ impl Timeline {
                     if let Some(lp) = local_player {
                         use_client_predictions = self.players_to_use_client_predictions(index, lp);
                         //if (use_client_predictions.len() > 1) {
-                            //crate::debug_log(&format!("{:?}", use_client_predictions));
+                        //crate::debug_log(&format!("{:?}", use_client_predictions));
                         //}
                     }
                 }
@@ -265,7 +275,7 @@ impl Timeline {
         &mut self,
         ignore_player_ids: &[PlayerId],
         server_states: &[PlayerState],
-        maybe_server_rule_state : Option<&CrossyRulesetFST>,
+        maybe_server_rule_state: Option<&CrossyRulesetFST>,
         time_us: u32,
     ) -> Option<usize> {
         let before = self.get_index_before_us(time_us)?;
@@ -295,14 +305,18 @@ impl Timeline {
         }
     }
 
-    fn players_to_use_client_predictions(&self, index : usize, local_player : PlayerId) -> Vec<PlayerId> {
+    fn players_to_use_client_predictions(
+        &self,
+        index: usize,
+        local_player: PlayerId,
+    ) -> Vec<PlayerId> {
         let mut player_ids = vec![local_player];
 
         for i in (0..=index).rev() {
             let state = &self.states[i];
 
             for player in &state.get_valid_player_states() {
-                let mut to_add : Option<PlayerId> = None;
+                let mut to_add: Option<PlayerId> = None;
                 for pid in &player_ids {
                     if player.is_being_pushed_by(*pid) {
                         to_add = Some(player.id);
@@ -319,8 +333,8 @@ impl Timeline {
                         if !player_ids.contains(&pid) {
                             player_ids.push(pid);
                         }
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
         }
@@ -385,10 +399,10 @@ mod tests {
     use crate::player::*;
 
     // We dont want to actually expose this
-    fn clone_timeline(timeline : &Timeline) -> Timeline {
+    fn clone_timeline(timeline: &Timeline) -> Timeline {
         Timeline {
-            map : Map::new(timeline.map.get_seed()),
-            states : timeline.states.clone(),
+            map: Map::new(timeline.map.get_seed()),
+            states: timeline.states.clone(),
         }
     }
 
@@ -420,10 +434,10 @@ mod tests {
             MoveState::Moving(state) => {
                 assert_eq!(MOVE_DUR, state.remaining_us);
                 assert_eq!(Pos::new_coord(0, 1), state.target);
-            },
+            }
             _ => {
                 panic!("Expected to be moving");
-            },
+            }
         }
     }
 
@@ -450,7 +464,8 @@ mod tests {
 
     #[test]
     fn test_split_out_range() {
-        let mut timeline = Timeline::from_server_parts("seed", 10_000, Vec::new(), CrossyRulesetFST::start());
+        let mut timeline =
+            Timeline::from_server_parts("seed", 10_000, Vec::new(), CrossyRulesetFST::start());
         timeline.add_player(PlayerId(0), Pos::new_coord(0, 0));
         timeline.tick_current_time(Some(PlayerInputs::default()), 15_000);
         assert_eq!(2, timeline.states.len());
@@ -476,7 +491,6 @@ mod tests {
             input: Input::Left,
             player_id: PlayerId(0),
         };
-
 
         timeline.propagate_input(&timed_input);
 
@@ -514,10 +528,10 @@ mod tests {
                 MoveState::Moving(state) => {
                     assert_eq!(MOVE_DUR, state.remaining_us);
                     assert_eq!(Pos::new_coord(0, 1), state.target);
-                },
+                }
                 _ => {
                     panic!("Expected to be moving");
-                },
+                }
             }
         }
 
@@ -567,10 +581,10 @@ mod tests {
                 MoveState::Moving(state) => {
                     assert_eq!(MOVE_DUR, state.remaining_us);
                     assert_eq!(Pos::new_coord(0, 3), state.target);
-                },
+                }
                 _ => {
                     panic!("Expected to be moving");
-                },
+                }
             }
         }
 
@@ -598,10 +612,10 @@ mod tests {
             MoveState::Moving(state) => {
                 assert_eq!(MOVE_DUR, state.remaining_us);
                 assert_eq!(Pos::new_coord(0, 3), state.target);
-            },
+            }
             _ => {
                 panic!("Expected to be moving");
-            },
+            }
         }
         assert_eq!(Pos::new_coord(4, 5), p1.pos);
         assert_eq!(MoveState::Stationary, p1.move_state);
