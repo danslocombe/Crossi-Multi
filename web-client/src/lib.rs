@@ -59,7 +59,7 @@ pub struct Client {
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
 
-    queued_server_messages : VecDeque<interop::ReceivedServerTick>,
+    queued_server_messages : VecDeque<interop::ServerTick>,
     queued_time_info : Option<interop::TimeRequestEnd>,
 
     ai_agent : Option<RefCell<Box<dyn ai::AIAgent>>>,
@@ -184,14 +184,11 @@ impl Client {
         // dont have the energy to explain, but the timing is fucked and just want to demo something.
         let mut server_tick_it = None;
         while  {
-            self.queued_server_messages.back().map(|x| x.server_tick.latest.time_us < current_time_us).unwrap_or(false)
+            self.queued_server_messages.back().map(|x| x.latest.time_us < current_time_us).unwrap_or(false)
         }
         {server_tick_it = self.queued_server_messages.pop_back();}
 
-        //if (self.queued_server_messages.len() > 0) {
-        {
-            //log!("DROPPED {} SERVER MESSAGES AS THEY ARE IN THE FUTURE, GOT TICK {}", self.queued_server_messages.len(), server_tick_it.is_some());
-        }
+        self.process_time_info();
 
         if let Some(server_tick) = server_tick_it {
             self.process_server_message(&server_tick);
@@ -204,27 +201,8 @@ impl Client {
         }
     }
 
-    fn process_server_message(&mut self, server_tick_rec : &interop::ReceivedServerTick)
+    fn process_time_info(&mut self)
     {
-        let server_tick = &server_tick_rec.server_tick;
-        // DAN HACK
-        // from branch "latency-approximation"
-        {
-            //let lerp_target = 
-            /*
-            let current_approx_server_time_at_receive = received_time.duration_since(self.server_start).as_micros() as u32;
-
-            let new_latency_measurement = received_time.saturating_duration_since(server_tick.exact_send_server_time_us);
-            self.estimated_latency_us = dan_lerp(self.estimated_latency_us, new_latency_measurement, 50.);
-
-            let delta_us = server_time_now_approx_us as i32 - estimated_server_time_prev_us as i32;
-
-            let lerp_target = estimated_server_time_prev_us as f32 - server_tick.exact_send_server_time_us as f32;
-            self.server_start = WasmInstant::now() - Duration::from_micros((server_tick.exact_send_server_time_us + self.estimated_latency_us as u32) as u64);
-            //log!("Estimated latency {}ms | lerping_towards {}", self.estimated_latency_us / 1000., lerp_target as f32 / 1000.);
-            */
-        }
-
         if let Some(time_request_end) = self.queued_time_info.take() {
             let t0 = time_request_end.client_send_time_us as i64;
             let t1 = time_request_end.server_receive_time_us as i64;
@@ -237,34 +215,26 @@ impl Client {
 
             let latency_lerp_k = 50. / TIME_REQUEST_INTERVAL as f32;
 
-
-
-            //self.estimated_latency_us = dan_lerp_snap_thresh(self.estimated_latency_us, ed as f32, latency_lerp_k, 10.);
             self.estimated_latency_us = dan_lerp(self.estimated_latency_us, ed as f32, latency_lerp_k);
-            //log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
-
-            //let estimated_server_time_us = server_tick.exact_send_server_time_us + self.estimated_latency_us as u32;
-            //let new_server_start = self.client_start + Duration::from_micros(server_tick_rec.client_receive_time_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
-
-            //let estimated_server_time_us = t2 as u32 + self.estimated_latency_us as u32;
 
             let time_now_us = WasmInstant::now().saturating_duration_since(self.client_start).as_micros() as u32;
             let estimated_server_time_us = t2 as u32 + self.estimated_latency_us as u32;
 
             let holding_time = time_now_us - t3 as u32;
-            log!("Holding time {}us", holding_time);
+            //log!("Holding time {}us", holding_time);
 
             let new_server_start = self.client_start + Duration::from_micros(t3 as u64 + holding_time as u64) - Duration::from_micros(estimated_server_time_us as u64);
 
             let server_start_lerp_k_up = 500. / TIME_REQUEST_INTERVAL as f32;
             let server_start_lerp_k_down = 500. / TIME_REQUEST_INTERVAL as f32;
             self.server_start = WasmInstant(dan_lerp_directional(self.server_start.0 as f32, new_server_start.0 as f32, server_start_lerp_k_up, server_start_lerp_k_down) as i128);
-            //self.server_start = WasmInstant(dan_lerp_snap_thresh(self.server_start.0 as f32, new_server_start.0 as f32, server_start_lerp_k, 1000.0) as i128);
-            log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
-            log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
+            //log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
+            //log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
         }
+    }
 
-
+    fn process_server_message(&mut self, server_tick : &interop::ServerTick)
+    {
         // If we have had a "major change" instead of patching up the current state we perform a full reset
         // At the moment a major change is either:
         //   We have moved between game states (eg the round ended)
@@ -356,12 +326,7 @@ impl Client {
                 //log!("Got time response, {:#?}", self.queued_time_info);
             },
             interop::CrossyMessage::ServerTick(server_tick) => {
-                let with_time = interop::ReceivedServerTick {
-                    client_receive_time_us,
-                    server_tick,
-                };
-
-                self.queued_server_messages.push_front(with_time);
+                self.queued_server_messages.push_front(server_tick);
             }
             _ => {},
         }

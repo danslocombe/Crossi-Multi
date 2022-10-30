@@ -94,15 +94,28 @@ function ping(initial_ping) {
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+function create_gameid_url()
+{
+    let x_endpoint = "";
+
+    if (!DEBUG)
+    {
+        x_endpoint = endpoint;
+    }
+
+    return x_endpoint + '/?game_id=' + game_id;
+}
+
 function write_join_link(game_id) {
+    const gameid_url = create_gameid_url();
     if (DEBUG && DEBUG_PLAY_LINK)
     {
-        document.getElementById("debug_join").innerHTML = '<a href="' + '/?game_id=' + game_id + '"> GameId: ' + game_id + '</a>';
-        document.getElementById("joinlink").value = '/?game_id=' + game_id;
+        document.getElementById("debug_join").innerHTML = '<a href="' + gameid_url + '"> GameId: ' + game_id + '</a>';
+        document.getElementById("joinlink").value = gameid_url;
     }
     else
     {
-        document.getElementById("joinlink").value = endpoint + '/?game_id=' + game_id;
+        document.getElementById("joinlink").value = gameid_url;
     }
 }
 
@@ -121,6 +134,7 @@ function start_game() {
             console.log("Created game ");
             console.log(x);
             game_id = x.game_id;
+            window.history.replaceState(null, '', create_gameid_url());
             write_join_link(game_id);
             join();
         });
