@@ -7,16 +7,18 @@ use crate::player::PlayerState;
 
 const STATE_BUFFER_SIZE: usize = 128;
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct RemoteInput {
     pub time_us: u32,
+    pub frame_id: u32,
     pub input: Input,
     pub player_id: PlayerId,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct RemoteTickState {
-    pub time_us: u32,
+    pub frame_id : u32,
+    //pub time_us: u32,
     pub states: Vec<PlayerState>,
 }
 
@@ -47,12 +49,13 @@ impl Timeline {
 
     pub fn from_server_parts(
         seed: &str,
+        frame_id : u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
         ruleset_state : CrossyRulesetFST
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(frame_id, time_us, player_states, ruleset_state));
         Timeline {
             states,
             map: Map::new(seed),
@@ -61,12 +64,13 @@ impl Timeline {
 
     pub fn from_server_parts_exact_seed(
         seed: u32,
+        frame_id : u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
         ruleset_state : CrossyRulesetFST
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(frame_id, time_us, player_states, ruleset_state));
         Timeline {
             states,
             map: Map::exact_seed(seed),
@@ -127,15 +131,38 @@ impl Timeline {
             return;
         }
 
-        inputs.sort_by(|x, y| x.time_us.cmp(&y.time_us));
+        // Can we assume its already sorted?
+        inputs.sort_by(|x, y| x.frame_id.cmp(&y.frame_id));
 
         for input in &inputs {
-            if (input.input != Input::None) {
-                self.propagate_input(input);
-            }
+            let frame_offset = self.frame_id_to_frame_offset(input.frame_id).unwrap();
+            self.states.get_mut(frame_offset).unwrap().player_inputs.set(input.player_id, input.input);
+        }
+
+        let start_frame_offset = self.frame_id_to_frame_offset(inputs[0].frame_id).unwrap();
+        self.simulate_up_to_date(start_frame_offset);
+    }
+
+    fn frame_id_to_frame_offset(&self, frame_id : u32) -> Option<usize>
+    {
+        let first_state = self.states.back()?;
+        let offset_back = frame_id.checked_sub(first_state.frame_id)? as usize;
+        //self.states
+        let offset_front = self.states.len() - offset_back;
+        assert!(frame_id == self.states.get(offset_front).unwrap().frame_id);
+        Some(offset_front)
+    }
+
+    fn simulate_up_to_date(&mut self, start_frame_offset: usize) {
+        for i in (0..start_frame_offset).rev() {
+            let inputs = self.states[i].player_inputs.clone();
+            let dt = self.states[i].time_us - self.states[i + 1].time_us;
+            let replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32, &self.map);
+            self.states[i] = replacement_state;
         }
     }
 
+    /*
     fn propagate_input(&mut self, input: &RemoteInput) {
         if let Some(index) = self.split_with_input(input.player_id, input.input, input.time_us) {
             // TODO handle index == 0
@@ -148,15 +175,6 @@ impl Timeline {
         }
         else {
             println!("propagate_input ERROR - no split");
-        }
-    }
-
-    fn simulate_up_to_date(&mut self, start_index: usize) {
-        for i in (0..start_index).rev() {
-            let inputs = self.states[i].player_inputs.clone();
-            let dt = self.states[i].time_us - self.states[i + 1].time_us;
-            let replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32, &self.map);
-            self.states[i] = replacement_state;
         }
     }
 
@@ -195,7 +213,9 @@ impl Timeline {
             Some(before)
         }
     }
+    */
 
+    /*
     pub fn propagate_state(
         &mut self,
         latest_remote_state: &RemoteTickState,
@@ -327,6 +347,7 @@ impl Timeline {
 
         player_ids
     }
+    */
 
     pub fn current_state(&self) -> &GameState {
         self.states.get(0).unwrap()
@@ -379,6 +400,7 @@ impl Timeline {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -782,3 +804,5 @@ mod tests {
         assert_eq!(MoveState::Stationary, p1.move_state);
     }
 }
+
+*/

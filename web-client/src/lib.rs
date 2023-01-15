@@ -1,7 +1,5 @@
 #![allow(unused_parens)]
 
-use wasm_bindgen::prelude::*;
-
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into())
@@ -17,6 +15,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use wasm_instant::WasmInstant;
 use serde::Deserialize;
+use wasm_bindgen::prelude::*;
 
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
@@ -53,14 +52,17 @@ pub struct Client {
     last_tick: u32,
     // The last server tick we received
     last_server_tick: Option<u32>,
+    last_server_frame_id: Option<u32>,
     local_player_info : Option<LocalPlayerInfo>,
     ready_state : bool,
 
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
 
-    queued_server_messages : VecDeque<interop::ServerTick>,
+    //queued_server_messages : VecDeque<interop::ServerTick>,
     queued_time_info : Option<interop::TimeRequestEnd>,
+
+    queued_server_linden_messages : VecDeque<interop::LindenServerTick>,
 
     ai_agent : Option<RefCell<Box<dyn ai::AIAgent>>>,
 }
@@ -69,12 +71,12 @@ pub struct Client {
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : &str, server_time_us : u32, estimated_latency_us : u32) -> Self {
+    pub fn new(seed : &str, frame_id : u32, server_time_us : u32, estimated_latency_us : u32) -> Self {
         // Setup statics
         console_error_panic_hook::set_once();
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
 
-        let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
+        let timeline = timeline::Timeline::from_server_parts(seed, frame_id, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
 
         // Estimate server start
         let client_start = WasmInstant::now();
@@ -86,6 +88,7 @@ impl Client {
             timeline,
             last_tick : server_time_us,
             last_server_tick : None,
+            last_server_frame_id: None,
             client_start,
             server_start,
             estimated_latency_us : estimated_latency_us as f32,
@@ -93,8 +96,9 @@ impl Client {
             // TODO proper ready state
             ready_state : false,
             trusted_rule_state: None,
-            queued_server_messages: Default::default(),
+            //queued_server_messages: Default::default(),
             queued_time_info: Default::default(),
+            queued_server_linden_messages: Default::default(),
             ai_agent : None,
         } 
     }
@@ -180,6 +184,7 @@ impl Client {
                 .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
         }
 
+        /*
         // BIGGEST hack
         // dont have the energy to explain, but the timing is fucked and just want to demo something.
         let mut server_tick_it = None;
@@ -193,8 +198,22 @@ impl Client {
         if let Some(server_tick) = server_tick_it {
             self.process_server_message(&server_tick);
         }
+        */
 
-        if (self.timeline.top_state().frame_id.floor() as u32 % 15) == 0
+        let current_frame_id = self.timeline.top_state().frame_id;
+        let mut server_tick_it = None;
+        while  {
+            self.queued_server_linden_messages.back().map(|x| x.latest.frame_id < current_frame_id).unwrap_or(false)
+        }
+        {server_tick_it = self.queued_server_linden_messages.pop_back();}
+
+        self.process_time_info();
+
+        if let Some(linden_server_tick) = server_tick_it {
+            self.process_linden_server_message(&linden_server_tick);
+        }
+
+        //if (self.timeline.top_state().frame_id.floor() as u32 % 15) == 0
         {
             //log!("{:?}", self.timeline.top_state().get_rule_state());
             //log!("{:?}", self.timeline.top_state());
@@ -233,6 +252,7 @@ impl Client {
         }
     }
 
+    /*
     fn process_server_message(&mut self, server_tick : &interop::ServerTick)
     {
         // If we have had a "major change" instead of patching up the current state we perform a full reset
@@ -294,6 +314,26 @@ impl Client {
         self.last_server_tick = Some(server_tick.latest.time_us);
         self.trusted_rule_state = Some(server_tick.rule_state.clone());
     }
+    */
+
+    fn process_linden_server_message(&mut self, linden_server_tick : &interop::LindenServerTick)
+    {
+        let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&linden_server_tick.rule_state)).unwrap_or(false);
+        //should_reset |= self.timeline.top_state().player_states.count_populated() != linden_server_tick.latest.states.len();
+
+        if (should_reset)
+        {
+            todo!("Implement reset");
+        }
+        else
+        {
+            self.timeline.propagate_inputs(linden_server_tick.delta_inputs.clone());
+        }
+
+        //self.last_server_tick = Some(linden_server_tick.latest.time_us);
+        self.last_server_frame_id = Some(linden_server_tick.latest.frame_id);
+        self.trusted_rule_state = Some(linden_server_tick.rule_state.clone());
+    }
 
     fn get_round_id(&self) -> u8 {
         self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0)
@@ -326,7 +366,11 @@ impl Client {
                 //log!("Got time response, {:#?}", self.queued_time_info);
             },
             interop::CrossyMessage::ServerTick(server_tick) => {
-                self.queued_server_messages.push_front(server_tick);
+                panic!("Removing original ServerTicks");
+                //self.queued_server_messages.push_front(server_tick);
+            }
+            interop::CrossyMessage::LindenServerTick(linden_server_tick) => {
+                self.queued_server_linden_messages.push_front(linden_server_tick);
             }
             _ => {},
         }
@@ -346,6 +390,7 @@ impl Client {
         let input = self.local_player_info.as_ref().map(|x| self.timeline.top_state().player_inputs.get(x.player_id)).unwrap_or(Input::None);
         interop::CrossyMessage::ClientTick(interop::ClientTick {
             time_us: self.last_tick,
+            frame_id: self.timeline.top_state().frame_id,
             input: input,
             lobby_ready : self.ready_state,
         })
@@ -353,7 +398,7 @@ impl Client {
 
     pub fn should_get_time_request(&self) -> bool {
         let frame_id = self.timeline.top_state().frame_id;
-        frame_id.floor() as u32 % TIME_REQUEST_INTERVAL == 0
+        frame_id % TIME_REQUEST_INTERVAL == 0
     }
 
     pub fn get_time_request(&self) -> Vec<u8>

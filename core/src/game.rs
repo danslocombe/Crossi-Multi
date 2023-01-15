@@ -170,7 +170,8 @@ pub struct GameState {
     pub player_states: PlayerIdMap<PlayerState>,
     pub ruleset_state : CrossyRulesetFST,
     pub player_inputs: PlayerInputs,
-    pub frame_id: f64,
+    //pub frame_id: f64,
+    pub frame_id : u32,
 }
 
 impl GameState {
@@ -180,18 +181,18 @@ impl GameState {
             player_states: PlayerIdMap::new(),
             player_inputs: PlayerInputs::new(),
             ruleset_state: CrossyRulesetFST::start(),
-            frame_id: 0.0,
+            frame_id: 0,
         }
     }
 
-    pub fn from_server_parts(time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
+    pub fn from_server_parts(frame_id : u32, time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
         let player_states = PlayerIdMap::from_definition(player_states_def.into_iter().map(|x| (x.id, x)).collect());
         GameState {
             time_us,
             player_states,
             player_inputs: PlayerInputs::new(),
             ruleset_state,
-            frame_id: 0.0,
+            frame_id,
         }
     }
 
@@ -263,7 +264,7 @@ impl GameState {
 
     fn simulate_mut(&mut self, player_inputs: Option<PlayerInputs>, dt_us: u32, map : &crate::map::Map) {
         self.time_us += dt_us;
-        self.frame_id += 1.0;
+        self.frame_id += 1;
 
         self.player_inputs = player_inputs.unwrap_or_default();
 
@@ -329,7 +330,7 @@ mod tests {
         let player_states = PlayerIdMap::from_definition(states.into_iter().map(|x| (x.id, x)).collect());
         GameState {
             time_us : 0,
-            frame_id : 0.,
+            frame_id : 0,
             player_states,
             player_inputs: PlayerInputs::default(),
             ruleset_state : CrossyRulesetFST::start(),

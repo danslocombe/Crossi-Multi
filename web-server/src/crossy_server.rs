@@ -40,9 +40,11 @@ pub struct ServerInner {
     start_utc: DateTime<Utc>,
     prev_tick: Instant,
     clients: Vec<Client>,
-    timeline: Timeline,
     next_socket_id: SocketId,
     pub ended: bool,
+
+    timeline: Timeline,
+    input_history : InputHistory,
 }
 
 impl Server {
@@ -60,12 +62,14 @@ impl Server {
                 empty_ticks: 0,
                 clients: Vec::new(),
                 new_players: Vec::new(),
-                timeline: Timeline::from_seed(&id.0),
                 prev_tick: start,
                 start,
                 start_utc,
                 next_socket_id: SocketId(0),
                 ended: false,
+
+                timeline: Timeline::from_seed(&id.0),
+                input_history: Default::default(),
             }),
         }
     }
@@ -288,9 +292,7 @@ impl Server {
                 inner.timeline.set_player_ready(ready_player, ready);
             }
 
-            // Send responses
-            let top_state = inner.timeline.top_state();
-
+            // Generate last sent times
             let mut last_client_sent = PlayerIdMap::new();
             for client in (&inner.clients)
                 .iter()
@@ -303,13 +305,19 @@ impl Server {
                         last_client_sent.set(
                             client.id,
                             RemoteTickState {
-                                time_us: x.time_us,
+                                frame_id: x.frame_id,
+                                //time_us: x.time_us,
                                 states: x.get_valid_player_states(),
                             },
                         );
                     });
             }
 
+
+            // Send responses
+            let top_state = inner.timeline.top_state();
+
+            /*
             let tick = CrossyMessage::ServerTick(ServerTick {
                 exact_send_server_time_us: Instant::now()
                     .saturating_duration_since(inner.start)
@@ -326,6 +334,42 @@ impl Server {
                 // Do we need some lookback period here?
                 rule_state: top_state.get_rule_state().clone(),
             });
+            self.outbound_tx.send(tick).unwrap();
+            */
+
+            // FIXME: if this is empty we are sending everything?
+
+            let delta_inputs = if let Some(min_last_client_sent)= last_client_sent.iter().map(|(_, s)| s.frame_id).min()
+            {
+                inner.input_history.inputs_since_frame(min_last_client_sent)
+            }
+            else
+            {
+                &[]
+            };
+
+            let mut last_client_frame_id = PlayerIdMap::new();
+            for (pid, state) in last_client_sent.iter() {
+                last_client_frame_id.set(pid, state.frame_id);
+            }
+
+            let linden_tick = CrossyMessage::LindenServerTick(LindenServerTick {
+                latest: RemoteTickState {
+                    frame_id: top_state.frame_id,
+                    states: top_state.get_valid_player_states(),
+                },
+                //server_time_us : top_state.time_us,
+                delta_inputs: delta_inputs.iter().cloned().collect(),
+                last_client_frame_id,
+                rule_state: top_state.get_rule_state().clone(),
+            });
+
+            if (delta_inputs.len() > 0)
+            {
+                println!("Sending {:#?}", linden_tick);
+            }
+
+            self.outbound_tx.send(linden_tick).unwrap();
 
             if (has_updates) {
                 for (id, state) in inner.timeline.top_state().player_states.iter() {
@@ -341,26 +385,21 @@ impl Server {
                 }
             }
 
-            if top_state.frame_id as usize % 300 == 0 {
-                //println!("Sending tick {:?}", tick);
-            }
-
+            // Timeout logic for when there are no players
             if (self.outbound_tx.receiver_count() <= 1) {
                 inner.empty_ticks += 1;
             } else {
                 inner.empty_ticks = 0;
             }
 
-            const EMPTY_TICKS_THERSHOLD: u32 = 60 * 20;
-            if (inner.empty_ticks > EMPTY_TICKS_THERSHOLD) {
+            const EMPTY_TICKS_THRESHOLD: u32 = 60 * 20;
+            if (inner.empty_ticks > EMPTY_TICKS_THRESHOLD) {
                 // Noone left listening, shut down
                 println!("[{:?}] Shutting down game", inner.game_id);
                 self.outbound_tx.send(CrossyMessage::GoodBye()).unwrap();
                 inner.ended = true;
                 return;
             }
-
-            self.outbound_tx.send(tick).unwrap();
 
             let now = Instant::now();
             let elapsed_time = now.saturating_duration_since(tick_start);
@@ -402,6 +441,7 @@ impl Server {
                             client_updates.push((
                                 RemoteInput {
                                     time_us: client_time,
+                                    frame_id: t.frame_id,
                                     input: t.input,
                                     player_id: player_client.id,
                                 },
@@ -479,4 +519,32 @@ fn find_spawn_pos(game_state: &crossy_multi_core::game::GameState) -> crossy_mul
     }
 
     panic!("Impossible, without 36 players");
+}
+
+
+#[derive(Default)]
+struct InputHistory
+{
+    sorted_inputs : Vec<crate::timeline::RemoteInput>,
+}
+
+impl InputHistory {
+    pub fn inputs_since_time(&self, time_us : u32) -> &[RemoteInput]
+    {
+        let index = self.sorted_inputs.partition_point(|x| {
+            x.time_us < time_us
+        });
+
+        &self.sorted_inputs[index..]
+    }
+
+    pub fn inputs_since_frame(&self, frame_id : u32) -> &[RemoteInput]
+    {
+        let index = self.sorted_inputs.partition_point(|x| {
+            // TODO how do we handle equality point?
+            x.frame_id < frame_id
+        });
+
+        &self.sorted_inputs[index..]
+    }
 }
