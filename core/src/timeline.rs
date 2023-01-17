@@ -122,8 +122,13 @@ impl Timeline {
     }
 
     pub fn set_player_ready(&mut self, player_id : PlayerId, ready_state : bool) {
-        let new = self.top_state().set_player_ready(player_id, ready_state);
-        self.push_state(new);
+
+        // TODO FIXME 
+        // I THINK THIS IS CALLED EVERY UPDATE ARTHGGHHH
+        let mutated = self.states.pop_front().unwrap().set_player_ready(player_id, ready_state);
+        self.push_state(mutated);
+       
+        //self.push_state(new);
     }
 
     pub fn propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) {
