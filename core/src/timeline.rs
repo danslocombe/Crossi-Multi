@@ -18,13 +18,13 @@ pub struct RemoteInput {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct RemoteTickState {
     pub frame_id : u32,
-    //pub time_us: u32,
+    pub time_us: u32,
     pub states: Vec<PlayerState>,
 }
 
 #[derive(Debug)]
 pub struct Timeline {
-    states: VecDeque<GameState>,
+    pub states: VecDeque<GameState>,
     pub map : Map,
 }
 
@@ -131,6 +131,8 @@ impl Timeline {
             return;
         }
 
+        println!("Propagating inputs {:#?} ", inputs);
+
         // Can we assume its already sorted?
         inputs.sort_by(|x, y| x.frame_id.cmp(&y.frame_id));
 
@@ -145,11 +147,33 @@ impl Timeline {
 
     fn frame_id_to_frame_offset(&self, frame_id : u32) -> Option<usize>
     {
+        println!("Finding frame {}", frame_id);
         let first_state = self.states.back()?;
+        println!("first_state  {:?}", first_state);
+        let last_state = self.states.front()?;
+        println!("last_state  {:?}", last_state);
         let offset_back = frame_id.checked_sub(first_state.frame_id)? as usize;
         //self.states
-        let offset_front = self.states.len() - offset_back;
-        assert!(frame_id == self.states.get(offset_front).unwrap().frame_id);
+        let offset_front = self.states.len() - offset_back - 1;
+        {
+            // DEBUG
+            println!("Offset back {} Offset front {}", offset_back, offset_front);
+
+            println!("{:?}", self.states.iter().map(|x| (x.frame_id, x.time_us)).collect::<Vec<_>>());
+
+            if let Some(got_frame) = self.states.get(offset_front)
+            {
+                if (frame_id != got_frame.frame_id)
+                {
+                    println!("ERROR! {} != {}", frame_id, got_frame.frame_id);
+                    panic!("AAAAH");
+                }
+            }
+            else
+            {
+                println!("Not enough data to get frame {}", frame_id);
+            }
+        }
         Some(offset_front)
     }
 

@@ -71,18 +71,22 @@ pub struct Client {
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : &str, frame_id : u32, server_time_us : u32, estimated_latency_us : u32) -> Self {
+    pub fn new(seed : &str, server_frame_id : u32, server_time_us : u32, estimated_latency_us : u32) -> Self {
         // Setup statics
         console_error_panic_hook::set_once();
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
 
-        let timeline = timeline::Timeline::from_server_parts(seed, frame_id, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
+        let estimated_current_frame_id = server_frame_id + estimated_latency_us / 16_666;
+        let timeline = timeline::Timeline::from_server_parts(seed, estimated_current_frame_id, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
 
         // Estimate server start
         let client_start = WasmInstant::now();
         let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
 
-        log!("CONSTRUCTING : Estimated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency_us);
+        //log!("CONSTRUCTING : Estimated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency_us);
+
+        log!("LINDEN CLIENT : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_current_frame_id);
+
 
         Client {
             timeline,
@@ -319,11 +323,23 @@ impl Client {
     fn process_linden_server_message(&mut self, linden_server_tick : &interop::LindenServerTick)
     {
         let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&linden_server_tick.rule_state)).unwrap_or(false);
-        //should_reset |= self.timeline.top_state().player_states.count_populated() != linden_server_tick.latest.states.len();
+        should_reset |= self.timeline.top_state().player_states.count_populated() != linden_server_tick.latest.states.len();
 
         if (should_reset)
         {
-            todo!("Implement reset");
+            self.timeline = timeline::Timeline::from_server_parts_exact_seed(
+                self.timeline.map.get_seed(),
+                linden_server_tick.latest.frame_id,
+                linden_server_tick.latest.time_us,
+                linden_server_tick.latest.states.clone(),
+                linden_server_tick.rule_state.clone());
+
+            // Reset ready state when we are not in the lobby
+            match (linden_server_tick.rule_state)
+            {
+                crossy_ruleset::CrossyRulesetFST::Lobby(_) => {},
+                _ => {self.ready_state = false}
+            }
         }
         else
         {
@@ -380,7 +396,6 @@ impl Client {
     {
         let message = self.get_client_message_internal();
         flexbuffers::to_vec(message).unwrap()
-
     }
 
     fn get_client_message_internal(&self) -> interop::CrossyMessage
@@ -388,12 +403,19 @@ impl Client {
         //let input = self.local_player_info.as_ref().map(|x| x.input).unwrap_or(Input::None);
         //let mut input = self.timeline.top_state().
         let input = self.local_player_info.as_ref().map(|x| self.timeline.top_state().player_inputs.get(x.player_id)).unwrap_or(Input::None);
-        interop::CrossyMessage::ClientTick(interop::ClientTick {
+        let message = interop::CrossyMessage::ClientTick(interop::ClientTick {
             time_us: self.last_tick,
             frame_id: self.timeline.top_state().frame_id,
             input: input,
             lobby_ready : self.ready_state,
-        })
+        });
+
+        if (input != Input::None) {
+            log!("{:?}", self.timeline.states.iter().map(|x| (x.frame_id, x.time_us)).collect::<Vec<_>>());
+            log!("{:?}", message);
+        }
+
+        message
     }
 
     pub fn should_get_time_request(&self) -> bool {

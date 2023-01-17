@@ -9,7 +9,7 @@ use crossy_multi_core::player_id_map::PlayerIdMap;
 use crossy_multi_core::timeline::{RemoteInput, RemoteTickState, Timeline};
 
 const SERVER_VERSION: u8 = 1;
-const DESIRED_TICK_TIME: Duration = Duration::from_millis(14);
+const DESIRED_TICK_TIME: Duration = Duration::from_nanos(16_666_666);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SocketId(pub u32);
@@ -119,6 +119,11 @@ impl Server {
         let inner = self.inner.lock().await;
         let now = Instant::now();
         now.saturating_duration_since(inner.start)
+    }
+
+    pub async fn frame_id(&self) -> u32 {
+        let inner = self.inner.lock().await;
+        inner.timeline.top_state().frame_id
     }
 
     pub async fn get_start_time_utc(&self) -> String {
@@ -306,7 +311,7 @@ impl Server {
                             client.id,
                             RemoteTickState {
                                 frame_id: x.frame_id,
-                                //time_us: x.time_us,
+                                time_us: x.time_us,
                                 states: x.get_valid_player_states(),
                             },
                         );
@@ -356,6 +361,7 @@ impl Server {
             let linden_tick = CrossyMessage::LindenServerTick(LindenServerTick {
                 latest: RemoteTickState {
                     frame_id: top_state.frame_id,
+                    time_us: top_state.time_us,
                     states: top_state.get_valid_player_states(),
                 },
                 //server_time_us : top_state.time_us,
