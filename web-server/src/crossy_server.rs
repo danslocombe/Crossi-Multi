@@ -343,15 +343,25 @@ impl Server {
             */
 
             // FIXME: if this is empty we are sending everything?
+            // FIXME: hack -100 frames from the top
+            //let delta_inputs = if let Some(min_last_client_sent)= last_client_sent.iter().map(|(_, s)| s.frame_id).min()
+            //let delta_inputs = if let 
+            let delta_inputs = 
+            {
+                let min_last_client_sent = inner.timeline.top_state().frame_id.saturating_sub(100);
+                //println!("Fetching min time {}", min_last_client_sent);
+                //inner.input_history.inputs_since_frame(min_last_client_sent)
+                let inputs_since = inner.timeline.inputs_since_frame(min_last_client_sent);
+                if inputs_since.len() > 0 {
+                    println!("Delta inputs since {}: {:#?}", min_last_client_sent, inputs_since);
+                }
 
-            let delta_inputs = if let Some(min_last_client_sent)= last_client_sent.iter().map(|(_, s)| s.frame_id).min()
-            {
-                inner.input_history.inputs_since_frame(min_last_client_sent)
-            }
-            else
-            {
-                &[]
+                inputs_since
             };
+            //else
+            //{
+            //    Vec::new()
+            //};
 
             let mut last_client_frame_id = PlayerIdMap::new();
             for (pid, state) in last_client_sent.iter() {
@@ -548,7 +558,7 @@ impl InputHistory {
     {
         let index = self.sorted_inputs.partition_point(|x| {
             // TODO how do we handle equality point?
-            x.frame_id < frame_id
+            x.frame_id <= frame_id
         });
 
         &self.sorted_inputs[index..]

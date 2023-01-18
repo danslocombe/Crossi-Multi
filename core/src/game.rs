@@ -159,6 +159,10 @@ impl PlayerInputs {
             Input::None
         }
     }
+
+    pub fn player_count(&self) -> usize {
+        self.inputs.len()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

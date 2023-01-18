@@ -361,8 +361,9 @@ impl Client {
                 _ => {self.ready_state = false}
             }
         }
-        else
+        else if (linden_server_tick.delta_inputs.len() > 0)
         {
+            log!("Propagating inputs {:#?}", linden_server_tick.delta_inputs);
             self.timeline.propagate_inputs(linden_server_tick.delta_inputs.clone());
         }
 
@@ -431,7 +432,7 @@ impl Client {
         });
 
         if (input != Input::None) {
-            log!("{:?}", self.timeline.states.iter().map(|x| (x.frame_id, x.time_us)).collect::<Vec<_>>());
+            //log!("{:?}", self.timeline.states.iter().map(|x| (x.frame_id, x.time_us)).collect::<Vec<_>>());
             log!("{:?}", message);
         }
 

@@ -131,19 +131,58 @@ impl Timeline {
         //self.push_state(new);
     }
 
+    pub fn inputs_since_frame(&self, frame_id : u32) -> Vec<RemoteInput> {
+        if let Some(mut offset) = self.frame_id_to_frame_offset(frame_id)
+        {
+            let mut inputs = Vec::with_capacity(offset);
+
+            while offset > 0 {
+                let state = self.states.get(offset).unwrap();
+                //println!("ISF offset {} - player count {}", offset, state.player_inputs.player_count());
+                for id in 0..state.player_inputs.player_count() {
+                    let player_id = PlayerId(id as u8);
+                    let input = state.player_inputs.get(player_id);
+                    if input != Input::None {
+                        inputs.push(RemoteInput {
+                            frame_id : state.frame_id,
+                            time_us: state.time_us,
+                            input,
+                            player_id,
+                        });
+                    }
+                }
+
+                offset -= 1;
+            }
+
+            inputs
+        }
+        else
+        {
+            Vec::new()
+        }
+    }
+
     pub fn propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) {
         if (inputs.is_empty()) {
             return;
         }
 
-        println!("Propagating inputs {:#?} ", inputs);
+        debug_log!("Propagating inputs {:#?} ", inputs);
 
         // Can we assume its already sorted?
         inputs.sort_by(|x, y| x.frame_id.cmp(&y.frame_id));
 
         for input in &inputs {
-            let frame_offset = self.frame_id_to_frame_offset(input.frame_id).unwrap();
-            self.states.get_mut(frame_offset).unwrap().player_inputs.set(input.player_id, input.input);
+
+            if let Some(frame_offset) = self.frame_id_to_frame_offset(input.frame_id)
+            {
+                self.states.get_mut(frame_offset).unwrap().player_inputs.set(input.player_id, input.input);
+            }
+            else
+            {
+                panic!("Argh! couldnt fetch frame offset for frame id {}, front {}, back {}", input.frame_id, self.states.front().unwrap().frame_id, self.states.back().unwrap().frame_id);
+            }
         }
 
         let start_frame_offset = self.frame_id_to_frame_offset(inputs[0].frame_id).unwrap();
@@ -152,31 +191,20 @@ impl Timeline {
 
     fn frame_id_to_frame_offset(&self, frame_id : u32) -> Option<usize>
     {
-        println!("Finding frame {}", frame_id);
         let first_state = self.states.back()?;
-        println!("first_state  {:?}", first_state);
-        let last_state = self.states.front()?;
-        println!("last_state  {:?}", last_state);
         let offset_back = frame_id.checked_sub(first_state.frame_id)? as usize;
-        //self.states
         let offset_front = self.states.len() - offset_back - 1;
         {
-            // DEBUG
-            println!("Offset back {} Offset front {}", offset_back, offset_front);
-
-            println!("{:?}", self.states.iter().map(|x| (x.frame_id, x.time_us)).collect::<Vec<_>>());
-
             if let Some(got_frame) = self.states.get(offset_front)
             {
                 if (frame_id != got_frame.frame_id)
                 {
-                    println!("ERROR! {} != {}", frame_id, got_frame.frame_id);
-                    panic!("AAAAH");
+                    panic!("Error looking up frame {}, got {}",frame_id, got_frame.frame_id) ;
                 }
             }
             else
             {
-                println!("Not enough data to get frame {}", frame_id);
+                panic!("Error looking up frame {}, could not fetch state with offset {}", frame_id, offset_front);
             }
         }
         Some(offset_front)
