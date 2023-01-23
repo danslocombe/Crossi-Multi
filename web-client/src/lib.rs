@@ -346,8 +346,10 @@ impl Client {
 
     fn process_linden_server_message(&mut self, linden_server_tick : &interop::LindenServerTick)
     {
-        let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&linden_server_tick.rule_state)).unwrap_or(false);
-        should_reset |= self.timeline.top_state().player_states.count_populated() != linden_server_tick.latest.states.len();
+        //let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&linden_server_tick.rule_state)).unwrap_or(false);
+        //should_reset |= self.timeline.top_state().player_states.count_populated() != linden_server_tick.latest.states.len();
+
+        let should_reset = false;
 
         if (should_reset)
         {
