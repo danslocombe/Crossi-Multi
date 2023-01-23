@@ -301,8 +301,10 @@ function create_player_def(sprites, move_sound, colour, source) {
 
             if (this.t == 1)
             {
+                /*
                 this.pinwheel = create_pinwheel(this.x + 4, this.y + 4, {depth: 1000});
                 simple_entities.push(this.pinwheel);
+                */
             }
 
             if (this.pinwheel)

@@ -14,7 +14,7 @@ pub fn set_debug_logger(logger : Box<dyn DebugLogger>) {
     }
 }
 
-fn debug_logline(logline : &str)
+pub fn debug_logline(logline : &str)
 {
     unsafe { if let Some(x) = DEBUG_LOGGER.as_ref() { x.log(logline); }}
 }
@@ -32,6 +32,7 @@ impl DebugLogger for StdoutLogger {
     }
 }
 
+#[macro_export]
 macro_rules! debug_log {
     ( $( $t:tt )* ) => {
         crate::debug_logline(&format!( $( $t )* ));

@@ -6,7 +6,7 @@ use crate::timeline::RemoteTickState;
 use crate::player_id_map::PlayerIdMap;
 use crate::crossy_ruleset::CrossyRulesetFST;
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CrossyMessage {
     Hello(ClientHello),
     HelloResponse(InitServerResponse),
@@ -82,9 +82,10 @@ pub struct ServerTick {
     pub rule_state : CrossyRulesetFST,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LindenServerTick {
     pub latest : RemoteTickState,
+    pub lkg_state : crate::game::GameState,
     pub delta_inputs : Vec<crate::timeline::RemoteInput>,
     pub last_client_frame_id : PlayerIdMap<u32>,
     pub rule_state : CrossyRulesetFST,

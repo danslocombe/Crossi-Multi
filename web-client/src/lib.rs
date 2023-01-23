@@ -136,6 +136,10 @@ impl Client {
         });
     }
 
+    pub fn get_top_frame_id(&self) -> u32 {
+        self.timeline.top_state().frame_id
+    }
+
     pub fn tick(&mut self) {
         const TICK_INTERVAL_US : u32 = 16_666;
 
@@ -146,7 +150,7 @@ impl Client {
             let delta_time = current_time_us.saturating_sub(self.last_tick);
             if (delta_time > TICK_INTERVAL_US)
             {
-                let tick_time = self.last_tick + delta_time;
+                let tick_time = self.last_tick + TICK_INTERVAL_US;
                 self.tick_inner(tick_time);
                 self.last_tick = tick_time;
             }
@@ -361,9 +365,24 @@ impl Client {
                 _ => {self.ready_state = false}
             }
         }
-        else if (linden_server_tick.delta_inputs.len() > 0)
+        else
         {
-            log!("Propagating inputs {:#?}", linden_server_tick.delta_inputs);
+            if let Some(client_state_at_lkg_time) = (self.timeline.try_get_state(linden_server_tick.lkg_state.frame_id))
+            {
+                if (linden_server_tick.lkg_state.player_states != client_state_at_lkg_time.player_states)
+                {
+                    log!("Mismatch in LKG! frame_id {}", client_state_at_lkg_time.frame_id);
+                    log!("Local at lkg time {:#?}", client_state_at_lkg_time.player_states);
+                    log!("LKG {:#?}", linden_server_tick.lkg_state.player_states);
+
+                    // TODO We do a ton of extra work, we recalculate from lkg with current inputs then run propate inputs from server.
+                    self.timeline = self.timeline.rebase(&linden_server_tick.lkg_state);
+                    //log!("Local {:#?}", client_state_at_lkg_time.player_states);
+                    //log!("Remote {:#?}", linden_server_tick.lkg_state);
+                    //self.timeline.states
+                }
+            }
+            //log!("Propagating inputs {:#?}", linden_server_tick.delta_inputs);
             self.timeline.propagate_inputs(linden_server_tick.delta_inputs.clone());
         }
 
@@ -433,7 +452,7 @@ impl Client {
 
         if (input != Input::None) {
             //log!("{:?}", self.timeline.states.iter().map(|x| (x.frame_id, x.time_us)).collect::<Vec<_>>());
-            log!("{:?}", message);
+            //log!("{:?}", message);
         }
 
         message
@@ -466,6 +485,12 @@ impl Client {
             .iter()
             .map(|x| x.to_public(self.get_round_id(), time_us, &self.timeline.map))
             .collect();
+
+        if (players.len() == 0)
+        {
+            log!("get_players_json() empty {:#?}", self.timeline.top_state());
+        }
+
         serde_json::to_string(&players).unwrap()
     }
 

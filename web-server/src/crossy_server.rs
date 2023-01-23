@@ -1,5 +1,6 @@
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
+use warp::hyper::client;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
@@ -38,7 +39,9 @@ pub struct ServerInner {
     new_players: Vec<game::PlayerId>,
     start: Instant,
     start_utc: DateTime<Utc>,
-    prev_tick: Instant,
+
+    last_tick_us : u32,
+
     clients: Vec<Client>,
     next_socket_id: SocketId,
     pub ended: bool,
@@ -62,7 +65,9 @@ impl Server {
                 empty_ticks: 0,
                 clients: Vec::new(),
                 new_players: Vec::new(),
-                prev_tick: start,
+
+                last_tick_us : 0,
+
                 start,
                 start_utc,
                 next_socket_id: SocketId(0),
@@ -197,11 +202,36 @@ impl Server {
             let new_players = std::mem::take(&mut inner.new_players);
 
             // Do simulations
+            /*
             let simulation_time_start = Instant::now();
             let dt_simulation = simulation_time_start.saturating_duration_since(inner.prev_tick);
             inner.prev_tick = simulation_time_start;
+            */
 
-            inner.timeline.tick(None, dt_simulation.as_micros() as u32);
+            // TODO Cleanup into another function
+            const TICK_INTERVAL_US : u32 = 16_666;
+
+            let current_time = inner.start.elapsed();
+            let current_time_us = current_time.as_micros() as u32;
+
+            let mut tick_count = 0;
+            loop {
+                let delta_time = current_time_us.saturating_sub(inner.last_tick_us);
+                if (delta_time > TICK_INTERVAL_US)
+                {
+                    tick_count += 1;
+                    inner.timeline.tick(None, TICK_INTERVAL_US);
+                    let tick_time = inner.last_tick_us + TICK_INTERVAL_US;
+                    inner.last_tick_us = tick_time;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            //println!("Tick count {}", tick_count);
+            //inner.timeline.tick(None, dt_simulation.as_micros() as u32);
 
             {
                 // TMP Assertion
@@ -342,26 +372,12 @@ impl Server {
             self.outbound_tx.send(tick).unwrap();
             */
 
-            // FIXME: if this is empty we are sending everything?
-            // FIXME: hack -100 frames from the top
-            //let delta_inputs = if let Some(min_last_client_sent)= last_client_sent.iter().map(|(_, s)| s.frame_id).min()
-            //let delta_inputs = if let 
-            let delta_inputs = 
-            {
-                let min_last_client_sent = inner.timeline.top_state().frame_id.saturating_sub(100);
-                //println!("Fetching min time {}", min_last_client_sent);
-                //inner.input_history.inputs_since_frame(min_last_client_sent)
-                let inputs_since = inner.timeline.inputs_since_frame(min_last_client_sent);
-                if inputs_since.len() > 0 {
-                    println!("Delta inputs since {}: {:#?}", min_last_client_sent, inputs_since);
-                }
+            // FIXME: We currently take -100 frames, we could do something smarter with the min last send time of clients 
+            // Do we need to be smart?
+            let lkg_frame_id = inner.timeline.top_state().frame_id.saturating_sub(100);
+            let delta_inputs = inner.timeline.inputs_since_frame(lkg_frame_id);
 
-                inputs_since
-            };
-            //else
-            //{
-            //    Vec::new()
-            //};
+            let lkg_state = inner.timeline.try_get_state(lkg_frame_id).unwrap();
 
             let mut last_client_frame_id = PlayerIdMap::new();
             for (pid, state) in last_client_sent.iter() {
@@ -369,21 +385,12 @@ impl Server {
             }
 
             let linden_tick = CrossyMessage::LindenServerTick(LindenServerTick {
-                latest: RemoteTickState {
-                    frame_id: top_state.frame_id,
-                    time_us: top_state.time_us,
-                    states: top_state.get_valid_player_states(),
-                },
-                //server_time_us : top_state.time_us,
+                latest : RemoteTickState::from_gamestate(top_state),
+                lkg_state : lkg_state.clone(),
                 delta_inputs: delta_inputs.iter().cloned().collect(),
                 last_client_frame_id,
                 rule_state: top_state.get_rule_state().clone(),
             });
-
-            if (delta_inputs.len() > 0)
-            {
-                println!("Sending {:#?}", linden_tick);
-            }
 
             self.outbound_tx.send(linden_tick).unwrap();
 
@@ -488,6 +495,7 @@ impl Server {
             }
         }
 
+        //println!("Received {} updates", client_updates.len());
         (client_updates, dropped_players, ready_players)
     }
 }

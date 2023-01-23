@@ -138,14 +138,16 @@ impl PlayerInputs {
         Self::default()
     }
 
-    pub fn set(&mut self, id: PlayerId, input: Input) {
+    pub fn set(&mut self, id: PlayerId, input: Input) -> bool {
         let index = id.0 as usize;
         if (index >= self.inputs.len())
         {
             self.inputs.resize(index + 1, Input::None);
         }
 
+        let changed = self.inputs[index] != input;
         self.inputs[index] = input;
+        changed
     }
 
     pub fn get(&self, id: PlayerId) -> Input {
@@ -171,11 +173,12 @@ pub struct GameState {
     // Should be fine
     // Only worry is drift from summing, going to matter?
     pub time_us: u32,
+    pub frame_id : u32,
+
     pub player_states: PlayerIdMap<PlayerState>,
     pub ruleset_state : CrossyRulesetFST,
     pub player_inputs: PlayerInputs,
     //pub frame_id: f64,
-    pub frame_id : u32,
 }
 
 impl GameState {

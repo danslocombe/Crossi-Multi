@@ -4,6 +4,7 @@ use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::map::Map;
 use crate::game::*;
 use crate::player::PlayerState;
+use crate::player_id_map::PlayerIdMap;
 
 const STATE_BUFFER_SIZE: usize = 128;
 
@@ -20,6 +21,46 @@ pub struct RemoteTickState {
     pub frame_id : u32,
     pub time_us: u32,
     pub states: Vec<PlayerState>,
+}
+
+impl RemoteTickState {
+    pub fn from_gamestate(game_state : &GameState) -> Self {
+        Self {
+            frame_id: game_state.frame_id,
+            time_us: game_state.time_us,
+            states: game_state.get_valid_player_states(),
+        }
+    }
+
+    /*
+    pub fn equal_player_states(&self, other_player_states : &PlayerIdMap<PlayerState>) -> bool
+    {
+        if (self.states.len() != other_player_states.count_populated())
+        {
+            debug_log!("Notequal len");
+            return false;
+        }
+
+        for state in &self.states
+        {
+            if let Some(x) = other_player_states.get(state.id)
+            {
+                if (x != state)
+                {
+                    debug_log!("Notequal pid {:?}, left {:#?} right {:#?}", x.id, x, state);
+                    return false;
+                }
+            }
+            else
+            {
+                debug_log!("Couldnt get pid {:?}", state.id);
+                return false;
+            }
+        }
+
+        true
+    }
+    */
 }
 
 #[derive(Debug)]
@@ -121,6 +162,11 @@ impl Timeline {
         self.states.get(0).unwrap()
     }
 
+    pub fn try_get_state(&self, frame_id : u32) -> Option<&GameState> {
+        let offset = self.frame_id_to_frame_offset(frame_id)?;
+        self.states.get(offset)
+    }
+
     pub fn set_player_ready(&mut self, player_id : PlayerId, ready_state : bool) {
 
         // TODO FIXME 
@@ -163,30 +209,87 @@ impl Timeline {
         }
     }
 
+    pub fn rebase(&self, base : &GameState) -> Self
+    {
+        debug_log!("Rebasing... {:?}", base);
+        let current_frame_id = self.top_state().frame_id;
+
+        let mut new_timeline = Self {
+            states : Default::default(),
+            map : self.map.clone(),
+        };
+
+        new_timeline.states.push_back(base.clone());
+
+        let mut iters = 0;
+
+        while {
+            new_timeline.top_state().frame_id < current_frame_id
+        } {
+            const TICK_INTERVAL_US : u32 = 16_666;
+            let mut inputs = PlayerInputs::default();
+            if let Some(state) = self.try_get_state(new_timeline.top_state().frame_id + 1)
+            {
+                inputs = state.player_inputs.clone();
+            }
+            new_timeline.tick(Some(inputs), TICK_INTERVAL_US);
+
+            iters += 1;
+        }
+
+        //debug_log!("Iters {}", iters);
+        //debug_log!("Prev top {:#?}", self.top_state());
+        //debug_log!("Top {:#?}", new_timeline.top_state());
+        //debug_log!("New timeline full {:#?}", new_timeline.states);
+        new_timeline
+    }
+
     pub fn propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) {
         if (inputs.is_empty()) {
             return;
         }
 
-        debug_log!("Propagating inputs {:#?} ", inputs);
+        //debug_log!("Propagating inputs {:#?} ", inputs);
 
         // Can we assume its already sorted?
         inputs.sort_by(|x, y| x.frame_id.cmp(&y.frame_id));
+
+        let mut resimulation_frame_id = None;
 
         for input in &inputs {
 
             if let Some(frame_offset) = self.frame_id_to_frame_offset(input.frame_id)
             {
-                self.states.get_mut(frame_offset).unwrap().player_inputs.set(input.player_id, input.input);
+                if (self.states.get_mut(frame_offset).unwrap().player_inputs.set(input.player_id, input.input))
+                {
+                    // There was some change
+                    if let Some(_) = self.frame_id_to_frame_offset(input.frame_id - 1)
+                    {
+                        //debug_log!("Propagate inputs, change on input {:#?}", input);
+                        resimulation_frame_id = Some(input.frame_id - 1);
+                    }
+                }
             }
             else
             {
-                panic!("Argh! couldnt fetch frame offset for frame id {}, front {}, back {}", input.frame_id, self.states.front().unwrap().frame_id, self.states.back().unwrap().frame_id);
+                // Warning this can happen on resets.
+                //panic!("Argh! couldnt fetch frame offset for frame id {}, front {}, back {}", input.frame_id, self.states.front().unwrap().frame_id, self.states.back().unwrap().frame_id);
             }
         }
 
-        let start_frame_offset = self.frame_id_to_frame_offset(inputs[0].frame_id).unwrap();
-        self.simulate_up_to_date(start_frame_offset);
+        if let Some(resim_id) = resimulation_frame_id
+        {
+            //debug_log!(">> Resimulating!");
+            let before = self.current_state().clone();
+            let start_frame_offset = self.frame_id_to_frame_offset(resim_id).unwrap();
+            self.simulate_up_to_date(start_frame_offset);
+
+            if (self.current_state().player_states == before.player_states) {
+                //debug_log!("Resimulating produced the same top state, probably a problem");
+                //debug_log!("Before {:#?}", before.player_states);
+                //debug_log!("After {:#?}", self.current_state().player_states);
+            }
+        }
     }
 
     fn frame_id_to_frame_offset(&self, frame_id : u32) -> Option<usize>
