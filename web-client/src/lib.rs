@@ -33,6 +33,8 @@ impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+const TICK_INTERVAL_US : u32 = 16_666;
+
 #[derive(Debug)]
 pub struct LocalPlayerInfo {
     player_id: game::PlayerId,
@@ -49,11 +51,12 @@ pub struct Client {
     estimated_latency_us : f32,
 
     timeline: timeline::Timeline,
-    last_tick: u32,
+    //last_tick: u32,
     // The last server tick we received
     last_server_tick: Option<u32>,
     last_server_frame_id: Option<u32>,
     local_player_info : Option<LocalPlayerInfo>,
+    last_sent_frame_id : u32,
     ready_state : bool,
 
     // This seems like a super hacky solution
@@ -90,13 +93,14 @@ impl Client {
 
         Client {
             timeline,
-            last_tick : server_time_us,
+            //last_tick : server_time_us,
             last_server_tick : None,
             last_server_frame_id: None,
             client_start,
             server_start,
             estimated_latency_us : estimated_latency_us as f32,
             local_player_info : None,
+            last_sent_frame_id : server_frame_id,
             // TODO proper ready state
             ready_state : false,
             trusted_rule_state: None,
@@ -141,18 +145,17 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
-        const TICK_INTERVAL_US : u32 = 16_666;
 
         let current_time = self.server_start.elapsed();
         let current_time_us = current_time.as_micros() as u32;
 
         loop {
-            let delta_time = current_time_us.saturating_sub(self.last_tick);
+            let last_time = self.timeline.top_state().time_us;
+            let delta_time = current_time_us.saturating_sub(last_time);
             if (delta_time > TICK_INTERVAL_US)
             {
-                let tick_time = self.last_tick + TICK_INTERVAL_US;
+                let tick_time = last_time + TICK_INTERVAL_US;
                 self.tick_inner(tick_time);
-                self.last_tick = tick_time;
             }
             else
             {
@@ -167,7 +170,8 @@ impl Client {
 
         // Move buffered input to input
         // awkward because of mut / immut borrowing
-        let mut player_inputs = self.timeline.get_last_player_inputs();
+        //let mut player_inputs = self.timeline.get_last_player_inputs();
+        let mut player_inputs = PlayerInputs::new();
 
         let mut can_move = false;
         let local_player_id = self.local_player_info.as_ref().map(|x| x.player_id);
@@ -208,8 +212,9 @@ impl Client {
         }
         else
         {
-            self.timeline
-                .tick_current_time(Some(player_inputs), current_time_us);
+            self.timeline.tick(Some(player_inputs), TICK_INTERVAL_US)
+            //self.timeline
+                //.tick_current_time(Some(player_inputs), current_time_us);
         }
 
         /*
@@ -377,11 +382,23 @@ impl Client {
         {
             if let Some(client_state_at_lkg_time) = (self.timeline.try_get_state(linden_server_tick.lkg_state.frame_id))
             {
-                if (linden_server_tick.lkg_state.player_states != client_state_at_lkg_time.player_states)
+                let mismatch_player_states = linden_server_tick.lkg_state.player_states != client_state_at_lkg_time.player_states;
+                let mismatch_rulestate = linden_server_tick.lkg_state.ruleset_state != client_state_at_lkg_time.ruleset_state;
+                if (mismatch_player_states || mismatch_rulestate)
                 {
-                    log!("Mismatch in LKG! frame_id {}", client_state_at_lkg_time.frame_id);
-                    log!("Local at lkg time {:#?}", client_state_at_lkg_time.player_states);
-                    log!("LKG {:#?}", linden_server_tick.lkg_state.player_states);
+                    if (mismatch_player_states)
+                    {
+                        log!("Mismatch in LKG! frame_id {}", client_state_at_lkg_time.frame_id);
+                        log!("Local at lkg time {:#?}", client_state_at_lkg_time.player_states);
+                        log!("LKG {:#?}", linden_server_tick.lkg_state.player_states);
+                        log!("Rebasing... {:?}", linden_server_tick.lkg_state);
+                    }
+                    else
+                    {
+                        //log!("Mismatch rules local {:#?} lkg {:#?}", client_state_at_lkg_time.ruleset_state, linden_server_tick.lkg_state.ruleset_state);
+                        log!("Mismatch rules");
+                    }
+
 
                     // TODO We do a ton of extra work, we recalculate from lkg with current inputs then run propate inputs from server.
                     self.timeline = self.timeline.rebase(&linden_server_tick.lkg_state);
@@ -440,30 +457,43 @@ impl Client {
         }
     }
 
-    pub fn get_client_message(&self) -> Vec<u8>
+    pub fn get_client_message(&mut self) -> Vec<u8>
     {
         let message = self.get_client_message_internal();
         flexbuffers::to_vec(message).unwrap()
     }
 
-    fn get_client_message_internal(&self) -> interop::CrossyMessage
+    fn get_client_message_internal(&mut self) -> interop::CrossyMessage
     {
         //let input = self.local_player_info.as_ref().map(|x| x.input).unwrap_or(Input::None);
         //let mut input = self.timeline.top_state().
-        let input = self.local_player_info.as_ref().map(|x| self.timeline.top_state().player_inputs.get(x.player_id)).unwrap_or(Input::None);
-        let message = interop::CrossyMessage::ClientTick(interop::ClientTick {
-            time_us: self.last_tick,
-            frame_id: self.timeline.top_state().frame_id,
-            input: input,
-            lobby_ready : self.ready_state,
-        });
 
-        if (input != Input::None) {
+        let mut ticks = Vec::new();
+
+        while self.last_sent_frame_id <= self.timeline.top_state().frame_id {
+            if let Some(timeline_state) = self.timeline.try_get_state(self.last_sent_frame_id)
+            {
+                let input = self.local_player_info
+                    .as_ref()
+                    .map(|x| timeline_state.player_inputs.get(x.player_id))
+                    .unwrap_or(Input::None);
+
+                ticks.push(interop::ClientTick {
+                    time_us: timeline_state.time_us,
+                    frame_id: timeline_state.frame_id,
+                    input: input,
+                    lobby_ready : self.ready_state,
+                });
+            }
+
+            self.last_sent_frame_id += 1;
+        }
+        //if (input != Input::None) {
             //log!("{:?}", self.timeline.states.iter().map(|x| (x.frame_id, x.time_us)).collect::<Vec<_>>());
             //log!("{:?}", message);
-        }
+        //}
 
-        message
+        interop::CrossyMessage::ClientTick(ticks)
     }
 
     pub fn should_get_time_request(&self) -> bool {
@@ -496,7 +526,7 @@ impl Client {
 
         if (players.len() == 0)
         {
-            log!("get_players_json() empty {:#?}", self.timeline.top_state());
+            //log!("get_players_json() empty {:#?}", self.timeline.top_state());
         }
 
         serde_json::to_string(&players).unwrap()

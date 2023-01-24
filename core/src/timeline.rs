@@ -211,7 +211,6 @@ impl Timeline {
 
     pub fn rebase(&self, base : &GameState) -> Self
     {
-        debug_log!("Rebasing... {:?}", base);
         let current_frame_id = self.top_state().frame_id;
 
         let mut new_timeline = Self {
@@ -266,7 +265,9 @@ impl Timeline {
                     if let Some(_) = self.frame_id_to_frame_offset(input.frame_id - 1)
                     {
                         //debug_log!("Propagate inputs, change on input {:#?}", input);
-                        resimulation_frame_id = Some(input.frame_id - 1);
+
+                        let new_resim_frame_id = (input.frame_id - 1).min(resimulation_frame_id.unwrap_or(u32::MAX));
+                        resimulation_frame_id = Some(new_resim_frame_id);
                     }
                 }
             }
@@ -307,7 +308,8 @@ impl Timeline {
             }
             else
             {
-                panic!("Error looking up frame {}, could not fetch state with offset {}", frame_id, offset_front);
+                //panic!("Error looking up frame {}, could not fetch state with offset {}", frame_id, offset_front);
+                return None;
             }
         }
         Some(offset_front)

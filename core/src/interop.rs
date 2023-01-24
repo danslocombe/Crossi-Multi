@@ -11,7 +11,7 @@ pub enum CrossyMessage {
     Hello(ClientHello),
     HelloResponse(InitServerResponse),
     ServerDecription(ServerDescription),
-    ClientTick(ClientTick),
+    ClientTick(Vec<ClientTick>),
     ClientDrop(),
     ServerTick(ServerTick),
     LindenServerTick(LindenServerTick),

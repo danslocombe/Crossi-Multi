@@ -457,23 +457,26 @@ impl Server {
 
         while let Some((message, socket_id, receive_time)) = queued_messages.pop() {
             match message {
-                CrossyMessage::ClientTick(t) => match inner.get_client_mut_by_addr(socket_id) {
+                CrossyMessage::ClientTick(client_ticks) => match inner.get_client_mut_by_addr(socket_id) {
                     Some(client) => {
                         if let Some(player_client) = client.player_client.as_mut() {
-                            let client_time = t.time_us;
-                            player_client.last_tick_us = client_time;
+                            for t in client_ticks
+                            {
+                                let client_time = t.time_us;
+                                player_client.last_tick_us = player_client.last_tick_us.max(client_time);
 
-                            ready_players.push((player_client.id, t.lobby_ready));
+                                ready_players.push((player_client.id, t.lobby_ready));
 
-                            client_updates.push((
-                                RemoteInput {
-                                    time_us: client_time,
-                                    frame_id: t.frame_id,
-                                    input: t.input,
-                                    player_id: player_client.id,
-                                },
-                                receive_time,
-                            ));
+                                client_updates.push((
+                                    RemoteInput {
+                                        time_us: client_time,
+                                        frame_id: t.frame_id,
+                                        input: t.input,
+                                        player_id: player_client.id,
+                                    },
+                                    receive_time,
+                                ));
+                            }
                         } else {
                             println!("Received client update from client who has not called /play");
                         }
