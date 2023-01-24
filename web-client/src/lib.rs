@@ -228,6 +228,9 @@ impl Client {
         }
         */
 
+        self.process_time_info();
+
+        /*
         let current_frame_id = self.timeline.top_state().frame_id;
         let mut server_tick_it = None;
         while  {
@@ -235,9 +238,12 @@ impl Client {
         }
         {server_tick_it = self.queued_server_linden_messages.pop_back();}
 
-        self.process_time_info();
-
         if let Some(linden_server_tick) = server_tick_it {
+            self.process_linden_server_message(&linden_server_tick);
+        }
+        */
+
+        while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
             self.process_linden_server_message(&linden_server_tick);
         }
 
@@ -599,6 +605,10 @@ impl Client {
             "go_up" => {
                 log!("Setting ai agent to 'go_up'");
                 self.ai_agent = Some(RefCell::new(Box::new(ai::go_up::GoUpAI::new(local_player_id))));
+            },
+            "back_and_forth" => {
+                log!("Setting ai agent to 'back_and_forth'");
+                self.ai_agent = Some(RefCell::new(Box::new(ai::BackAndForth::new(local_player_id))));
             },
             _ => {
                 log!("Unknown ai agent {}", ai_config);

@@ -360,15 +360,25 @@ fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerS
                 let CoordPos{x : _x, y} = *coord_pos;
                 const SCREEN_KILL_BUFFER : i32 = 4;
                 if y > screen_y + crate::SCREEN_SIZE + SCREEN_KILL_BUFFER {
+                    debug_log!("Killing, off the end of the screen {:?} {:?}", player_state.id, player_state.pos);
                     return true;
                 }
 
                 let row = map.get_row(round_id, y);
                 if let RowType::River(_) = row.row_type {
+                    debug_log!("Killing, walked into river {:?} {:?}", player_state.id, player_state.pos);
                     return true;
                 }
 
-                if map.collides_car(time_us, round_id, *coord_pos) {
+                let mut coord_pos_to_check_car_collision = *coord_pos;
+
+                if let crate::player::MoveState::Moving(moving_state) = &player_state.move_state {
+                    if let Pos::Coord(moving_to_coord_pos) = moving_state.target {
+                        coord_pos_to_check_car_collision = moving_to_coord_pos;
+                    }
+                }
+
+                if map.collides_car(time_us, round_id, coord_pos_to_check_car_collision) {
                     return true;
                 }
 

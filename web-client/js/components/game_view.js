@@ -53,6 +53,9 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 else if (this.current_input === "1") {
                     this.client.set_ai("go_up");
                 }
+                else if (this.current_input === "2") {
+                    this.client.set_ai("back_and_forth");
+                }
                 else
                 {
                     this.client.buffer_input_json('"' + this.current_input + '"');
@@ -275,10 +278,21 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 this.intro_ui.draw(this.froggy_draw_ctx);
 
                 // TMP
-                let frame_id = this.client.get_top_frame_id();
+                //let frame_id = this.client.get_top_frame_id();
                 //this.font_controller.text(this.froggy_draw_ctx, frame_id.toString(), 10, 10);
-                this.froggy_draw_ctx.ctx.fillStyle = "black";
-                this.froggy_draw_ctx.ctx.fillText(frame_id.toString(), 10, 10);
+                //this.froggy_draw_ctx.ctx.fillStyle = "black";
+                //this.froggy_draw_ctx.ctx.fillText(frame_id.toString(), 10, 10);
+
+                const local_player_id = this.client.get_local_player_id();
+                if (local_player_id >= 0)
+                {
+                    let local_player = this.players.get(local_player_id);
+                    if (local_player)
+                    {
+                        this.froggy_draw_ctx.ctx.fillStyle = "black";
+                        this.froggy_draw_ctx.ctx.fillText(`(${Math.round(local_player.source.x)}, ${Math.round(local_player.source.y)})`, 10, 10);
+                    }
+                }
             }
         }
     }

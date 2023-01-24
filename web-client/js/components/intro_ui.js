@@ -74,8 +74,19 @@ export function create_intro_ui(font_controller, client) {
 
         draw : function(froggy_draw_ctx) {
             const xoff = 24; 
+
+            /*
+            froggy_draw_ctx.ctx.fillStyle = "#FFFFFF";
+            froggy_draw_ctx.ctx.fillRect(0, 0, 256, 256);
+
+                this.font_controller.text(froggy_draw_ctx, "heavy rain", xoff + 8, this.text_y - this.font_controller.text_height / 2 - 8);
+                this.font_controller.text(froggy_draw_ctx, "eleven degrees", xoff - 12, this.text_y - this.font_controller.text_height / 2 + 8);
+                */
+            
             if (this.in_lobby)
             {
+                //return;
+
                 if (!this.local_player_has_moved)
                 {
                     this.font_controller.text(froggy_draw_ctx, "move with", xoff + 8, this.text_y - this.font_controller.text_height / 2 - 8);

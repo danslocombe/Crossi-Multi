@@ -266,6 +266,7 @@ impl Server {
                     .as_micros() as u32;
                 let delta = (update.time_us as f32 - receive_time_us as f32) / 1000.;
                 //let delta = (update.time_us as i32 - inner.timeline.top_state().time_us as i32) / 1000;
+                /*
                 println!(
                     "[{:?}] Update - {:?} at client time {}ms, receive_time {}ms, delta {}ms",
                     update.player_id,
@@ -274,6 +275,7 @@ impl Server {
                     receive_time_us / 1000,
                     delta.floor()
                 );
+                */
             }
 
             if (nonempty_updates.len() > 0) {
@@ -394,6 +396,7 @@ impl Server {
 
             self.outbound_tx.send(linden_tick).unwrap();
 
+            /*
             if (has_updates) {
                 for (id, state) in inner.timeline.top_state().player_states.iter() {
                     match &state.move_state {
@@ -407,6 +410,7 @@ impl Server {
                     }
                 }
             }
+            */
 
             // Timeout logic for when there are no players
             if (self.outbound_tx.receiver_count() <= 1) {
