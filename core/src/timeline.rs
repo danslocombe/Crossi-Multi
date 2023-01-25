@@ -8,6 +8,8 @@ use crate::player_id_map::PlayerIdMap;
 
 const STATE_BUFFER_SIZE: usize = 128;
 
+pub const TICK_INTERVAL_US : u32 = 16_666;
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct RemoteInput {
     pub time_us: u32,
@@ -31,36 +33,6 @@ impl RemoteTickState {
             states: game_state.get_valid_player_states(),
         }
     }
-
-    /*
-    pub fn equal_player_states(&self, other_player_states : &PlayerIdMap<PlayerState>) -> bool
-    {
-        if (self.states.len() != other_player_states.count_populated())
-        {
-            debug_log!("Notequal len");
-            return false;
-        }
-
-        for state in &self.states
-        {
-            if let Some(x) = other_player_states.get(state.id)
-            {
-                if (x != state)
-                {
-                    debug_log!("Notequal pid {:?}, left {:#?} right {:#?}", x.id, x, state);
-                    return false;
-                }
-            }
-            else
-            {
-                debug_log!("Couldnt get pid {:?}", state.id);
-                return false;
-            }
-        }
-
-        true
-    }
-    */
 }
 
 #[derive(Debug)]
@@ -225,7 +197,6 @@ impl Timeline {
         while {
             new_timeline.top_state().frame_id < current_frame_id
         } {
-            const TICK_INTERVAL_US : u32 = 16_666;
             let mut inputs = PlayerInputs::default();
             if let Some(state) = self.try_get_state(new_timeline.top_state().frame_id + 1)
             {
@@ -236,10 +207,6 @@ impl Timeline {
             iters += 1;
         }
 
-        //debug_log!("Iters {}", iters);
-        //debug_log!("Prev top {:#?}", self.top_state());
-        //debug_log!("Top {:#?}", new_timeline.top_state());
-        //debug_log!("New timeline full {:#?}", new_timeline.states);
         new_timeline
     }
 
@@ -247,8 +214,6 @@ impl Timeline {
         if (inputs.is_empty()) {
             return;
         }
-
-        //debug_log!("Propagating inputs {:#?} ", inputs);
 
         // Can we assume its already sorted?
         inputs.sort_by(|x, y| x.frame_id.cmp(&y.frame_id));
@@ -323,193 +288,6 @@ impl Timeline {
             self.states[i] = replacement_state;
         }
     }
-
-    /*
-    fn propagate_input(&mut self, input: &RemoteInput) {
-        if let Some(index) = self.split_with_input(input.player_id, input.input, input.time_us) {
-            // TODO handle index == 0
-            if (index > 0) {
-                self.simulate_up_to_date(index);
-            }
-            else {
-                println!("propagate_input ERROR - bad index");
-            }
-        }
-        else {
-            println!("propagate_input ERROR - no split");
-        }
-    }
-
-    fn split_with_input(
-        &mut self,
-        player_id: PlayerId,
-        input: Input,
-        time_us: u32,
-    ) -> Option<usize> {
-        // Given some time t
-        // Find the states before and after t s0 and s1, insert a new state s
-        // between them
-        //
-        //     t0  t  t1
-        //     |   |  |
-        //  .. s0  s  s1 ..
-
-        let before = self.get_index_before_us(time_us)?;
-
-        if before == 0 {
-            // TODO handle super-low latency edgecase
-            // Can only happen when latency < frame delay
-            None
-        } else {
-            let state_before = &self.states[before];
-            let dt = time_us - state_before.time_us;
-
-            let after = before - 1;
-
-            let mut inputs = self.states[after].player_inputs.clone();
-            inputs.set(player_id, input);
-            let mut split_state = state_before.simulate(Some(inputs), dt as u32, &self.map);
-            split_state.frame_id -= 0.5;
-
-            self.states.insert(before, split_state);
-            Some(before)
-        }
-    }
-    */
-
-    /*
-    pub fn propagate_state(
-        &mut self,
-        latest_remote_state: &RemoteTickState,
-        rule_state : Option<&CrossyRulesetFST>,
-        client_latest_remote_state: Option<&RemoteTickState>,
-        local_player: Option<PlayerId>,
-    ) {
-        // /////////////////////////////////////////////////////////////
-        //    client_last     s_server
-        //        |              |
-        //        |              |
-        // s0 .. s1 ..     .. s2 | s3 .. s_now
-        //
-        // s0 oldest state stored
-        // s1 last local state that had an influence on s_server
-        // s2 s3 sandwich s_server
-        //
-        // Strat:
-        // Pop all older than s1
-        // s1 becomes the "trusted" state to base all else on
-        //
-        // create modified s_server' by using local player state
-        // from s2 and the inputs from s3
-        // modify s3 .. s_now into s3' .. s_now'
-        //
-        // /////////////////////////////////////////////////////////////
-        //
-        // s1 .. s2 s_server' s3' .. s_now'
-        //
-        // /////////////////////////////////////////////////////////////
-
-        let mut use_client_predictions : Vec<PlayerId> = local_player.into_iter().collect();
-
-        if let Some(state) = client_latest_remote_state.as_ref() {
-            if let Some(index) = self.split_with_state(&[], &state.states, None, state.time_us) {
-                // Commented out to fix some glitchy behaviour where client predictions not correctly triggered
-                //while self.states.len() > index + 1 {
-                //    self.states.pop_back();
-                //}
-
-                if (index > 0) {
-                    self.simulate_up_to_date(index);
-
-                    if let Some(lp) = local_player {
-                        use_client_predictions = self.players_to_use_client_predictions(index, lp);
-                        //if (use_client_predictions.len() > 1) {
-                            //crate::debug_log(&format!("{:?}", use_client_predictions));
-                        //}
-                    }
-                }
-            }
-        }
-
-        if let Some(index) = self.split_with_state(
-            &use_client_predictions,
-            &latest_remote_state.states,
-            rule_state,
-            latest_remote_state.time_us,
-        ) {
-            if (index > 0) {
-                self.simulate_up_to_date(index);
-            }
-        }
-    }
-
-    fn split_with_state(
-        &mut self,
-        ignore_player_ids: &[PlayerId],
-        server_states: &[PlayerState],
-        maybe_server_rule_state : Option<&CrossyRulesetFST>,
-        time_us: u32,
-    ) -> Option<usize> {
-        let before = self.get_index_before_us(time_us)?;
-
-        if before == 0 {
-            None
-        } else {
-            let state_before = &self.states[before];
-            let dt = time_us - state_before.time_us;
-
-            let mut split_state = state_before.simulate(None, dt as u32, &self.map);
-
-            for server_player_state in server_states {
-                if (!ignore_player_ids.contains(&server_player_state.id)) {
-                    split_state
-                        .set_player_state(server_player_state.id, server_player_state.clone());
-                }
-            }
-
-            if let Some(server_rule_state) = maybe_server_rule_state {
-                split_state.ruleset_state = server_rule_state.clone();
-            }
-
-            split_state.frame_id -= 0.5;
-            self.states.insert(before, split_state);
-            Some(before)
-        }
-    }
-
-    fn players_to_use_client_predictions(&self, index : usize, local_player : PlayerId) -> Vec<PlayerId> {
-        let mut player_ids = vec![local_player];
-
-        for i in (0..=index).rev() {
-            let state = &self.states[i];
-
-            for player in &state.get_valid_player_states() {
-                let mut to_add : Option<PlayerId> = None;
-                for pid in &player_ids {
-                    if player.is_being_pushed_by(*pid) {
-                        to_add = Some(player.id);
-                        break;
-                    }
-                }
-
-                // Bug
-                // Edge case where we dont add secondary push if on the last frame
-                // Think its fine to ignore
-
-                match to_add {
-                    Some(pid) => {
-                        if !player_ids.contains(&pid) {
-                            player_ids.push(pid);
-                        }
-                    },
-                    _ => {},
-                }
-            }
-        }
-
-        player_ids
-    }
-    */
 
     pub fn current_state(&self) -> &GameState {
         self.states.get(0).unwrap()

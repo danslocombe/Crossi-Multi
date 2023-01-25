@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use crossy_multi_core::game;
 use crossy_multi_core::interop::*;
 use crossy_multi_core::player_id_map::PlayerIdMap;
-use crossy_multi_core::timeline::{RemoteInput, RemoteTickState, Timeline};
+use crossy_multi_core::timeline::{RemoteInput, RemoteTickState, Timeline, TICK_INTERVAL_US};
 
 const SERVER_VERSION: u8 = 1;
 const DESIRED_TICK_TIME: Duration = Duration::from_nanos(16_666_666);
@@ -202,11 +202,6 @@ impl Server {
             let new_players = std::mem::take(&mut inner.new_players);
 
             // Do simulations
-            /*
-            let simulation_time_start = Instant::now();
-            let dt_simulation = simulation_time_start.saturating_duration_since(inner.prev_tick);
-            inner.prev_tick = simulation_time_start;
-            */
 
             // TODO Cleanup into another function
             const TICK_INTERVAL_US : u32 = 16_666;
@@ -214,12 +209,10 @@ impl Server {
             let current_time = inner.start.elapsed();
             let current_time_us = current_time.as_micros() as u32;
 
-            let mut tick_count = 0;
             loop {
                 let delta_time = current_time_us.saturating_sub(inner.last_tick_us);
                 if (delta_time > TICK_INTERVAL_US)
                 {
-                    tick_count += 1;
                     inner.timeline.tick(None, TICK_INTERVAL_US);
                     let tick_time = inner.last_tick_us + TICK_INTERVAL_US;
                     inner.last_tick_us = tick_time;
@@ -227,21 +220,6 @@ impl Server {
                 else
                 {
                     break;
-                }
-            }
-
-            //println!("Tick count {}", tick_count);
-            //inner.timeline.tick(None, dt_simulation.as_micros() as u32);
-
-            {
-                // TMP Assertion
-                let current_time = inner.timeline.top_state().time_us;
-                for (update, _) in &mut client_updates {
-                    if (update.time_us > current_time) {
-                        println!("Update from the future from {:?} - ahead {}us - client time {}us server time {}us", update.player_id, update.time_us.saturating_sub(current_time), update.time_us, current_time);
-                        // HACK this shitttt
-                        update.time_us = current_time - 1;
-                    }
                 }
             }
 
@@ -279,30 +257,10 @@ impl Server {
             }
 
             if (nonempty_updates.len() > 0) {
-                //let top_state_before = inner.timeline.top_state().clone();
                 inner
                     .timeline
                     .propagate_inputs(nonempty_updates.into_iter().map(|(x, _)| x).collect());
-                /*
-                let top_state_after = inner.timeline.top_state();
 
-                if (top_state_before.player_states.count_populated() != top_state_after.player_states.count_populated())
-                {
-                    println!("Different player counts");
-                }
-                else
-                {
-                    for (pid, before_state) in top_state_before.player_states.iter() {
-                        if let Some(new) = top_state_after.get_player(pid)
-                        {
-                            //if (before_state.pos != new.pos)
-                            {
-                                println!("Player {:?} {:?} -> {:?}", pid, before_state, new);
-                            }
-                        }
-                    }
-                }
-                */
             }
 
             for new_player in new_players {
@@ -354,26 +312,6 @@ impl Server {
             // Send responses
             let top_state = inner.timeline.top_state();
 
-            /*
-            let tick = CrossyMessage::ServerTick(ServerTick {
-                exact_send_server_time_us: Instant::now()
-                    .saturating_duration_since(inner.start)
-                    .as_micros() as u32,
-
-                latest: RemoteTickState {
-                    time_us: top_state.time_us,
-                    states: top_state.get_valid_player_states(),
-                },
-                last_client_sent,
-
-                // If an input comes in late that affects state change then this ignores it
-                // Do we care?
-                // Do we need some lookback period here?
-                rule_state: top_state.get_rule_state().clone(),
-            });
-            self.outbound_tx.send(tick).unwrap();
-            */
-
             // FIXME: We currently take -100 frames, we could do something smarter with the min last send time of clients 
             // Do we need to be smart?
             let lkg_frame_id = inner.timeline.top_state().frame_id.saturating_sub(100);
@@ -395,22 +333,6 @@ impl Server {
             });
 
             self.outbound_tx.send(linden_tick).unwrap();
-
-            /*
-            if (has_updates) {
-                for (id, state) in inner.timeline.top_state().player_states.iter() {
-                    match &state.move_state {
-                        crossy_multi_core::player::MoveState::Moving(m) => {
-                            println!(
-                                "[{}] Moving->({:?}, remaining_us: {})",
-                                id.0, m.target, m.remaining_us
-                            )
-                        }
-                        _ => println!("[{}] {:?}", id.0, state.pos),
-                    }
-                }
-            }
-            */
 
             // Timeout logic for when there are no players
             if (self.outbound_tx.receiver_count() <= 1) {

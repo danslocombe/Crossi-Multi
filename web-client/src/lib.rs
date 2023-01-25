@@ -162,6 +162,12 @@ impl Client {
                 break;
             }
         }
+
+        self.process_time_info();
+
+        while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
+            self.process_linden_server_message(&linden_server_tick);
+        }
     }
 
     pub fn tick_inner(&mut self, current_time_us : u32) {
@@ -213,49 +219,6 @@ impl Client {
         else
         {
             self.timeline.tick(Some(player_inputs), TICK_INTERVAL_US)
-            //self.timeline
-                //.tick_current_time(Some(player_inputs), current_time_us);
-        }
-
-        /*
-        // BIGGEST hack
-        // dont have the energy to explain, but the timing is fucked and just want to demo something.
-        let mut server_tick_it = None;
-        while  {
-            self.queued_server_messages.back().map(|x| x.latest.time_us < current_time_us).unwrap_or(false)
-        }
-        {server_tick_it = self.queued_server_messages.pop_back();}
-
-        self.process_time_info();
-
-        if let Some(server_tick) = server_tick_it {
-            self.process_server_message(&server_tick);
-        }
-        */
-
-        self.process_time_info();
-
-        /*
-        let current_frame_id = self.timeline.top_state().frame_id;
-        let mut server_tick_it = None;
-        while  {
-            self.queued_server_linden_messages.back().map(|x| x.latest.frame_id < current_frame_id).unwrap_or(false)
-        }
-        {server_tick_it = self.queued_server_linden_messages.pop_back();}
-
-        if let Some(linden_server_tick) = server_tick_it {
-            self.process_linden_server_message(&linden_server_tick);
-        }
-        */
-
-        while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
-            self.process_linden_server_message(&linden_server_tick);
-        }
-
-        //if (self.timeline.top_state().frame_id.floor() as u32 % 15) == 0
-        {
-            //log!("{:?}", self.timeline.top_state().get_rule_state());
-            //log!("{:?}", self.timeline.top_state());
         }
     }
 
@@ -290,70 +253,6 @@ impl Client {
             //log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
         }
     }
-
-    /*
-    fn process_server_message(&mut self, server_tick : &interop::ServerTick)
-    {
-        // If we have had a "major change" instead of patching up the current state we perform a full reset
-        // At the moment a major change is either:
-        //   We have moved between game states (eg the round ended)
-        //   A player has joined or left
-        let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&server_tick.rule_state)).unwrap_or(false);
-        should_reset |= self.timeline.top_state().player_states.count_populated() != server_tick.latest.states.len();
-
-        if (should_reset) {
-            self.timeline = timeline::Timeline::from_server_parts_exact_seed(
-                self.timeline.map.get_seed(),
-                server_tick.latest.time_us,
-                server_tick.latest.states.clone(),
-                server_tick.rule_state.clone());
-
-            // Reset ready state when we are not in the lobby
-            match (server_tick.rule_state)
-            {
-                crossy_ruleset::CrossyRulesetFST::Lobby(_) => {},
-                _ => {self.ready_state = false}
-            }
-        }
-        else
-        {
-            match self.local_player_info.as_ref()
-            {
-                Some(lpi) => {
-                    if (self.timeline.top_state().get_player(lpi.player_id)).is_none()
-                    {
-                        // Edge case
-                        // First tick with the player
-                        // we need to take state from server
-                        self.timeline.propagate_state(
-                            &server_tick.latest,
-                            Some(&server_tick.rule_state),
-                            Some(&server_tick.latest),
-                            None);
-                    }
-                    else
-                    {
-                        self.timeline.propagate_state(
-                            &server_tick.latest,
-                            Some(&server_tick.rule_state),
-                            server_tick.last_client_sent.get(lpi.player_id),
-                            Some(lpi.player_id));
-                    }
-                }
-                _ => {
-                    self.timeline.propagate_state(
-                        &server_tick.latest,
-                        Some(&server_tick.rule_state),
-                        None,
-                        None);
-                }
-            }
-        }
-
-        self.last_server_tick = Some(server_tick.latest.time_us);
-        self.trusted_rule_state = Some(server_tick.rule_state.clone());
-    }
-    */
 
     fn process_linden_server_message(&mut self, linden_server_tick : &interop::LindenServerTick)
     {
