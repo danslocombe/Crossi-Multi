@@ -191,10 +191,9 @@ impl Server {
 
     pub async fn run(&self) {
         // Still have client listeners
-        //while self.outbound_tx.receiver_count() > 0 {
         loop {
             let tick_start = Instant::now();
-            let (mut client_updates, dropped_players, ready_players) = self.receive_updates().await;
+            let (client_updates, dropped_players, ready_players) = self.receive_updates().await;
 
             let mut inner = self.inner.lock().await;
 
@@ -202,10 +201,6 @@ impl Server {
             let new_players = std::mem::take(&mut inner.new_players);
 
             // Do simulations
-
-            // TODO Cleanup into another function
-            const TICK_INTERVAL_US : u32 = 16_666;
-
             let current_time = inner.start.elapsed();
             let current_time_us = current_time.as_micros() as u32;
 
@@ -219,15 +214,6 @@ impl Server {
                 }
                 else
                 {
-                    break;
-                }
-            }
-
-            let mut has_updates = false;
-
-            for (x, _) in &client_updates {
-                if (x.input != game::Input::None) {
-                    has_updates = true;
                     break;
                 }
             }
@@ -424,7 +410,6 @@ impl Server {
             }
         }
 
-        //println!("Received {} updates", client_updates.len());
         (client_updates, dropped_players, ready_players)
     }
 }

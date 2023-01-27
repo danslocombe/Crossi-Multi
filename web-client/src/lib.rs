@@ -51,10 +51,7 @@ pub struct Client {
     estimated_latency_us : f32,
 
     timeline: timeline::Timeline,
-    //last_tick: u32,
-    // The last server tick we received
-    last_server_tick: Option<u32>,
-    last_server_frame_id: Option<u32>,
+
     local_player_info : Option<LocalPlayerInfo>,
     last_sent_frame_id : u32,
     ready_state : bool,
@@ -62,7 +59,6 @@ pub struct Client {
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
 
-    //queued_server_messages : VecDeque<interop::ServerTick>,
     queued_time_info : Option<interop::TimeRequestEnd>,
 
     queued_server_linden_messages : VecDeque<interop::LindenServerTick>,
@@ -86,16 +82,11 @@ impl Client {
         let client_start = WasmInstant::now();
         let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
 
-        //log!("CONSTRUCTING : Estimated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency_us);
-
-        log!("LINDEN CLIENT : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_current_frame_id);
+        log!("Constructing client : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_current_frame_id);
 
 
         Client {
             timeline,
-            //last_tick : server_time_us,
-            last_server_tick : None,
-            last_server_frame_id: None,
             client_start,
             server_start,
             estimated_latency_us : estimated_latency_us as f32,
@@ -104,7 +95,6 @@ impl Client {
             // TODO proper ready state
             ready_state : false,
             trusted_rule_state: None,
-            //queued_server_messages: Default::default(),
             queued_time_info: Default::default(),
             queued_server_linden_messages: Default::default(),
             ai_agent : None,
@@ -310,8 +300,6 @@ impl Client {
             self.timeline.propagate_inputs(linden_server_tick.delta_inputs.clone());
         }
 
-        //self.last_server_tick = Some(linden_server_tick.latest.time_us);
-        self.last_server_frame_id = Some(linden_server_tick.latest.frame_id);
         self.trusted_rule_state = Some(linden_server_tick.rule_state.clone());
     }
 
@@ -345,10 +333,7 @@ impl Client {
 
                 //log!("Got time response, {:#?}", self.queued_time_info);
             },
-            interop::CrossyMessage::ServerTick(server_tick) => {
-                panic!("Removing original ServerTicks");
-                //self.queued_server_messages.push_front(server_tick);
-            }
+
             interop::CrossyMessage::LindenServerTick(linden_server_tick) => {
                 self.queued_server_linden_messages.push_front(linden_server_tick);
             }
@@ -423,11 +408,6 @@ impl Client {
             .map(|x| x.to_public(self.get_round_id(), time_us, &self.timeline.map))
             .collect();
 
-        if (players.len() == 0)
-        {
-            //log!("get_players_json() empty {:#?}", self.timeline.top_state());
-        }
-
         serde_json::to_string(&players).unwrap()
     }
 
@@ -448,11 +428,6 @@ impl Client {
     }
 
     fn get_latest_server_rule_state(&self) -> Option<&crossy_ruleset::CrossyRulesetFST> {
-        /*
-        let us = self.last_server_tick? + 1;
-        let state_before = self.timeline.get_state_before_eq_us(us)?;
-        Some(state_before.get_rule_state())
-        */
         self.trusted_rule_state.as_ref()
     }
 

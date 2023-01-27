@@ -13,7 +13,6 @@ pub enum CrossyMessage {
     ServerDecription(ServerDescription),
     ClientTick(Vec<ClientTick>),
     ClientDrop(),
-    ServerTick(ServerTick),
     LindenServerTick(LindenServerTick),
 
     TimeRequestPacket(TimeRequestPacket),
@@ -70,16 +69,6 @@ pub struct ClientTick {
     pub input: Input,
     // TODO probably shouldnt be here?
     pub lobby_ready : bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct ServerTick {
-    // Removing as we are setting up a proper route
-    pub exact_send_server_time_us : u32,
-
-    pub latest : RemoteTickState,
-    pub last_client_sent : PlayerIdMap<RemoteTickState>,
-    pub rule_state : CrossyRulesetFST,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
