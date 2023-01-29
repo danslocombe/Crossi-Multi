@@ -251,7 +251,7 @@ function create_player_def(sprites, move_sound, colour, source) {
         dynamic_depth : 0,
         created_corpse : false,
         t : 0,
-        lobby_ready : false,
+        //lobby_ready : false,
         pinwheel : null,
 
         tick : function(state, simple_entities, rule_state) {
@@ -292,12 +292,14 @@ function create_player_def(sprites, move_sound, colour, source) {
             this.y = this.source.y * SCALE;
             this.dynamic_depth = this.y;
 
+            /*
             if (rule_state && rule_state.Lobby) {
                 this.lobby_ready = rule_state.Lobby.ready_states.inner[this.source.player_id];
             }
             else {
                 this.lobby_ready = false;
             }
+            */
 
             if (this.t == 1)
             {
@@ -346,6 +348,7 @@ function create_player_def(sprites, move_sound, colour, source) {
                 froggy_draw_ctx.ctx.scale(-1, 1);
             }
 
+            /*
             if (this.lobby_ready) {
                 froggy_draw_ctx.ctx.strokeStyle = this.colour;
                 froggy_draw_ctx.ctx.beginPath();
@@ -359,6 +362,7 @@ function create_player_def(sprites, move_sound, colour, source) {
                 froggy_draw_ctx.ctx.lineTo(xx, yy - 9);
                 froggy_draw_ctx.ctx.stroke();
             }
+            */
 
             // TODO make transparent
             // do in sprite

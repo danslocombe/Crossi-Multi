@@ -139,16 +139,6 @@ impl Timeline {
         self.states.get(offset)
     }
 
-    pub fn set_player_ready(&mut self, player_id : PlayerId, ready_state : bool) {
-
-        // TODO FIXME 
-        // I THINK THIS IS CALLED EVERY UPDATE ARTHGGHHH
-        let mutated = self.states.pop_front().unwrap().set_player_ready(player_id, ready_state);
-        self.push_state(mutated);
-       
-        //self.push_state(new);
-    }
-
     pub fn inputs_since_frame(&self, frame_id : u32) -> Vec<RemoteInput> {
         if let Some(mut offset) = self.frame_id_to_frame_offset(frame_id)
         {

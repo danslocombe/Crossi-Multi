@@ -67,8 +67,6 @@ pub struct ClientTick {
     pub time_us: u32,
     pub frame_id: u32,
     pub input: Input,
-    // TODO probably shouldnt be here?
-    pub lobby_ready : bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

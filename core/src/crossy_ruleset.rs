@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::{PlayerInputs, Input};
 use crate::game::{PlayerId, Pos, CoordPos};
 use crate::player::PlayerState;
 use crate::player_id_map::PlayerIdMap;
@@ -21,7 +22,7 @@ impl GameConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LobbyState {
-    pub ready_states : PlayerIdMap<bool>,
+    pub time_with_all_players_in_ready_zone : u32,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -88,46 +89,44 @@ impl CrossyRulesetFST
 {
     pub fn start() -> Self {
         Lobby(LobbyState {
-            ready_states: PlayerIdMap::new(),
+            time_with_all_players_in_ready_zone: 0,
         })
     }
 
     pub fn tick(&self, dt : u32, time_us : u32, player_states : &mut PlayerIdMap<PlayerState>, map : &Map) -> Self {
         match self {
             Lobby(state) => {
-                let mut new_lobby = state.clone();
+                let enough_players = player_states.count_populated() >= MIN_PLAYERS;
+                let all_in_ready_zone = player_states.iter().all(|(_, x)| player_in_lobby_ready_zone(x));
 
-                // Ensure all players have an entry in ready_states.
-                new_lobby.ready_states.seed_missing(player_states, false);
-                new_lobby.ready_states.intersect(player_states);
+                if (enough_players && all_in_ready_zone) {
+                    if (state.time_with_all_players_in_ready_zone > 120) { 
 
-                let enough_players = new_lobby.ready_states.count_populated() >= MIN_PLAYERS;
-                let all_ready = new_lobby.ready_states.iter().all(|(_, x)| *x);
+                        debug_log!("Starting Game! ...");
+                        debug_log!("Player States {:?}", player_states);
 
-                if (enough_players && all_ready) {
+                        // Initialize to all zero
+                        let win_counts = PlayerIdMap::seed_from(player_states, 0);
+                        let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
+                        reset_positions(player_states, true);
 
-                    debug_log!("Starting Game! ...");
-                    debug_log!("Player States {:?}", player_states);
-                    debug_log!("Ready States {:?}", new_lobby.ready_states);
+                        let game_config = GameConfig::new();
 
-                    // Initialize to all zero
-                    let win_counts = PlayerIdMap::seed_from(player_states, 0);
-                    let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
-                    reset_positions(player_states, true);
-
-                    let game_config = GameConfig::new();
-
-                    RoundWarmup(WarmupState {
-                        win_counts,
-                        alive_states,
-                        remaining_us : COUNTDOWN_TIME_US,
-                        round_id : 1,
-                        river_spawn_times : Default::default(),
-                        game_config,
-                    })
+                        RoundWarmup(WarmupState {
+                            win_counts,
+                            alive_states,
+                            remaining_us : COUNTDOWN_TIME_US,
+                            round_id : 1,
+                            river_spawn_times : Default::default(),
+                            game_config,
+                        })
+                    }
+                    else {
+                        Lobby(LobbyState { time_with_all_players_in_ready_zone: state.time_with_all_players_in_ready_zone + 1 })
+                    }
                 }
                 else {
-                    Lobby(new_lobby)
+                    Lobby(LobbyState { time_with_all_players_in_ready_zone: state.time_with_all_players_in_ready_zone / 2 })
                 }
             },
             RoundWarmup(state) => {
@@ -247,9 +246,8 @@ impl CrossyRulesetFST
                     }
                     _ => {
                         // Reset to lobby
-                        let ready_states = PlayerIdMap::seed_from(player_states, false);
                         Lobby(LobbyState {
-                            ready_states,
+                            time_with_all_players_in_ready_zone: 0,
                         })
                     }
                 }
@@ -372,6 +370,8 @@ fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerS
 
                 let mut coord_pos_to_check_car_collision = *coord_pos;
 
+                // When the player is moving between spots be more generous to player
+                // Check for car collisions at the point they are moving to.
                 if let crate::player::MoveState::Moving(moving_state) = &player_state.move_state {
                     if let Pos::Coord(moving_to_coord_pos) = moving_state.target {
                         coord_pos_to_check_car_collision = moving_to_coord_pos;
@@ -403,5 +403,15 @@ fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<Al
         if should_kill(time_us, round_id, map, player_state, screen_y) {
             alive_states.set(id, AliveState::Dead);
         }
+    }
+}
+
+fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
+    if let Pos::Coord(CoordPos{x, y}) = player.pos {
+        x >= 6 && x <= 14 && y >= 12 && y <= 16
+    }
+    else
+    {
+        false
     }
 }

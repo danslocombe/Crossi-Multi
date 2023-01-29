@@ -193,7 +193,7 @@ impl Server {
         // Still have client listeners
         loop {
             let tick_start = Instant::now();
-            let (client_updates, dropped_players, ready_players) = self.receive_updates().await;
+            let (client_updates, dropped_players) = self.receive_updates().await;
 
             let mut inner = self.inner.lock().await;
 
@@ -230,7 +230,6 @@ impl Server {
                     .as_micros() as u32;
                 let delta = (update.time_us as f32 - receive_time_us as f32) / 1000.;
                 //let delta = (update.time_us as i32 - inner.timeline.top_state().time_us as i32) / 1000;
-                /*
                 println!(
                     "[{:?}] Update - {:?} at client time {}ms, receive_time {}ms, delta {}ms",
                     update.player_id,
@@ -239,7 +238,6 @@ impl Server {
                     receive_time_us / 1000,
                     delta.floor()
                 );
-                */
             }
 
             if (nonempty_updates.len() > 0) {
@@ -267,10 +265,6 @@ impl Server {
             for dropped_player in dropped_players {
                 println!("[{:?}] Dropping player {:?}", inner.game_id, dropped_player);
                 inner.timeline.remove_player(dropped_player);
-            }
-
-            for (ready_player, ready) in ready_players {
-                inner.timeline.set_player_ready(ready_player, ready);
             }
 
             // Generate last sent times
@@ -349,7 +343,6 @@ impl Server {
     ) -> (
         Vec<(RemoteInput, Instant)>,
         Vec<game::PlayerId>,
-        Vec<(game::PlayerId, bool)>,
     ) {
         let mut queued_messages = Vec::with_capacity(8);
 
@@ -358,7 +351,6 @@ impl Server {
         drop(guard);
 
         let mut client_updates = Vec::new();
-        let mut ready_players = Vec::new();
 
         let mut inner = self.inner.lock().await;
         let mut dropped_players = vec![];
@@ -372,8 +364,6 @@ impl Server {
                             {
                                 let client_time = t.time_us;
                                 player_client.last_tick_us = player_client.last_tick_us.max(client_time);
-
-                                ready_players.push((player_client.id, t.lobby_ready));
 
                                 client_updates.push((
                                     RemoteInput {
@@ -410,7 +400,7 @@ impl Server {
             }
         }
 
-        (client_updates, dropped_players, ready_players)
+        (client_updates, dropped_players)
     }
 }
 

@@ -54,7 +54,6 @@ pub struct Client {
 
     local_player_info : Option<LocalPlayerInfo>,
     last_sent_frame_id : u32,
-    ready_state : bool,
 
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
@@ -92,8 +91,6 @@ impl Client {
             estimated_latency_us : estimated_latency_us as f32,
             local_player_info : None,
             last_sent_frame_id : server_frame_id,
-            // TODO proper ready state
-            ready_state : false,
             trusted_rule_state: None,
             queued_time_info: Default::default(),
             queued_server_linden_messages: Default::default(),
@@ -106,14 +103,6 @@ impl Client {
             player_id : PlayerId(player_id as u8),
             buffered_input : Input::None,
         })
-    }
-
-    pub fn get_ready_state(&self) -> bool {
-        self.ready_state
-    }
-
-    pub fn set_ready_state(&mut self, state : bool) {
-        self.ready_state = state;
     }
 
     pub fn buffer_input_json(&mut self, input_json : &str) {
@@ -259,13 +248,6 @@ impl Client {
                 linden_server_tick.latest.time_us,
                 linden_server_tick.latest.states.clone(),
                 linden_server_tick.rule_state.clone());
-
-            // Reset ready state when we are not in the lobby
-            match (linden_server_tick.rule_state)
-            {
-                crossy_ruleset::CrossyRulesetFST::Lobby(_) => {},
-                _ => {self.ready_state = false}
-            }
         }
         else
         {
@@ -349,9 +331,6 @@ impl Client {
 
     fn get_client_message_internal(&mut self) -> interop::CrossyMessage
     {
-        //let input = self.local_player_info.as_ref().map(|x| x.input).unwrap_or(Input::None);
-        //let mut input = self.timeline.top_state().
-
         let mut ticks = Vec::new();
 
         while self.last_sent_frame_id <= self.timeline.top_state().frame_id {
@@ -366,16 +345,11 @@ impl Client {
                     time_us: timeline_state.time_us,
                     frame_id: timeline_state.frame_id,
                     input: input,
-                    lobby_ready : self.ready_state,
                 });
             }
 
             self.last_sent_frame_id += 1;
         }
-        //if (input != Input::None) {
-            //log!("{:?}", self.timeline.states.iter().map(|x| (x.frame_id, x.time_us)).collect::<Vec<_>>());
-            //log!("{:?}", message);
-        //}
 
         interop::CrossyMessage::ClientTick(ticks)
     }

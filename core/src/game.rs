@@ -34,7 +34,6 @@ impl CoordPos {
 
     pub fn apply_input(&self, input: Input) -> Self {
         match input {
-            Input::None => *self,
             Input::Up => CoordPos {
                 x: self.x,
                 y: self.y - 1,
@@ -51,6 +50,7 @@ impl CoordPos {
                 x: self.x + 1,
                 y: self.y,
             },
+            _  => *self,
         }
     }
 }
@@ -71,7 +71,6 @@ impl PreciseCoords {
 
     pub fn apply_input(&self, input: Input) -> Self {
         match input {
-            Input::None => *self,
             Input::Up => Self {
                 x: self.x,
                 y: self.y - 1,
@@ -88,6 +87,7 @@ impl PreciseCoords {
                 x: self.x + 1.0,
                 y: self.y,
             },
+            _ => *self,
         }
     }
 }
@@ -242,18 +242,6 @@ impl GameState {
         };
 
         new.set_player_state(id, state);
-        new
-    }
-
-    pub fn set_player_ready(&self, id : PlayerId, ready : bool) -> Self {
-        let mut new = self.clone();
-        match &mut new.ruleset_state {
-            CrossyRulesetFST::Lobby(state) => {
-                state.ready_states.set(id, ready);
-            },
-            _ => {},
-        };
-
         new
     }
 

@@ -136,14 +136,6 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 if (local_player_id >= 0) {
                     for (const current_player_state of current_player_states) {
                         if (!this.players.get(current_player_state.id)) {
-                            //console.log("CURRENT PLAYER STATES WHEN CANT FIND LOCAL PLAYER");
-                            //console.log(">>>");
-                            //console.log("this.players");
-                            //console.log(JSON.stringify(this.players));
-                            //console.log(">>>");
-                            //console.log(JSON.stringify(current_player_states));
-                            //console.log(">>> Current player"); 
-                            //console.log(JSON.stringify(current_player_state));
                             console.log("creating player");
                             if (current_player_state.id === local_player_id) {
                                 console.log("creating local player");
@@ -167,14 +159,6 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                         if (players_with_values.has(player_id)) {
                             filtered_players.set(player_id, player);
                         }
-                    }
-
-                    if (filtered_players.size != this.players.size)
-                    {
-                        //console.log("Player dropped!");
-                        //console.log("Before: " + JSON.stringify(this.players));
-                        //console.log("After: " + JSON.stringify(filtered_players));
-                        //console.log("Players_json: " + players_json);
                     }
 
                     this.players = filtered_players;
