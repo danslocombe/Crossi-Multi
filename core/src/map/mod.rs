@@ -72,7 +72,7 @@ pub struct MapInner {
     rounds : Vec<MapRound>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Map{
    seed : u32,
    inner : std::sync::Arc<std::sync::Mutex<MapInner>>,

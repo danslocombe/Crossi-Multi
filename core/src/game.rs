@@ -34,7 +34,6 @@ impl CoordPos {
 
     pub fn apply_input(&self, input: Input) -> Self {
         match input {
-            Input::None => *self,
             Input::Up => CoordPos {
                 x: self.x,
                 y: self.y - 1,
@@ -51,6 +50,7 @@ impl CoordPos {
                 x: self.x + 1,
                 y: self.y,
             },
+            _  => *self,
         }
     }
 }
@@ -71,7 +71,6 @@ impl PreciseCoords {
 
     pub fn apply_input(&self, input: Input) -> Self {
         match input {
-            Input::None => *self,
             Input::Up => Self {
                 x: self.x,
                 y: self.y - 1,
@@ -88,6 +87,7 @@ impl PreciseCoords {
                 x: self.x + 1.0,
                 y: self.y,
             },
+            _ => *self,
         }
     }
 }
@@ -138,14 +138,16 @@ impl PlayerInputs {
         Self::default()
     }
 
-    pub fn set(&mut self, id: PlayerId, input: Input) {
+    pub fn set(&mut self, id: PlayerId, input: Input) -> bool {
         let index = id.0 as usize;
         if (index >= self.inputs.len())
         {
             self.inputs.resize(index + 1, Input::None);
         }
 
+        let changed = self.inputs[index] != input;
         self.inputs[index] = input;
+        changed
     }
 
     pub fn get(&self, id: PlayerId) -> Input {
@@ -159,6 +161,10 @@ impl PlayerInputs {
             Input::None
         }
     }
+
+    pub fn player_count(&self) -> usize {
+        self.inputs.len()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -167,10 +173,12 @@ pub struct GameState {
     // Should be fine
     // Only worry is drift from summing, going to matter?
     pub time_us: u32,
+    pub frame_id : u32,
+
     pub player_states: PlayerIdMap<PlayerState>,
     pub ruleset_state : CrossyRulesetFST,
     pub player_inputs: PlayerInputs,
-    pub frame_id: f64,
+    //pub frame_id: f64,
 }
 
 impl GameState {
@@ -180,18 +188,18 @@ impl GameState {
             player_states: PlayerIdMap::new(),
             player_inputs: PlayerInputs::new(),
             ruleset_state: CrossyRulesetFST::start(),
-            frame_id: 0.0,
+            frame_id: 0,
         }
     }
 
-    pub fn from_server_parts(time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
+    pub fn from_server_parts(frame_id : u32, time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
         let player_states = PlayerIdMap::from_definition(player_states_def.into_iter().map(|x| (x.id, x)).collect());
         GameState {
             time_us,
             player_states,
             player_inputs: PlayerInputs::new(),
             ruleset_state,
-            frame_id: 0.0,
+            frame_id,
         }
     }
 
@@ -237,18 +245,6 @@ impl GameState {
         new
     }
 
-    pub fn set_player_ready(&self, id : PlayerId, ready : bool) -> Self {
-        let mut new = self.clone();
-        match &mut new.ruleset_state {
-            CrossyRulesetFST::Lobby(state) => {
-                state.ready_states.set(id, ready);
-            },
-            _ => {},
-        };
-
-        new
-    }
-
     pub fn remove_player(&self, id: PlayerId) -> Self {
         let mut new = self.clone();
         new.player_states.remove(id);
@@ -263,7 +259,7 @@ impl GameState {
 
     fn simulate_mut(&mut self, player_inputs: Option<PlayerInputs>, dt_us: u32, map : &crate::map::Map) {
         self.time_us += dt_us;
-        self.frame_id += 1.0;
+        self.frame_id += 1;
 
         self.player_inputs = player_inputs.unwrap_or_default();
 
@@ -329,7 +325,7 @@ mod tests {
         let player_states = PlayerIdMap::from_definition(states.into_iter().map(|x| (x.id, x)).collect());
         GameState {
             time_us : 0,
-            frame_id : 0.,
+            frame_id : 0,
             player_states,
             player_inputs: PlayerInputs::default(),
             ruleset_state : CrossyRulesetFST::start(),

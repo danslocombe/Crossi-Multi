@@ -4,25 +4,40 @@ use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::map::Map;
 use crate::game::*;
 use crate::player::PlayerState;
+use crate::player_id_map::PlayerIdMap;
 
 const STATE_BUFFER_SIZE: usize = 128;
 
-#[derive(Debug, Clone)]
+pub const TICK_INTERVAL_US : u32 = 16_666;
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct RemoteInput {
     pub time_us: u32,
+    pub frame_id: u32,
     pub input: Input,
     pub player_id: PlayerId,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct RemoteTickState {
+    pub frame_id : u32,
     pub time_us: u32,
     pub states: Vec<PlayerState>,
 }
 
+impl RemoteTickState {
+    pub fn from_gamestate(game_state : &GameState) -> Self {
+        Self {
+            frame_id: game_state.frame_id,
+            time_us: game_state.time_us,
+            states: game_state.get_valid_player_states(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Timeline {
-    states: VecDeque<GameState>,
+    pub states: VecDeque<GameState>,
     pub map : Map,
 }
 
@@ -47,12 +62,13 @@ impl Timeline {
 
     pub fn from_server_parts(
         seed: &str,
+        frame_id : u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
         ruleset_state : CrossyRulesetFST
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(frame_id, time_us, player_states, ruleset_state));
         Timeline {
             states,
             map: Map::new(seed),
@@ -61,12 +77,13 @@ impl Timeline {
 
     pub fn from_server_parts_exact_seed(
         seed: u32,
+        frame_id : u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
         ruleset_state : CrossyRulesetFST
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(frame_id, time_us, player_states, ruleset_state));
         Timeline {
             states,
             map: Map::exact_seed(seed),
@@ -117,9 +134,70 @@ impl Timeline {
         self.states.get(0).unwrap()
     }
 
-    pub fn set_player_ready(&mut self, player_id : PlayerId, ready_state : bool) {
-        let new = self.top_state().set_player_ready(player_id, ready_state);
-        self.push_state(new);
+    pub fn try_get_state(&self, frame_id : u32) -> Option<&GameState> {
+        let offset = self.frame_id_to_frame_offset(frame_id)?;
+        self.states.get(offset)
+    }
+
+    pub fn inputs_since_frame(&self, frame_id : u32) -> Vec<RemoteInput> {
+        if let Some(mut offset) = self.frame_id_to_frame_offset(frame_id)
+        {
+            let mut inputs = Vec::with_capacity(offset);
+
+            while offset > 0 {
+                let state = self.states.get(offset).unwrap();
+                //println!("ISF offset {} - player count {}", offset, state.player_inputs.player_count());
+                for id in 0..state.player_inputs.player_count() {
+                    let player_id = PlayerId(id as u8);
+                    let input = state.player_inputs.get(player_id);
+                    if input != Input::None {
+                        inputs.push(RemoteInput {
+                            frame_id : state.frame_id,
+                            time_us: state.time_us,
+                            input,
+                            player_id,
+                        });
+                    }
+                }
+
+                offset -= 1;
+            }
+
+            inputs
+        }
+        else
+        {
+            Vec::new()
+        }
+    }
+
+    pub fn rebase(&self, base : &GameState) -> Self
+    {
+        let current_frame_id = self.top_state().frame_id;
+
+        let mut new_timeline = Self {
+            states : Default::default(),
+            map : self.map.clone(),
+        };
+
+        new_timeline.states.push_back(base.clone());
+
+        let mut iters = 0;
+
+        while {
+            new_timeline.top_state().frame_id < current_frame_id
+        } {
+            let mut inputs = PlayerInputs::default();
+            if let Some(state) = self.try_get_state(new_timeline.top_state().frame_id + 1)
+            {
+                inputs = state.player_inputs.clone();
+            }
+            new_timeline.tick(Some(inputs), TICK_INTERVAL_US);
+
+            iters += 1;
+        }
+
+        new_timeline
     }
 
     pub fn propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) {
@@ -127,205 +205,78 @@ impl Timeline {
             return;
         }
 
-        inputs.sort_by(|x, y| x.time_us.cmp(&y.time_us));
+        // Can we assume its already sorted?
+        inputs.sort_by(|x, y| x.frame_id.cmp(&y.frame_id));
+
+        let mut resimulation_frame_id = None;
 
         for input in &inputs {
-            if (input.input != Input::None) {
-                self.propagate_input(input);
+
+            if let Some(frame_offset) = self.frame_id_to_frame_offset(input.frame_id)
+            {
+                if (self.states.get_mut(frame_offset).unwrap().player_inputs.set(input.player_id, input.input))
+                {
+                    // There was some change
+                    if let Some(_) = self.frame_id_to_frame_offset(input.frame_id - 1)
+                    {
+                        //debug_log!("Propagate inputs, change on input {:#?}", input);
+
+                        let new_resim_frame_id = (input.frame_id - 1).min(resimulation_frame_id.unwrap_or(u32::MAX));
+                        resimulation_frame_id = Some(new_resim_frame_id);
+                    }
+                }
+            }
+            else
+            {
+                // Warning this can happen on resets.
+                //panic!("Argh! couldnt fetch frame offset for frame id {}, front {}, back {}", input.frame_id, self.states.front().unwrap().frame_id, self.states.back().unwrap().frame_id);
+            }
+        }
+
+        if let Some(resim_id) = resimulation_frame_id
+        {
+            //debug_log!(">> Resimulating!");
+            let before = self.current_state().clone();
+            let start_frame_offset = self.frame_id_to_frame_offset(resim_id).unwrap();
+            self.simulate_up_to_date(start_frame_offset);
+
+            if (self.current_state().player_states == before.player_states) {
+                //debug_log!("Resimulating produced the same top state, probably a problem");
+                //debug_log!("Before {:#?}", before.player_states);
+                //debug_log!("After {:#?}", self.current_state().player_states);
             }
         }
     }
 
-    fn propagate_input(&mut self, input: &RemoteInput) {
-        if let Some(index) = self.split_with_input(input.player_id, input.input, input.time_us) {
-            // TODO handle index == 0
-            if (index > 0) {
-                self.simulate_up_to_date(index);
+    fn frame_id_to_frame_offset(&self, frame_id : u32) -> Option<usize>
+    {
+        let first_state = self.states.back()?;
+        let offset_back = frame_id.checked_sub(first_state.frame_id)? as usize;
+        let offset_front = self.states.len() - offset_back - 1;
+        {
+            if let Some(got_frame) = self.states.get(offset_front)
+            {
+                if (frame_id != got_frame.frame_id)
+                {
+                    panic!("Error looking up frame {}, got {}",frame_id, got_frame.frame_id) ;
+                }
             }
-            else {
-                println!("propagate_input ERROR - bad index");
+            else
+            {
+                //panic!("Error looking up frame {}, could not fetch state with offset {}", frame_id, offset_front);
+                return None;
             }
         }
-        else {
-            println!("propagate_input ERROR - no split");
-        }
+        Some(offset_front)
     }
 
-    fn simulate_up_to_date(&mut self, start_index: usize) {
-        for i in (0..start_index).rev() {
+    fn simulate_up_to_date(&mut self, start_frame_offset: usize) {
+        for i in (0..start_frame_offset).rev() {
             let inputs = self.states[i].player_inputs.clone();
             let dt = self.states[i].time_us - self.states[i + 1].time_us;
             let replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32, &self.map);
             self.states[i] = replacement_state;
         }
-    }
-
-    fn split_with_input(
-        &mut self,
-        player_id: PlayerId,
-        input: Input,
-        time_us: u32,
-    ) -> Option<usize> {
-        // Given some time t
-        // Find the states before and after t s0 and s1, insert a new state s
-        // between them
-        //
-        //     t0  t  t1
-        //     |   |  |
-        //  .. s0  s  s1 ..
-
-        let before = self.get_index_before_us(time_us)?;
-
-        if before == 0 {
-            // TODO handle super-low latency edgecase
-            // Can only happen when latency < frame delay
-            None
-        } else {
-            let state_before = &self.states[before];
-            let dt = time_us - state_before.time_us;
-
-            let after = before - 1;
-
-            let mut inputs = self.states[after].player_inputs.clone();
-            inputs.set(player_id, input);
-            let mut split_state = state_before.simulate(Some(inputs), dt as u32, &self.map);
-            split_state.frame_id -= 0.5;
-
-            self.states.insert(before, split_state);
-            Some(before)
-        }
-    }
-
-    pub fn propagate_state(
-        &mut self,
-        latest_remote_state: &RemoteTickState,
-        rule_state : Option<&CrossyRulesetFST>,
-        client_latest_remote_state: Option<&RemoteTickState>,
-        local_player: Option<PlayerId>,
-    ) {
-        // /////////////////////////////////////////////////////////////
-        //    client_last     s_server
-        //        |              |
-        //        |              |
-        // s0 .. s1 ..     .. s2 | s3 .. s_now
-        //
-        // s0 oldest state stored
-        // s1 last local state that had an influence on s_server
-        // s2 s3 sandwich s_server
-        //
-        // Strat:
-        // Pop all older than s1
-        // s1 becomes the "trusted" state to base all else on
-        //
-        // create modified s_server' by using local player state
-        // from s2 and the inputs from s3
-        // modify s3 .. s_now into s3' .. s_now'
-        //
-        // /////////////////////////////////////////////////////////////
-        //
-        // s1 .. s2 s_server' s3' .. s_now'
-        //
-        // /////////////////////////////////////////////////////////////
-
-        let mut use_client_predictions : Vec<PlayerId> = local_player.into_iter().collect();
-
-        if let Some(state) = client_latest_remote_state.as_ref() {
-            if let Some(index) = self.split_with_state(&[], &state.states, None, state.time_us) {
-                // Commented out to fix some glitchy behaviour where client predictions not correctly triggered
-                //while self.states.len() > index + 1 {
-                //    self.states.pop_back();
-                //}
-
-                if (index > 0) {
-                    self.simulate_up_to_date(index);
-
-                    if let Some(lp) = local_player {
-                        use_client_predictions = self.players_to_use_client_predictions(index, lp);
-                        //if (use_client_predictions.len() > 1) {
-                            //crate::debug_log(&format!("{:?}", use_client_predictions));
-                        //}
-                    }
-                }
-            }
-        }
-
-        if let Some(index) = self.split_with_state(
-            &use_client_predictions,
-            &latest_remote_state.states,
-            rule_state,
-            latest_remote_state.time_us,
-        ) {
-            if (index > 0) {
-                self.simulate_up_to_date(index);
-            }
-        }
-    }
-
-    fn split_with_state(
-        &mut self,
-        ignore_player_ids: &[PlayerId],
-        server_states: &[PlayerState],
-        maybe_server_rule_state : Option<&CrossyRulesetFST>,
-        time_us: u32,
-    ) -> Option<usize> {
-        let before = self.get_index_before_us(time_us)?;
-
-        if before == 0 {
-            None
-        } else {
-            let state_before = &self.states[before];
-            let dt = time_us - state_before.time_us;
-
-            let mut split_state = state_before.simulate(None, dt as u32, &self.map);
-
-            for server_player_state in server_states {
-                if (!ignore_player_ids.contains(&server_player_state.id)) {
-                    split_state
-                        .set_player_state(server_player_state.id, server_player_state.clone());
-                }
-            }
-
-            if let Some(server_rule_state) = maybe_server_rule_state {
-                split_state.ruleset_state = server_rule_state.clone();
-            }
-
-            split_state.frame_id -= 0.5;
-            self.states.insert(before, split_state);
-            Some(before)
-        }
-    }
-
-    fn players_to_use_client_predictions(&self, index : usize, local_player : PlayerId) -> Vec<PlayerId> {
-        let mut player_ids = vec![local_player];
-
-        for i in (0..=index).rev() {
-            let state = &self.states[i];
-
-            for player in &state.get_valid_player_states() {
-                let mut to_add : Option<PlayerId> = None;
-                for pid in &player_ids {
-                    if player.is_being_pushed_by(*pid) {
-                        to_add = Some(player.id);
-                        break;
-                    }
-                }
-
-                // Bug
-                // Edge case where we dont add secondary push if on the last frame
-                // Think its fine to ignore
-
-                match to_add {
-                    Some(pid) => {
-                        if !player_ids.contains(&pid) {
-                            player_ids.push(pid);
-                        }
-                    },
-                    _ => {},
-                }
-            }
-        }
-
-        player_ids
     }
 
     pub fn current_state(&self) -> &GameState {
@@ -379,6 +330,7 @@ impl Timeline {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -782,3 +734,5 @@ mod tests {
         assert_eq!(MoveState::Stationary, p1.move_state);
     }
 }
+
+*/

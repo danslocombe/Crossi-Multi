@@ -10,7 +10,7 @@ import { create_prop_controller } from "./props";
 import { create_from_ai_overlay } from "./ai_overlay";
 import { create_from_lilly_overlay } from "./lilly_move_hints"
 import { create_font_controller } from "./font"
-import { create_intro_ui } from "./intro_ui"
+import { create_intro_ui, create_intro_ui_bg } from "./intro_ui"
 
 
 const audio_crowd = new Audio('/sounds/snd_win.wav');
@@ -41,6 +41,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         dialogue : create_dialogue_controller(),
         prop_controller : create_prop_controller(),
         intro_ui : create_intro_ui(font_controller, client),
+        intro_ui_bg : create_intro_ui_bg(),
         font_controller : font_controller,
 
         tick : function()
@@ -52,6 +53,9 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 }
                 else if (this.current_input === "1") {
                     this.client.set_ai("go_up");
+                }
+                else if (this.current_input === "2") {
+                    this.client.set_ai("back_and_forth");
                 }
                 else
                 {
@@ -191,6 +195,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 this.countdown.tick(this.rule_state);
                 this.dialogue.tick(this.rule_state, this.players, this.simple_entities);
                 this.intro_ui.tick(this.players);
+                this.intro_ui_bg.tick(this.rule_state);
 
                 this.prop_controller.tick(this.rule_state, this.simple_entities, this.client);
                 this.font_controller.tick();
@@ -201,6 +206,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
             const in_lobby = !this.rule_state || this.rule_state.Lobby || this.rule_state.End;
             const in_warmup = this.rule_state && this.rule_state.RoundWarmup;
             draw_background(this.froggy_draw_ctx, in_lobby, in_warmup, this.client)
+            this.intro_ui_bg.draw(this.froggy_draw_ctx);
 
             if (this.client) {
                 let draw_with_depth = [];
@@ -257,6 +263,23 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 this.dialogue.draw(this.froggy_draw_ctx);
                 this.countdown.draw(this.froggy_draw_ctx);
                 this.intro_ui.draw(this.froggy_draw_ctx);
+
+                // TMP
+                //let frame_id = this.client.get_top_frame_id();
+                //this.font_controller.text(this.froggy_draw_ctx, frame_id.toString(), 10, 10);
+                //this.froggy_draw_ctx.ctx.fillStyle = "black";
+                //this.froggy_draw_ctx.ctx.fillText(frame_id.toString(), 10, 10);
+
+                const local_player_id = this.client.get_local_player_id();
+                if (local_player_id >= 0)
+                {
+                    let local_player = this.players.get(local_player_id);
+                    if (local_player)
+                    {
+                        this.froggy_draw_ctx.ctx.fillStyle = "black";
+                        this.froggy_draw_ctx.ctx.fillText(`(${Math.round(local_player.source.x)}, ${Math.round(local_player.source.y)})`, 10, 10);
+                    }
+                }
             }
         }
     }

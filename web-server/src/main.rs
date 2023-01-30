@@ -224,6 +224,7 @@ struct JoinResponse {
     pub socket_id : crossy_server::SocketId,
     pub server_description : interop::ServerDescription,
     pub server_time_us : u32,
+    pub server_frame_id : u32,
 }
 
 async fn join_handler(options : JoinOptions, db: GameDb) -> Result<Response, Rejection>  {
@@ -232,10 +233,12 @@ async fn join_handler(options : JoinOptions, db: GameDb) -> Result<Response, Rej
     //let last_frame_time_us = dbinner.game.get_last_frame_time_us().await;
     let socket_id = dbinner.game.join().await;
     let server_time_us = dbinner.game.time_since().await;
+    let server_frame_id = dbinner.game.frame_id().await;
     let response = JoinResponse {
         socket_id,
         server_description,
         server_time_us : server_time_us.as_micros() as u32,
+        server_frame_id,
     };
 
     Ok(reply::json(&response).into_response())

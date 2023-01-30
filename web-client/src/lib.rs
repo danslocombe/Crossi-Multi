@@ -1,7 +1,5 @@
 #![allow(unused_parens)]
 
-use wasm_bindgen::prelude::*;
-
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into())
@@ -17,6 +15,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use wasm_instant::WasmInstant;
 use serde::Deserialize;
+use wasm_bindgen::prelude::*;
 
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
@@ -34,6 +33,8 @@ impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+const TICK_INTERVAL_US : u32 = 16_666;
+
 #[derive(Debug)]
 pub struct LocalPlayerInfo {
     player_id: game::PlayerId,
@@ -50,17 +51,16 @@ pub struct Client {
     estimated_latency_us : f32,
 
     timeline: timeline::Timeline,
-    last_tick: u32,
-    // The last server tick we received
-    last_server_tick: Option<u32>,
+
     local_player_info : Option<LocalPlayerInfo>,
-    ready_state : bool,
+    last_sent_frame_id : u32,
 
     // This seems like a super hacky solution
     trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
 
-    queued_server_messages : VecDeque<interop::ServerTick>,
     queued_time_info : Option<interop::TimeRequestEnd>,
+
+    queued_server_linden_messages : VecDeque<interop::LindenServerTick>,
 
     ai_agent : Option<RefCell<Box<dyn ai::AIAgent>>>,
 }
@@ -69,32 +69,31 @@ pub struct Client {
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : &str, server_time_us : u32, estimated_latency_us : u32) -> Self {
+    pub fn new(seed : &str, server_frame_id : u32, server_time_us : u32, estimated_latency_us : u32) -> Self {
         // Setup statics
         console_error_panic_hook::set_once();
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
 
-        let timeline = timeline::Timeline::from_server_parts(seed, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
+        let estimated_current_frame_id = server_frame_id + estimated_latency_us / 16_666;
+        let timeline = timeline::Timeline::from_server_parts(seed, estimated_current_frame_id, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
 
         // Estimate server start
         let client_start = WasmInstant::now();
         let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
 
-        log!("CONSTRUCTING : Estimated t0 {:?} server t1 {} estimated latency {}", server_start, server_time_us, estimated_latency_us);
+        log!("Constructing client : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_current_frame_id);
+
 
         Client {
             timeline,
-            last_tick : server_time_us,
-            last_server_tick : None,
             client_start,
             server_start,
             estimated_latency_us : estimated_latency_us as f32,
             local_player_info : None,
-            // TODO proper ready state
-            ready_state : false,
+            last_sent_frame_id : server_frame_id,
             trusted_rule_state: None,
-            queued_server_messages: Default::default(),
             queued_time_info: Default::default(),
+            queued_server_linden_messages: Default::default(),
             ai_agent : None,
         } 
     }
@@ -104,14 +103,6 @@ impl Client {
             player_id : PlayerId(player_id as u8),
             buffered_input : Input::None,
         })
-    }
-
-    pub fn get_ready_state(&self) -> bool {
-        self.ready_state
-    }
-
-    pub fn set_ready_state(&mut self, state : bool) {
-        self.ready_state = state;
     }
 
     pub fn buffer_input_json(&mut self, input_json : &str) {
@@ -128,13 +119,44 @@ impl Client {
         });
     }
 
+    pub fn get_top_frame_id(&self) -> u32 {
+        self.timeline.top_state().frame_id
+    }
+
     pub fn tick(&mut self) {
+
         let current_time = self.server_start.elapsed();
-        self.last_tick = current_time.as_micros() as u32;
+        let current_time_us = current_time.as_micros() as u32;
+
+        loop {
+            let last_time = self.timeline.top_state().time_us;
+            let delta_time = current_time_us.saturating_sub(last_time);
+            if (delta_time > TICK_INTERVAL_US)
+            {
+                let tick_time = last_time + TICK_INTERVAL_US;
+                self.tick_inner(tick_time);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        self.process_time_info();
+
+        while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
+            self.process_linden_server_message(&linden_server_tick);
+        }
+    }
+
+    pub fn tick_inner(&mut self, current_time_us : u32) {
+        //let current_time = self.server_start.elapsed();
+        //self.last_tick = current_time.as_micros() as u32;
 
         // Move buffered input to input
         // awkward because of mut / immut borrowing
-        let mut player_inputs = self.timeline.get_last_player_inputs();
+        //let mut player_inputs = self.timeline.get_last_player_inputs();
+        let mut player_inputs = PlayerInputs::new();
 
         let mut can_move = false;
         let local_player_id = self.local_player_info.as_ref().map(|x| x.player_id);
@@ -169,35 +191,13 @@ impl Client {
         }
 
         // Tick 
-        let current_time_us = current_time.as_micros() as u32;
         if (self.timeline.top_state().time_us > current_time_us)
         {
             log!("OH NO WE ARE IN THE PAST!");
         }
         else
         {
-            self.timeline
-                .tick_current_time(Some(player_inputs), current_time.as_micros() as u32);
-        }
-
-        // BIGGEST hack
-        // dont have the energy to explain, but the timing is fucked and just want to demo something.
-        let mut server_tick_it = None;
-        while  {
-            self.queued_server_messages.back().map(|x| x.latest.time_us < current_time_us).unwrap_or(false)
-        }
-        {server_tick_it = self.queued_server_messages.pop_back();}
-
-        self.process_time_info();
-
-        if let Some(server_tick) = server_tick_it {
-            self.process_server_message(&server_tick);
-        }
-
-        if (self.timeline.top_state().frame_id.floor() as u32 % 15) == 0
-        {
-            //log!("{:?}", self.timeline.top_state().get_rule_state());
-            //log!("{:?}", self.timeline.top_state());
+            self.timeline.tick(Some(player_inputs), TICK_INTERVAL_US)
         }
     }
 
@@ -233,66 +233,56 @@ impl Client {
         }
     }
 
-    fn process_server_message(&mut self, server_tick : &interop::ServerTick)
+    fn process_linden_server_message(&mut self, linden_server_tick : &interop::LindenServerTick)
     {
-        // If we have had a "major change" instead of patching up the current state we perform a full reset
-        // At the moment a major change is either:
-        //   We have moved between game states (eg the round ended)
-        //   A player has joined or left
-        let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&server_tick.rule_state)).unwrap_or(false);
-        should_reset |= self.timeline.top_state().player_states.count_populated() != server_tick.latest.states.len();
+        //let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&linden_server_tick.rule_state)).unwrap_or(false);
+        //should_reset |= self.timeline.top_state().player_states.count_populated() != linden_server_tick.latest.states.len();
 
-        if (should_reset) {
+        let should_reset = false;
+
+        if (should_reset)
+        {
             self.timeline = timeline::Timeline::from_server_parts_exact_seed(
                 self.timeline.map.get_seed(),
-                server_tick.latest.time_us,
-                server_tick.latest.states.clone(),
-                server_tick.rule_state.clone());
-
-            // Reset ready state when we are not in the lobby
-            match (server_tick.rule_state)
-            {
-                crossy_ruleset::CrossyRulesetFST::Lobby(_) => {},
-                _ => {self.ready_state = false}
-            }
+                linden_server_tick.latest.frame_id,
+                linden_server_tick.latest.time_us,
+                linden_server_tick.latest.states.clone(),
+                linden_server_tick.rule_state.clone());
         }
         else
         {
-            match self.local_player_info.as_ref()
+            if let Some(client_state_at_lkg_time) = (self.timeline.try_get_state(linden_server_tick.lkg_state.frame_id))
             {
-                Some(lpi) => {
-                    if (self.timeline.top_state().get_player(lpi.player_id)).is_none()
+                let mismatch_player_states = linden_server_tick.lkg_state.player_states != client_state_at_lkg_time.player_states;
+                let mismatch_rulestate = linden_server_tick.lkg_state.ruleset_state != client_state_at_lkg_time.ruleset_state;
+                if (mismatch_player_states || mismatch_rulestate)
+                {
+                    if (mismatch_player_states)
                     {
-                        // Edge case
-                        // First tick with the player
-                        // we need to take state from server
-                        self.timeline.propagate_state(
-                            &server_tick.latest,
-                            Some(&server_tick.rule_state),
-                            Some(&server_tick.latest),
-                            None);
+                        log!("Mismatch in LKG! frame_id {}", client_state_at_lkg_time.frame_id);
+                        log!("Local at lkg time {:#?}", client_state_at_lkg_time.player_states);
+                        log!("LKG {:#?}", linden_server_tick.lkg_state.player_states);
+                        log!("Rebasing... {:?}", linden_server_tick.lkg_state);
                     }
                     else
                     {
-                        self.timeline.propagate_state(
-                            &server_tick.latest,
-                            Some(&server_tick.rule_state),
-                            server_tick.last_client_sent.get(lpi.player_id),
-                            Some(lpi.player_id));
+                        //log!("Mismatch rules local {:#?} lkg {:#?}", client_state_at_lkg_time.ruleset_state, linden_server_tick.lkg_state.ruleset_state);
+                        log!("Mismatch rules");
                     }
-                }
-                _ => {
-                    self.timeline.propagate_state(
-                        &server_tick.latest,
-                        Some(&server_tick.rule_state),
-                        None,
-                        None);
+
+
+                    // TODO We do a ton of extra work, we recalculate from lkg with current inputs then run propate inputs from server.
+                    self.timeline = self.timeline.rebase(&linden_server_tick.lkg_state);
+                    //log!("Local {:#?}", client_state_at_lkg_time.player_states);
+                    //log!("Remote {:#?}", linden_server_tick.lkg_state);
+                    //self.timeline.states
                 }
             }
+            //log!("Propagating inputs {:#?}", linden_server_tick.delta_inputs);
+            self.timeline.propagate_inputs(linden_server_tick.delta_inputs.clone());
         }
 
-        self.last_server_tick = Some(server_tick.latest.time_us);
-        self.trusted_rule_state = Some(server_tick.rule_state.clone());
+        self.trusted_rule_state = Some(linden_server_tick.rule_state.clone());
     }
 
     fn get_round_id(&self) -> u8 {
@@ -325,35 +315,48 @@ impl Client {
 
                 //log!("Got time response, {:#?}", self.queued_time_info);
             },
-            interop::CrossyMessage::ServerTick(server_tick) => {
-                self.queued_server_messages.push_front(server_tick);
+
+            interop::CrossyMessage::LindenServerTick(linden_server_tick) => {
+                self.queued_server_linden_messages.push_front(linden_server_tick);
             }
             _ => {},
         }
     }
 
-    pub fn get_client_message(&self) -> Vec<u8>
+    pub fn get_client_message(&mut self) -> Vec<u8>
     {
         let message = self.get_client_message_internal();
         flexbuffers::to_vec(message).unwrap()
-
     }
 
-    fn get_client_message_internal(&self) -> interop::CrossyMessage
+    fn get_client_message_internal(&mut self) -> interop::CrossyMessage
     {
-        //let input = self.local_player_info.as_ref().map(|x| x.input).unwrap_or(Input::None);
-        //let mut input = self.timeline.top_state().
-        let input = self.local_player_info.as_ref().map(|x| self.timeline.top_state().player_inputs.get(x.player_id)).unwrap_or(Input::None);
-        interop::CrossyMessage::ClientTick(interop::ClientTick {
-            time_us: self.last_tick,
-            input: input,
-            lobby_ready : self.ready_state,
-        })
+        let mut ticks = Vec::new();
+
+        while self.last_sent_frame_id <= self.timeline.top_state().frame_id {
+            if let Some(timeline_state) = self.timeline.try_get_state(self.last_sent_frame_id)
+            {
+                let input = self.local_player_info
+                    .as_ref()
+                    .map(|x| timeline_state.player_inputs.get(x.player_id))
+                    .unwrap_or(Input::None);
+
+                ticks.push(interop::ClientTick {
+                    time_us: timeline_state.time_us,
+                    frame_id: timeline_state.frame_id,
+                    input: input,
+                });
+            }
+
+            self.last_sent_frame_id += 1;
+        }
+
+        interop::CrossyMessage::ClientTick(ticks)
     }
 
     pub fn should_get_time_request(&self) -> bool {
         let frame_id = self.timeline.top_state().frame_id;
-        frame_id.floor() as u32 % TIME_REQUEST_INTERVAL == 0
+        frame_id % TIME_REQUEST_INTERVAL == 0
     }
 
     pub fn get_time_request(&self) -> Vec<u8>
@@ -378,6 +381,7 @@ impl Client {
             .iter()
             .map(|x| x.to_public(self.get_round_id(), time_us, &self.timeline.map))
             .collect();
+
         serde_json::to_string(&players).unwrap()
     }
 
@@ -398,11 +402,6 @@ impl Client {
     }
 
     fn get_latest_server_rule_state(&self) -> Option<&crossy_ruleset::CrossyRulesetFST> {
-        /*
-        let us = self.last_server_tick? + 1;
-        let state_before = self.timeline.get_state_before_eq_us(us)?;
-        Some(state_before.get_rule_state())
-        */
         self.trusted_rule_state.as_ref()
     }
 
@@ -484,6 +483,10 @@ impl Client {
             "go_up" => {
                 log!("Setting ai agent to 'go_up'");
                 self.ai_agent = Some(RefCell::new(Box::new(ai::go_up::GoUpAI::new(local_player_id))));
+            },
+            "back_and_forth" => {
+                log!("Setting ai agent to 'back_and_forth'");
+                self.ai_agent = Some(RefCell::new(Box::new(ai::BackAndForth::new(local_player_id))));
             },
             _ => {
                 log!("Unknown ai agent {}", ai_config);

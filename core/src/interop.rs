@@ -6,14 +6,14 @@ use crate::timeline::RemoteTickState;
 use crate::player_id_map::PlayerIdMap;
 use crate::crossy_ruleset::CrossyRulesetFST;
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CrossyMessage {
     Hello(ClientHello),
     HelloResponse(InitServerResponse),
     ServerDecription(ServerDescription),
-    ClientTick(ClientTick),
+    ClientTick(Vec<ClientTick>),
     ClientDrop(),
-    ServerTick(ServerTick),
+    LindenServerTick(LindenServerTick),
 
     TimeRequestPacket(TimeRequestPacket),
     TimeRequestIntermediate(TimeRequestIntermediate),
@@ -65,18 +65,16 @@ impl ClientHello {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ClientTick {
     pub time_us: u32,
+    pub frame_id: u32,
     pub input: Input,
-    // TODO probably shouldnt be here?
-    pub lobby_ready : bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct ServerTick {
-    // Removing as we are setting up a proper route
-    pub exact_send_server_time_us : u32,
-
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LindenServerTick {
     pub latest : RemoteTickState,
-    pub last_client_sent : PlayerIdMap<RemoteTickState>,
+    pub lkg_state : crate::game::GameState,
+    pub delta_inputs : Vec<crate::timeline::RemoteInput>,
+    pub last_client_frame_id : PlayerIdMap<u32>,
     pub rule_state : CrossyRulesetFST,
 }
 

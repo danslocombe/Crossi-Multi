@@ -33,6 +33,7 @@ impl<T> PlayerIdMap<T> {
     }
 
     pub fn set(&mut self, id: PlayerId, x : T) {
+        //assert!(id.0 != 0);
         let index = id.0 as usize;
         while (index >= self.inner.len())
         {
@@ -43,6 +44,7 @@ impl<T> PlayerIdMap<T> {
     }
 
     pub fn remove(&mut self, id : PlayerId) {
+        //assert!(id.0 != 0);
         let index = id.0 as usize;
         if index >= self.inner.len() {
             // Nothing to do
@@ -53,6 +55,7 @@ impl<T> PlayerIdMap<T> {
     }
 
     pub fn get_mut(&mut self, id: crate::PlayerId) -> Option<&mut T> {
+        //assert!(id.0 != 0);
         let index = id.0 as usize;
         if index < self.inner.len()
         {
@@ -65,6 +68,7 @@ impl<T> PlayerIdMap<T> {
     }
 
     pub fn get(&self, id: crate::PlayerId) -> Option<&T> {
+        //assert!(id.0 != 0);
         let index = id.0 as usize;
         if index < self.inner.len()
         {
