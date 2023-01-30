@@ -1,3 +1,4 @@
+import { SCALE } from "./constants";
 import { dan_lerp } from "./utils";
 
 export function create_intro_ui(font_controller, client) {
@@ -98,12 +99,44 @@ export function create_intro_ui(font_controller, client) {
                     {
                         this.font_controller.text(froggy_draw_ctx, "invite friends", xoff - 16, this.text_y - this.font_controller.text_height / 2);
                     }
+                    /*
                     else if (!this.local_player_has_readied)
                     {
                         this.font_controller.text(froggy_draw_ctx, "press space", xoff, this.text_y - this.font_controller.text_height / 2 - 8);
                         this.font_controller.text(froggy_draw_ctx, "to ready up", xoff, this.text_y - this.font_controller.text_height / 2 + 8);
                     }
+                    */
                 }
+            }
+        },
+    }
+}
+
+export function create_intro_ui_bg() {
+    return {
+        visible : false,
+        proportion : 0,
+        tick : function(rule_state) {
+            this.visible = false;
+            this.proportion = 0;
+            if (rule_state && rule_state.Lobby)
+            {
+                this.visible = true;
+                this.proportion = rule_state.Lobby.time_with_all_players_in_ready_zone / 120;
+            }
+        },
+        draw : function(froggy_draw_ctx) {
+            if (this.visible) {
+                const x0 = 6 * SCALE;
+                const y0 = 12 * SCALE;
+                const width_base = (14 - 6) * SCALE;
+                const height = (16 - 12) * SCALE;
+
+                froggy_draw_ctx.ctx.fillStyle = "white";
+                froggy_draw_ctx.ctx.fillRect(x0, y0, width_base * this.proportion, height);
+
+                froggy_draw_ctx.ctx.strokeStyle = "black";
+                froggy_draw_ctx.ctx.strokeRect(x0, y0, width_base, height);
             }
         },
     }
