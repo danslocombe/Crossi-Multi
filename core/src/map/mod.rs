@@ -374,7 +374,7 @@ impl MapRound {
 
             // Seed 0 is reserved for lobbies
             // We shouldnt generate any roads / rivers
-            if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.2) {
+            if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.25) {
                 verbose_log!("Generating obtacle row at y={}", row_id.to_y());
 
                 if (rng.gen_unit("feature_type") < 0.5) {
@@ -440,9 +440,9 @@ impl MapRound {
                 }
             }
             else {
-                const WALL_WIDTH_MAX : i32 = 4;
+                const WALL_WIDTH_MAX : i32 = 6;
                 const WALL_WIDTH_MIN : i32 = 1;
-                let new_wall_width = self.gen_state_wall_width + rng.choose("wall_width", &[-1, 0, 0, 1]);
+                let new_wall_width = self.gen_state_wall_width + rng.choose("wall_width", &[-1, -1, 0, 0, 0, 0, 1, 1, 1]);
                 self.gen_state_wall_width = new_wall_width.min(WALL_WIDTH_MAX).max(WALL_WIDTH_MIN);
 
                 self.rows.push_front(Row {
