@@ -11,6 +11,7 @@ import { create_from_ai_overlay } from "./ai_overlay";
 import { create_from_lilly_overlay } from "./lilly_move_hints"
 import { create_font_controller } from "./font"
 import { create_intro_ui, create_intro_ui_bg } from "./intro_ui"
+import { create_audio_manager } from "./audio_manager"
 
 
 const audio_crowd = new Audio('/sounds/snd_win.wav');
@@ -25,6 +26,7 @@ audio_crowd.addEventListener('timeupdate', function(){
 
 export function create_game_view(ctx, client, ws, key_event_source) {
     let font_controller = create_font_controller();
+    let audio_manager = create_audio_manager();
 
     let view = {
         client : client,
@@ -37,12 +39,13 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         rule_state : undefined,
         players : new Map(),
         camera : create_camera(),
-        countdown : create_countdown(),
-        dialogue : create_dialogue_controller(),
+        countdown : create_countdown(audio_manager),
+        dialogue : create_dialogue_controller(audio_manager),
         prop_controller : create_prop_controller(),
         intro_ui : create_intro_ui(font_controller, client),
         intro_ui_bg : create_intro_ui_bg(),
         font_controller : font_controller,
+        audio_manager : audio_manager,
 
         tick : function()
         {
@@ -141,11 +144,11 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                             if (current_player_state.id === local_player_id) {
                                 console.log("creating local player");
                                 // Create local player
-                                this.players.set(current_player_state.id, create_player_local(this.client, this.key_event_source));
+                                this.players.set(current_player_state.id, create_player_local(this.client, this.key_event_source, this.audio_manager));
                             }
                             else {
                                 // Create remote player
-                                this.players.set(current_player_state.id, create_player_remote(this.client, current_player_state.id));
+                                this.players.set(current_player_state.id, create_player_remote(this.client, current_player_state.id, this.audio_manager));
                             }
                         }
 
@@ -287,11 +290,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
     let listener = key_event_source.add_input_listener();
     listener.on_input_keydown = function(input) {
         view.current_input = input;
-    }
-
-    let activate_listener = key_event_source.add_activate_listener();
-    activate_listener.on_activate_keydown = function() {
-        view.client.set_ready_state(!view.client.get_ready_state());
+        view.audio_manager.webpage_has_inputs = true;
     }
 
     return view;

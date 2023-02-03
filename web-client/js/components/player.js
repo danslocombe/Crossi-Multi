@@ -41,7 +41,7 @@ function lerp_snap(x0, y0, x1, y1)
     }
 }
 
-function move_effects(x, y, simple_entities, player_def) {
+function move_effects(x, y, simple_entities, player_def, audio_manager) {
     for (let i = 0; i < 2; i++) {
         const dust_off = Math.random() * (3 / SCALE);
         const dust_dir = Math.random() * 2 * 3.141;
@@ -50,10 +50,10 @@ function move_effects(x, y, simple_entities, player_def) {
         simple_entities.push(create_dust(dust_x, dust_y));
     }
 
-    player_def.move_sound.play();
+    audio_manager.play(player_def.move_sound);
 }
 
-export function create_player_remote(client, player_id) {
+export function create_player_remote(client, player_id, audio_manager) {
     let source = {
         client : client,
         player_id : player_id,
@@ -63,6 +63,7 @@ export function create_player_remote(client, player_id) {
         moving : false,
         x_flip : 1,
         frame_id : 0,
+        audio_manager : audio_manager,
 
         tick : function(player_state, simple_entities, player_def) {
             // dumb implementation
@@ -102,7 +103,7 @@ export function create_player_remote(client, player_id) {
             }
 
             if (moving && !this.moving) {
-                move_effects(x, y, simple_entities, player_def);
+                move_effects(x, y, simple_entities, player_def, this.audio_manager);
             }
 
             this.moving = moving;
@@ -112,10 +113,10 @@ export function create_player_remote(client, player_id) {
         }
     };
 
-    return player_def_from_player_id(player_id, source)
+    return player_def_from_player_id(player_id, source, audio_manager)
 }
 
-export function create_player_local(client, key_event_source) {
+export function create_player_local(client, key_event_source, audio_manager) {
     const player_id = client.get_local_player_id();
     let source = {
         client : client,
@@ -125,6 +126,7 @@ export function create_player_local(client, key_event_source) {
         moving : false,
         x_flip : 1,
         frame_id : 0,
+        audio_manager : audio_manager,
 
         tick : function(player_state, simple_entities, player_def) {
             const x0 = player_state.x;
@@ -159,10 +161,10 @@ export function create_player_local(client, key_event_source) {
             // Started moving
             if (player_state.moving && !this.moving) {
 
-                move_effects(x, y, simple_entities, player_def);
+                move_effects(x, y, simple_entities, player_def, this.audio_manager);
 
                 if (player_state.pushing >= 0) {
-                    snd_push.play();
+                    this.audio_manager.play(snd_push);
                 }
             }
 
@@ -182,15 +184,15 @@ export function create_player_local(client, key_event_source) {
         }
     };
 
-    return player_def_from_player_id(player_id, source)
+    return player_def_from_player_id(player_id, source, audio_manager)
 }
 
-function player_def_from_player_id(id, source) {
+function player_def_from_player_id(id, source, audio_manager) {
     // player ids start from 1
     const sprites = sprites_list[id - 1];
     const move_sound = move_sounds_list[id - 1];
     const colour = colours_list[id - 1];
-    return create_player_def(sprites, move_sound, colour, source)
+    return create_player_def(sprites, move_sound, colour, source, audio_manager)
 }
 
 function create_crown(owning_player, i) {
@@ -238,11 +240,12 @@ function create_crown(owning_player, i) {
     }
 }
 
-function create_player_def(sprites, move_sound, colour, source) {
+function create_player_def(sprites, move_sound, colour, source, audio_manager) {
     return {
         sprite : sprites.spr,
         sprite_dead : sprites.spr_dead,
         sprite_name : sprites.spr_name,
+        audio_manager : audio_manager,
         colour : colour,
         move_sound : move_sound,
         source : source,
@@ -265,7 +268,7 @@ function create_player_def(sprites, move_sound, colour, source) {
                     {
                         const corpse = create_corpse(this.x, this.y, this.sprite_dead);
                         simple_entities.push(corpse);
-                        snd_hit_car.play();
+                        this.audio_manager.play(snd_hit_car);
                     }
                     else {
                         for (let i = 0; i < 2; i++) {
@@ -276,7 +279,7 @@ function create_player_def(sprites, move_sound, colour, source) {
                             simple_entities.push(create_bubble(bubble_x, bubble_y));
                         }
 
-                        snd_drown.play();
+                        this.audio_manager.play(snd_drown);
                     }
 
                     const whiteout = create_whiteout()

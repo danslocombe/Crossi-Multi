@@ -14,11 +14,12 @@ snd_countdown.volume = 0.25;
 let snd_countdown_go = new Audio('/sounds/snd_countdown_go.wav');
 snd_countdown_go.volume = 0.25;
 
-export function create_countdown() {
+export function create_countdown(audio_manager) {
     return {
         enabled : false,
         time : 0,
         go_time : 0,
+        audio_manager : audio_manager,
 
         tick : function (rule_state) {
             if (!rule_state) {
@@ -29,7 +30,7 @@ export function create_countdown() {
                 const time = Math.ceil(rule_state.RoundWarmup.remaining_us / 1000000);
                 //console.log(rule_state.RoundWarmup);
                 if (time != this.time) {
-                    snd_countdown.play();
+                    this.audio_manager.play(snd_countdown);
                 }
                 this.time = time;
                 this.enabled = true;
@@ -39,7 +40,7 @@ export function create_countdown() {
                 if (this.go_time > 0) {
                     if (this.time == 1) {
                         // First tick of "go"
-                        snd_countdown_go.play();
+                        this.audio_manager.play(snd_countdown_go);
                         this.time = 0;
                     }
                     this.go_time -= 1;
