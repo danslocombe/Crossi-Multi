@@ -133,8 +133,7 @@ impl Client {
             let delta_time = current_time_us.saturating_sub(last_time);
             if (delta_time > TICK_INTERVAL_US)
             {
-                let tick_time = last_time + TICK_INTERVAL_US;
-                self.tick_inner(tick_time);
+                self.tick_inner();
             }
             else
             {
@@ -149,13 +148,7 @@ impl Client {
         }
     }
 
-    pub fn tick_inner(&mut self, current_time_us : u32) {
-        //let current_time = self.server_start.elapsed();
-        //self.last_tick = current_time.as_micros() as u32;
-
-        // Move buffered input to input
-        // awkward because of mut / immut borrowing
-        //let mut player_inputs = self.timeline.get_last_player_inputs();
+    pub fn tick_inner(&mut self) {
         let mut player_inputs = PlayerInputs::new();
 
         let mut can_move = false;
@@ -190,15 +183,7 @@ impl Client {
             player_inputs.set(self.local_player_info.as_ref().unwrap().player_id, local_input);
         }
 
-        // Tick 
-        if (self.timeline.top_state().time_us > current_time_us)
-        {
-            log!("OH NO WE ARE IN THE PAST!");
-        }
-        else
-        {
-            self.timeline.tick(Some(player_inputs), TICK_INTERVAL_US)
-        }
+        self.timeline.tick(Some(player_inputs), TICK_INTERVAL_US)
     }
 
     fn process_time_info(&mut self)
