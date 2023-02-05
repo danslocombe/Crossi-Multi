@@ -97,7 +97,6 @@ export function create_prop(x, y, prop_name) {
 
 export function create_prop_controller() {
     return {
-        run_this_round : false,
         last_generated_round : -1,
         gen_to: 20,
 
@@ -107,9 +106,8 @@ export function create_prop_controller() {
             }
 
             const round_id = get_round_id_from_rule_state(rule_state);
-            if (!this.run_this_round && round_id >= 0 && this.last_generated_round != round_id) {
+            if (round_id >= 0 && this.last_generated_round != round_id) {
                 console.log("Creating props");
-                this.run_this_round = true;
                 this.last_generated_round = round_id;
 
                 const stand_left = create_prop(4, 10*SCALE, "stand");
@@ -164,7 +162,6 @@ export function create_prop_controller() {
                 }
             }
             else if (rule_state.RoundCooldown){
-                this.run_this_round = false;
                 this.gen_to = 20;
             }
 

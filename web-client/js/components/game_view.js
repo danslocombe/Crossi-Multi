@@ -107,10 +107,17 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     }
 
                     if (this.rule_state && rule_state.RoundWarmup && !this.rule_state.RoundWarmup) {
+                        console.log("State is 'RoundWarmup' movnig into warmup state...");
                         moving_into_warmup = true;
                     }
 
-                    if (this.rule_state && rule_state.End && !this.rule_state.End) {
+                    if (this.rule_state && rule_state.EndWinner && !this.rule_state.EndWinner) {
+                        console.log("State is 'EndWinner' movnig into end state...");
+                        moving_into_end = true;
+                    }
+
+                    if (this.rule_state && rule_state.EndAllLeft && !this.rule_state.EndAllLeft) {
+                        console.log("State is 'EndAllLeft' movnig into end state...");
                         moving_into_end = true;
                     }
 
@@ -206,7 +213,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         },
 
         draw : function() {
-            const in_lobby = !this.rule_state || this.rule_state.Lobby || this.rule_state.End;
+            const in_lobby = !this.rule_state || this.rule_state.Lobby || this.rule_state.EndWinner || this.rule_state.EndAllLeft;
             const in_warmup = this.rule_state && this.rule_state.RoundWarmup;
             draw_background(this.froggy_draw_ctx, in_lobby, in_warmup, this.client)
             this.intro_ui_bg.draw(this.froggy_draw_ctx);

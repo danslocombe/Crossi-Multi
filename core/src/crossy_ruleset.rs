@@ -62,8 +62,13 @@ pub struct CooldownState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EndState {
+pub struct EndWinnerState {
     pub winner_id : PlayerId,
+    pub remaining_us : u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EndAllLeftState {
     pub remaining_us : u32,
 }
 
@@ -74,7 +79,8 @@ pub enum CrossyRulesetFST
     RoundWarmup(WarmupState),
     Round(RoundState),
     RoundCooldown(CooldownState),
-    End(EndState),
+    EndWinner(EndWinnerState),
+    EndAllLeft(EndAllLeftState),
 }
 
 const MIN_PLAYERS : usize = 2;
@@ -162,6 +168,13 @@ impl CrossyRulesetFST
                 }
             },
             Round(state) => {
+                if (player_states.count_populated() < MIN_PLAYERS)
+                {
+                    // No longer enough players in the game, because people left.
+                    // Send back to lobby
+                    return Self::start();
+                }
+
                 let mut new_state = state.clone();
                 // New player joined?
                 new_state.alive_states.seed_missing(player_states, AliveState::NotInGame);
@@ -212,7 +225,7 @@ impl CrossyRulesetFST
                             if (new_count >= state.round_state.game_config.required_win_count) {
                                 debug_log!("Going to end state");
                                 reset_positions(player_states, false);
-                                return End(EndState {
+                                return EndWinner(EndWinnerState {
                                     winner_id,
                                     remaining_us : WINNER_TIME_US,
                                 })
@@ -236,12 +249,27 @@ impl CrossyRulesetFST
                     }
                 }
             },
-            End(state) => {
+            EndWinner(state) => {
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
-                        End(EndState {
+                        EndWinner(EndWinnerState {
                             remaining_us,
                             winner_id : state.winner_id,
+                        })
+                    }
+                    _ => {
+                        // Reset to lobby
+                        Lobby(LobbyState {
+                            time_with_all_players_in_ready_zone: 0,
+                        })
+                    }
+                }
+            },
+            EndAllLeft(state) => {
+                match state.remaining_us.checked_sub(dt) {
+                    Some(remaining_us) => {
+                        EndAllLeft(EndAllLeftState {
+                            remaining_us,
                         })
                     }
                     _ => {
@@ -286,7 +314,7 @@ impl CrossyRulesetFST
             RoundCooldown(state) => {
                 state.round_state.alive_states.get_copy(player_id).unwrap_or(AliveState::NotInGame)
             },
-            End(state) => {
+            EndWinner(state) => {
                 if player_id == state.winner_id
                 {
                     AliveState::Alive
@@ -295,7 +323,8 @@ impl CrossyRulesetFST
                 {
                     AliveState::NotInGame
                 }
-            }
+            },
+            EndAllLeft(_) => AliveState::Alive,
         }
     }
      
@@ -305,7 +334,8 @@ impl CrossyRulesetFST
             RoundWarmup(_) => 0,
             Round(state) => state.screen_y,
             RoundCooldown(state) => state.round_state.screen_y,
-            End(_) => 0,
+            EndWinner(_) => 0,
+            EndAllLeft(_) => 0,
         }
     }
 
@@ -315,7 +345,8 @@ impl CrossyRulesetFST
             (RoundWarmup(_), RoundWarmup(_)) => true,
             (Round(_), Round(_)) => true,
             (RoundCooldown(_), RoundCooldown(_)) => true,
-            (End(_), End(_)) => true,
+            (EndWinner(_), EndWinner(_)) => true,
+            (EndAllLeft(_), EndAllLeft(_)) => true,
             _ => false,
         }
     }
