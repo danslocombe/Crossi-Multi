@@ -1,4 +1,4 @@
-import { create_winner_ui } from "./game_ui";
+import { create_winner_ui, create_winner_ui_font } from "./game_ui";
 import { dan_lerp, ease_in_quad } from "./utils";
 import { create_whiteout } from "./visual_effects";
 
@@ -174,9 +174,10 @@ function create_dialogue(sprite_name, audio_manager, duration = undefined) {
     };
 }
 
-export function create_dialogue_controller(audio_manager) {
+export function create_dialogue_controller(audio_manager, font_controller) {
     return {
         audio_manager : audio_manager,
+        font_controller : font_controller,
         dialogue_instance : undefined,
         winner_ui_instance : undefined,
         no_winner_ui_instance : undefined,
@@ -228,7 +229,8 @@ export function create_dialogue_controller(audio_manager) {
                         if (players.has(alive_player_id)) {
                             const sprite_name = players.get(alive_player_id).sprite_name;
                             this.dialogue_instance = create_dialogue(sprite_name, this.audio_manager);
-                            this.winner_ui_instance = create_winner_ui();
+                            //this.winner_ui_instance = create_winner_ui();
+                            this.winner_ui_instance = create_winner_ui_font(this.font_controller);
                             simple_entities.push(this.winner_ui_instance);
                         }
                     }

@@ -80,8 +80,8 @@ export function create_intro_ui(font_controller, client) {
             froggy_draw_ctx.ctx.fillStyle = "#FFFFFF";
             froggy_draw_ctx.ctx.fillRect(0, 0, 256, 256);
 
-                this.font_controller.text(froggy_draw_ctx, "heavy rain", xoff + 8, this.text_y - this.font_controller.text_height / 2 - 8);
-                this.font_controller.text(froggy_draw_ctx, "eleven degrees", xoff - 12, this.text_y - this.font_controller.text_height / 2 + 8);
+                this.font_controller.text(froggy_draw_ctx, "heavy rain", xoff + 8, this.text_y - this.font_controller.font.height / 2 - 8);
+                this.font_controller.text(froggy_draw_ctx, "eleven degrees", xoff - 12, this.text_y - this.font_controller.font.height / 2 + 8);
                 */
             
             if (this.in_lobby)
@@ -90,20 +90,22 @@ export function create_intro_ui(font_controller, client) {
 
                 if (!this.local_player_has_moved)
                 {
-                    this.font_controller.text(froggy_draw_ctx, "move with", xoff + 8, this.text_y - this.font_controller.text_height / 2 - 8);
-                    this.font_controller.text(froggy_draw_ctx, "the arrow keys", xoff - 12, this.text_y - this.font_controller.text_height / 2 + 8);
+                    this.font_controller.set_Font_small();
+                    this.font_controller.text(froggy_draw_ctx, "move with", xoff + 8, this.text_y - this.font_controller.font.height / 2 - 8);
+                    this.font_controller.text(froggy_draw_ctx, "the arrow keys", xoff - 12, this.text_y - this.font_controller.font.height / 2 + 8);
                 }
                 else
                 {
                     if (!this.multiple_players)
                     {
-                        this.font_controller.text(froggy_draw_ctx, "invite friends", xoff - 16, this.text_y - this.font_controller.text_height / 2);
+                        this.font_controller.set_Font_small();
+                        this.font_controller.text(froggy_draw_ctx, "invite friends", xoff - 16, this.text_y - this.font_controller.font.height / 2);
                     }
                     /*
                     else if (!this.local_player_has_readied)
                     {
-                        this.font_controller.text(froggy_draw_ctx, "press space", xoff, this.text_y - this.font_controller.text_height / 2 - 8);
-                        this.font_controller.text(froggy_draw_ctx, "to ready up", xoff, this.text_y - this.font_controller.text_height / 2 + 8);
+                        this.font_controller.text(froggy_draw_ctx, "press space", xoff, this.text_y - this.font_controller.font.height / 2 - 8);
+                        this.font_controller.text(froggy_draw_ctx, "to ready up", xoff, this.text_y - this.font_controller.font.height / 2 + 8);
                     }
                     */
                 }

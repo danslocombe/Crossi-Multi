@@ -66,6 +66,109 @@ export function create_countdown(audio_manager) {
     }
 }
 
+export function create_countdown_font(audio_manager, font_controller) {
+    return {
+        enabled : false,
+        time : 0,
+        go_time : 0,
+        audio_manager : audio_manager,
+        font_controller : font_controller,
+        text: "",
+
+        tick : function (rule_state) {
+            if (!rule_state) {
+                return;
+            }
+
+            if (rule_state.RoundWarmup) {
+                const time = Math.ceil(rule_state.RoundWarmup.remaining_us / 1000000);
+                //console.log(rule_state.RoundWarmup);
+                if (time != this.time) {
+                    this.audio_manager.play(snd_countdown);
+                }
+                this.time = time;
+                this.enabled = true;
+                this.go_time = 60;
+            }
+            else if (rule_state.Round) {
+                if (this.go_time > 0) {
+                    if (this.time == 1) {
+                        // First tick of "go"
+                        this.audio_manager.play(snd_countdown_go);
+                        this.time = 0;
+                    }
+                    this.go_time -= 1;
+                    this.enabled = true;
+                }
+                else {
+                    this.enabled = false;
+                }
+            }
+            else {
+                this.enabled = false;
+            }
+
+            const frame_id = 3 - this.time;
+            if (frame_id == 0) {
+                this.text = "three";
+            }
+            if (frame_id == 1) {
+                this.text = "two";
+            }
+            if (frame_id == 2) {
+                this.text = "one";
+            }
+            if (frame_id == 3) {
+                this.text = "go";
+            }
+        },
+
+        draw : function(crossy_draw_ctx) {
+            if (this.enabled) {
+
+                const w = this.text.length * this.font_controller.font.width;
+                const h = this.font_controller.font.height;
+
+                this.font_controller.set_font_blob();
+                this.font_controller.text(crossy_draw_ctx, this.text, 80 - w / 2, 80);
+            }
+        }
+    }
+}
+
+export function create_winner_ui_font(font_controller) {
+    return {
+        foreground_depth : 5,
+        is_alive : true,
+        t : 0,
+        t_end : 180,
+        no_winner : false,
+        text : "winner",
+        font_controller : font_controller,
+
+        alive : function(x) {
+            return this.is_alive;
+        },
+
+        trigger_no_winner : function() {
+            this.text = "no winner";
+            this.no_winner = true;
+        },
+
+        tick : function (rule_state) {
+            this.t += 1;
+        },
+
+        draw : function(crossy_draw_ctx) {
+
+            const w = this.text.length * this.font_controller.font.width;
+            const h = this.font_controller.font.height;
+
+            this.font_controller.text(crossy_draw_ctx, this.text, 80 - w / 2, 80);
+        }
+    }
+}
+
 export function create_winner_ui() {
     return {
         foreground_depth : 5,

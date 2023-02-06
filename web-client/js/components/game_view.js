@@ -3,7 +3,7 @@ import { create_player_remote, create_player_local } from "./player";
 import { draw_background } from "./background";
 import { create_car } from "./car";
 import { create_camera } from "./camera";
-import { create_countdown } from "./game_ui";
+import { create_countdown, create_countdown_font } from "./game_ui";
 import { create_dialogue_controller } from "./dialogue";
 import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";
@@ -39,8 +39,8 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         rule_state : undefined,
         players : new Map(),
         camera : create_camera(),
-        countdown : create_countdown(audio_manager),
-        dialogue : create_dialogue_controller(audio_manager),
+        countdown : create_countdown_font(audio_manager, font_controller),
+        dialogue : create_dialogue_controller(audio_manager, font_controller),
         prop_controller : create_prop_controller(),
         intro_ui : create_intro_ui(font_controller, client),
         intro_ui_bg : create_intro_ui_bg(),
