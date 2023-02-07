@@ -18,11 +18,14 @@ let small_font = {
 let spr_font_blob = new Image(16 * 22, 22);
 spr_font_blob.src = '/sprites/spr_font_blob.png';
 
+let spr_font_blob_2 = new Image(16 * 22, 22);
+spr_font_blob_2.src = '/sprites/spr_font_blob_2.png';
+
 let blob_font = {
     width: 16,
     height: 22,
     sprite_0 : spr_font_blob,
-    sprite_1 : spr_font_blob,
+    sprite_1 : spr_font_blob_2,
 }
 
 export function create_font_controller() {
