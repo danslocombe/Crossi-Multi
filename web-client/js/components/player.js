@@ -1,7 +1,7 @@
 import { SCALE} from "./constants.js";
 import { dan_lerp, diff} from "./utils.js";
 import { create_whiteout, create_dust, create_corpse, create_bubble, create_pinwheel } from "./visual_effects.js";
-import { MOVE_T, spr_shadow, sprites_list, colours_list, move_sounds_list } from "./character_assets.js";
+import { MOVE_T, spr_shadow, sprites_list, colours_list, move_sounds_list, names } from "./character_assets.js";
 
 let spr_crown = new Image(8, 6);
 spr_crown.src = '/sprites/spr_crown.png';
@@ -192,7 +192,8 @@ function player_def_from_player_id(id, source, audio_manager) {
     const sprites = sprites_list[id - 1];
     const move_sound = move_sounds_list[id - 1];
     const colour = colours_list[id - 1];
-    return create_player_def(sprites, move_sound, colour, source, audio_manager)
+    const name = names[id - 1];
+    return create_player_def(sprites, move_sound, colour, name, source, audio_manager)
 }
 
 function create_crown(owning_player, i) {
@@ -240,7 +241,7 @@ function create_crown(owning_player, i) {
     }
 }
 
-function create_player_def(sprites, move_sound, colour, source, audio_manager) {
+function create_player_def(sprites, move_sound, colour, name, source, audio_manager) {
     return {
         sprite : sprites.spr,
         sprite_dead : sprites.spr_dead,
@@ -249,6 +250,7 @@ function create_player_def(sprites, move_sound, colour, source, audio_manager) {
         colour : colour,
         move_sound : move_sound,
         source : source,
+        name: name,
         x : 0,
         y : 0,
         dynamic_depth : 0,
@@ -352,6 +354,7 @@ function create_player_def(sprites, move_sound, colour, source, audio_manager) {
             }
 
             /*
+            // Exclamation mark on head
             if (this.lobby_ready) {
                 froggy_draw_ctx.ctx.strokeStyle = this.colour;
                 froggy_draw_ctx.ctx.beginPath();

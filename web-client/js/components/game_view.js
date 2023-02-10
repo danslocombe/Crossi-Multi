@@ -92,6 +92,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 }
 
                 const rule_state_json = this.client.get_rule_state_json()
+                let moving_into_lobby = false;
                 let moving_into_warmup = false;
                 let moving_into_end = false;
                 if (rule_state_json) {
@@ -104,6 +105,11 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     else
                     {
                         this.intro_ui.set_in_game();
+                    }
+
+                    if (this.rule_state && rule_state.Lobby && !this.rule_state.Lobby) {
+                        console.log("Moving into lobby state...");
+                        moving_into_lobby = true;
                     }
 
                     if (this.rule_state && rule_state.RoundWarmup && !this.rule_state.RoundWarmup) {
@@ -127,7 +133,10 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 const players_json = this.client.get_players_json();
                 const current_player_states = JSON.parse(players_json);
 
-                if (moving_into_warmup) {
+                if (moving_into_lobby) {
+                    this.simple_entities = [];
+                }
+                else if (moving_into_warmup) {
                     audio_crowd.play();
                     this.simple_entities = [];
                     for (const [_, player] of this.players) {
@@ -139,7 +148,21 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 else if (moving_into_end)
                 {
                     this.simple_entities = [];
-                    this.simple_entities.push(create_game_winner_ui(this.font_controller, "dan"));
+                    let winner_name = "";
+                    if (this.rule_state && this.rule_state.EndWinner) {
+                        winner_name = this.players.get(this.rule_state.EndWinner.winner_id).name;
+                    }
+                    else
+                    {
+                        // One player left, get their name
+                        const local_player_id = this.client.get_local_player_id();
+                        if (local_player_id >= 0)
+                        {
+                            winner_name = this.players.get(this.client.get_local_player_id()).name;
+                        }
+                    }
+
+                    this.simple_entities.push(create_game_winner_ui(this.font_controller, winner_name));
                 }
 
                 let players_with_values = new Set();

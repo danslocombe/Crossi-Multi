@@ -51,3 +51,13 @@ export const move_sounds_list = [
 for (let sound of move_sounds_list) {
     sound.volume = 0.15;
 }
+
+export const names = [
+    "frog",
+    "duck",
+    "mouse",
+    "bird",
+    "snake",
+    "yellow frog",
+    "blue frog",
+]
