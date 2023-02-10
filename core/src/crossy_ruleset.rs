@@ -15,7 +15,8 @@ pub struct GameConfig {
 impl GameConfig {
     pub fn new() -> Self {
         Self {
-            required_win_count : 3,
+            //required_win_count : 3,
+            required_win_count : 1,
         }
     }
 }
@@ -272,6 +273,7 @@ impl CrossyRulesetFST
                     }
                     _ => {
                         // Reset to lobby
+                        reset_positions(player_states, ResetPositionTarget::LobbyPositions);
                         Self::start()
                     }
                 }
@@ -285,6 +287,7 @@ impl CrossyRulesetFST
                     }
                     _ => {
                         // Reset to lobby
+                        reset_positions(player_states, ResetPositionTarget::LobbyPositions);
                         Self::start()
                     }
                 }

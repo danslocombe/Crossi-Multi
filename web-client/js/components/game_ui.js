@@ -136,39 +136,6 @@ export function create_countdown_font(audio_manager, font_controller) {
     }
 }
 
-export function create_winner_ui_font(font_controller) {
-    return {
-        foreground_depth : 5,
-        is_alive : true,
-        t : 0,
-        t_end : 180,
-        no_winner : false,
-        text : "winner",
-        font_controller : font_controller,
-
-        alive : function(x) {
-            return this.is_alive;
-        },
-
-        trigger_no_winner : function() {
-            this.text = "no winner";
-            this.no_winner = true;
-        },
-
-        tick : function (rule_state) {
-            this.t += 1;
-        },
-
-        draw : function(crossy_draw_ctx) {
-
-            const w = this.text.length * this.font_controller.font.width;
-            const h = this.font_controller.font.height;
-
-            this.font_controller.text(crossy_draw_ctx, this.text, 80 - w / 2, 80);
-        }
-    }
-}
-
 export function create_winner_ui() {
     return {
         foreground_depth : 5,
@@ -244,6 +211,70 @@ export function create_winner_ui() {
                 h_draw);
 
             ctx.restore();
+        }
+    }
+}
+
+export function create_winner_ui_font(font_controller) {
+    return {
+        foreground_depth : 5,
+        is_alive : true,
+        t : 0,
+        t_end : 180,
+        no_winner : false,
+        text : "winner",
+        font_controller : font_controller,
+
+        alive : function(x) {
+            return this.is_alive;
+        },
+
+        trigger_no_winner : function() {
+            this.text = "no winner";
+            this.no_winner = true;
+        },
+
+        tick : function (rule_state) {
+            this.t += 1;
+        },
+
+        draw : function(crossy_draw_ctx) {
+
+            const w = this.text.length * this.font_controller.font.width;
+            const h = this.font_controller.font.height;
+
+            this.font_controller.text(crossy_draw_ctx, this.text, 80 - w / 2, 80);
+        }
+    }
+}
+
+export function create_game_winner_ui(font_controller, winning_player_name) {
+    return {
+        foreground_depth : 5,
+        is_alive : true,
+        t : 0,
+        t_end : 180,
+        no_winner : false,
+        winning_player_name: winning_player_name,
+        font_controller : font_controller,
+
+        alive : function(x) {
+            return this.is_alive;
+        },
+
+        tick : function (rule_state) {
+            this.t += 1;
+        },
+
+        draw : function(crossy_draw_ctx) {
+
+            this.font_controller.set_font_blob();
+
+            const h = this.font_controller.font.height;
+            this.font_controller.text(crossy_draw_ctx, "congrats", 80 - "congrats".length * this.font_controller.font.width / 2, 80 - h / 2);
+
+            const w = this.winning_player_name.length * this.font_controller.font.width;
+            this.font_controller.text(crossy_draw_ctx, this.winning_player_name, 80 - w / 2, 80 + h / 2);
         }
     }
 }

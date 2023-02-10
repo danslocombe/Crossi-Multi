@@ -3,7 +3,7 @@ import { create_player_remote, create_player_local } from "./player";
 import { draw_background } from "./background";
 import { create_car } from "./car";
 import { create_camera } from "./camera";
-import { create_countdown, create_countdown_font } from "./game_ui";
+import { create_countdown, create_countdown_font, create_game_winner_ui } from "./game_ui";
 import { create_dialogue_controller } from "./dialogue";
 import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";
@@ -139,6 +139,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 else if (moving_into_end)
                 {
                     this.simple_entities = [];
+                    this.simple_entities.push(create_game_winner_ui(this.font_controller, "dan"));
                 }
 
                 let players_with_values = new Set();
