@@ -191,7 +191,7 @@ impl CrossyRulesetFST
                     }
                 }
                 else {
-                    Lobby(LobbyState { time_with_all_players_in_ready_zone: state.time_with_all_players_in_ready_zone / 2 })
+                    Lobby(LobbyState { time_with_all_players_in_ready_zone: (state.time_with_all_players_in_ready_zone as f32 * 0.8).round() as u32})
                 }
             },
             RoundWarmup(state) => {
@@ -510,7 +510,7 @@ fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<Al
 
 fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
     if let Pos::Coord(CoordPos{x, y}) = player.pos {
-        x >= 6 && x <= 14 && y >= 12 && y <= 16
+        x >= 7 && x <= 12 && y >= 14 && y <= 17
     }
     else
     {

@@ -129,10 +129,10 @@ export function create_intro_ui_bg() {
         },
         draw : function(froggy_draw_ctx) {
             if (this.visible) {
-                const x0 = 6 * SCALE;
-                const y0 = 12 * SCALE;
-                const width_base = (14 - 6) * SCALE;
-                const height = (16 - 12) * SCALE;
+                const x0 = 7 * SCALE;
+                const y0 = 14 * SCALE;
+                const width_base = 6 * SCALE;
+                const height = 4 * SCALE;
 
                 froggy_draw_ctx.ctx.fillStyle = "white";
                 froggy_draw_ctx.ctx.fillRect(x0, y0, width_base * this.proportion, height);
