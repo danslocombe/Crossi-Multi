@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{PlayerInputs, Input};
+use crate::{PlayerInputs, Input, player};
 use crate::game::{PlayerId, Pos, CoordPos};
 use crate::player::PlayerState;
 use crate::player_id_map::PlayerIdMap;
@@ -101,6 +101,22 @@ pub enum CrossyRulesetFST
     EndAllLeft(EndAllLeftState),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RulesState
+{
+    pub game_id : u32,
+    pub fst : CrossyRulesetFST,
+}
+
+impl Default for RulesState {
+    fn default() -> Self {
+        Self {
+            game_id: 0,
+            fst: CrossyRulesetFST::start(),
+        }
+    }
+}
+
 const MIN_PLAYERS : usize = 2;
 const COUNTDOWN_TIME_US : u32 = 3 * 1_000_000;
 const COOLDOWN_TIME_US : u32 = 4 * 1_000_000;
@@ -108,6 +124,31 @@ const WINNER_TIME_US : u32 = 3 * 1_000_000;
 const RIVER_SPAWN_Y_OFFSET : i32 = 12;
 
 use CrossyRulesetFST::*;
+
+impl RulesState
+{
+    pub fn tick(&self, dt : u32, time_us : u32, player_states : &mut PlayerIdMap<PlayerState>, map : &Map) -> Self {
+        let new_fst = self.fst.tick(dt, time_us, player_states, map);
+
+        if (self.fst.in_lobby() && !new_fst.in_lobby())
+        {
+            // Went from non-lobby back to lobby
+            // Increment the game id
+
+            Self {
+                game_id: self.game_id + 1,
+                fst: new_fst,
+            }
+        }
+        else
+        {
+            Self {
+                game_id: self.game_id,
+                fst: new_fst,
+            }
+        }
+    }
+}
 
 impl CrossyRulesetFST
 {
@@ -359,6 +400,13 @@ impl CrossyRulesetFST
             (RoundCooldown(_), RoundCooldown(_)) => true,
             (EndWinner(_), EndWinner(_)) => true,
             (EndAllLeft(_), EndAllLeft(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub fn in_lobby(&self) -> bool {
+        match self {
+            CrossyRulesetFST::Lobby(_) => true,
             _ => false,
         }
     }

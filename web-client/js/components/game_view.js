@@ -36,7 +36,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         key_event_source : key_event_source,
         current_input : "None",
         simple_entities : [],
-        rule_state : undefined,
+        rules_state : undefined,
         players : new Map(),
         camera : create_camera(),
         countdown : create_countdown_font(audio_manager, font_controller),
@@ -72,7 +72,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                     // DEBUG HACK
                     //const html_elem = document.getElementById('invite_text_id');
-                    //html_elem.innerHTML = (this.client.get_rule_state_json());
+                    //html_elem.innerHTML = (this.client.get_rules_state_json());
                 }
 
                 // Check if ws in ready state
@@ -91,43 +91,47 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     }
                 }
 
-                const rule_state_json = this.client.get_rule_state_json()
+                const rules_state_json = this.client.get_rules_state_json()
+
                 let moving_into_lobby = false;
                 let moving_into_warmup = false;
                 let moving_into_end = false;
-                if (rule_state_json) {
-                    const rule_state = JSON.parse(rule_state_json);
+                if (rules_state_json) {
+                    const rules_state = JSON.parse(rules_state_json);
 
-                    if (this.rule_state && rule_state.Lobby)
+                    if (this.rules_state)
                     {
-                        this.intro_ui.set_in_lobby();
-                    }
-                    else
-                    {
-                        this.intro_ui.set_in_game();
+                        if (rules_state.fst.Lobby)
+                        {
+                            this.intro_ui.set_in_lobby();
+                        }
+                        else
+                        {
+                            this.intro_ui.set_in_game();
+                        }
+
+                        if (rules_state.fst.Lobby && !this.rules_state.fst.Lobby) {
+                            console.log("Moving into lobby state...");
+                            moving_into_lobby = true;
+                        }
+
+                        if (rules_state.fst.RoundWarmup && !this.rules_state.fst.RoundWarmup) {
+                            console.log("State is 'RoundWarmup' movnig into warmup state...");
+                            moving_into_warmup = true;
+                        }
+
+                        if (rules_state.fst.EndWinner && !this.rules_state.fst.EndWinner) {
+                            console.log("State is 'EndWinner' movnig into end state...");
+                            moving_into_end = true;
+                        }
+
+                        if (rules_state.fst.EndAllLeft && !this.rules_state.fst.EndAllLeft) {
+                            console.log("State is 'EndAllLeft' movnig into end state...");
+                            moving_into_end = true;
+                        }
                     }
 
-                    if (this.rule_state && rule_state.Lobby && !this.rule_state.Lobby) {
-                        console.log("Moving into lobby state...");
-                        moving_into_lobby = true;
-                    }
-
-                    if (this.rule_state && rule_state.RoundWarmup && !this.rule_state.RoundWarmup) {
-                        console.log("State is 'RoundWarmup' movnig into warmup state...");
-                        moving_into_warmup = true;
-                    }
-
-                    if (this.rule_state && rule_state.EndWinner && !this.rule_state.EndWinner) {
-                        console.log("State is 'EndWinner' movnig into end state...");
-                        moving_into_end = true;
-                    }
-
-                    if (this.rule_state && rule_state.EndAllLeft && !this.rule_state.EndAllLeft) {
-                        console.log("State is 'EndAllLeft' movnig into end state...");
-                        moving_into_end = true;
-                    }
-
-                    this.rule_state = rule_state;
+                    this.rules_state = rules_state;
                 }
 
                 const players_json = this.client.get_players_json();
@@ -141,7 +145,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     this.simple_entities = [];
                     for (const [_, player] of this.players) {
                         if (player) {
-                            player.new_round(this.rule_state.RoundWarmup, this.simple_entities);
+                            player.new_round(this.rules_state.fst.RoundWarmup, this.simple_entities);
                         }
                     }
                 }
@@ -149,8 +153,8 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 {
                     this.simple_entities = [];
                     let winner_name = "";
-                    if (this.rule_state && this.rule_state.EndWinner) {
-                        winner_name = this.players.get(this.rule_state.EndWinner.winner_id).name;
+                    if (this.rules_state && this.rules_state.fst.EndWinner) {
+                        winner_name = this.players.get(this.rules_state.fst.EndWinner.winner_id).name;
                     }
                     else
                     {
@@ -184,7 +188,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                         }
 
                         let player = this.players.get(current_player_state.id);
-                        player.tick(current_player_state, this.simple_entities, this.rule_state);
+                        player.tick(current_player_state, this.simple_entities, this.rules_state);
 
                         players_with_values.add(current_player_state.id);
                     }
@@ -207,7 +211,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 // before pruning by camera_y_max
                 const CAMERA_Y_MAX_BUGFIX = 160;
                 let camera_y_max = CAMERA_Y_MAX_BUGFIX;
-                if (this.rule_state && this.rule_state.Round) {
+                if (this.rules_state && this.rules_state.fst.Round) {
                     // Do proper pruning if we are in a round where camera cant go down
                     camera_y_max = (this.camera.y + 20) * SCALE;
                 }
@@ -222,23 +226,23 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 this.simple_entities = simple_entities_new;
 
-                this.camera.tick(this.rule_state);
+                this.camera.tick(this.rules_state);
                 this.froggy_draw_ctx.x_off = Math.round(-SCALE * this.camera.x);
                 this.froggy_draw_ctx.y_off = Math.round(-SCALE * this.camera.y);
 
-                this.countdown.tick(this.rule_state);
-                this.dialogue.tick(this.rule_state, this.players, this.simple_entities);
+                this.countdown.tick(this.rules_state);
+                this.dialogue.tick(this.rules_state, this.players, this.simple_entities);
                 this.intro_ui.tick(this.players);
-                this.intro_ui_bg.tick(this.rule_state);
+                this.intro_ui_bg.tick(this.rules_state);
 
-                this.prop_controller.tick(this.rule_state, this.simple_entities, this.client);
+                this.prop_controller.tick(this.rules_state, this.simple_entities, this.client);
                 this.font_controller.tick();
             }
         },
 
         draw : function() {
-            const in_lobby = !this.rule_state || this.rule_state.Lobby || this.rule_state.EndWinner || this.rule_state.EndAllLeft;
-            const in_warmup = this.rule_state && this.rule_state.RoundWarmup;
+            const in_lobby = !this.rules_state || this.rules_state.fst.Lobby || this.rules_state.fst.EndWinner || this.rules_state.fst.EndAllLeft;
+            const in_warmup = this.rules_state && this.rules_state.fst.RoundWarmup;
             draw_background(this.froggy_draw_ctx, in_lobby, in_warmup, this.client)
             this.intro_ui_bg.draw(this.froggy_draw_ctx);
 

@@ -1,6 +1,6 @@
 import { SCALE } from "./constants"
 import { rand_push_spectator } from "./spectator";
-import { get_target_y_from_rule_state, get_round_id_from_rule_state } from "./utils";
+import { get_target_y_from_rules_state, get_round_id_from_rules_state } from "./utils";
 
 var sprite_map_def = {
     "foliage" : {w: SCALE, y : SCALE, frames : 6, depth : 250},
@@ -97,16 +97,17 @@ export function create_prop(x, y, prop_name) {
 
 export function create_prop_controller() {
     return {
-        last_generated_round : -1,
+        last_generated_round : -2,
         gen_to: 20,
 
-        tick : function(rule_state, simple_entities, client) {
-            if (!rule_state) {
+        tick : function(rules_state, simple_entities, client) {
+            if (!rules_state) {
                 return;
             }
 
-            const round_id = get_round_id_from_rule_state(rule_state);
-            if (round_id >= 0 && this.last_generated_round != round_id) {
+            const round_id = get_round_id_from_rules_state(rules_state);
+            //if (round_id >= 0 && this.last_generated_round != round_id) {
+            if (this.last_generated_round != round_id) {
                 console.log("Creating props");
                 this.last_generated_round = round_id;
 
@@ -161,11 +162,11 @@ export function create_prop_controller() {
                     }
                 }
             }
-            else if (rule_state.RoundCooldown){
+            else if (rules_state.fst.RoundCooldown){
                 this.gen_to = 20;
             }
 
-            const gen_to_target = get_target_y_from_rule_state(rule_state);
+            const gen_to_target = get_target_y_from_rules_state(rules_state);
             if (gen_to_target !== undefined)
             {
                 while (this.gen_to > gen_to_target - 4) {

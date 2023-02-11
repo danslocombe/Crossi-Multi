@@ -259,7 +259,7 @@ function create_player_def(sprites, move_sound, colour, name, source, audio_mana
         //lobby_ready : false,
         pinwheel : null,
 
-        tick : function(state, simple_entities, rule_state) {
+        tick : function(state, simple_entities, rules_state) {
             this.t += 1;
             const alive_state = this.source.client.player_alive_state_json(this.source.player_id);
             if (alive_state === '"Dead"') {
@@ -291,15 +291,15 @@ function create_player_def(sprites, move_sound, colour, name, source, audio_mana
 
                 return;
             }
-            this.source.tick(state, simple_entities, this, rule_state);
+            this.source.tick(state, simple_entities, this, rules_state);
 
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
             this.dynamic_depth = this.y;
 
             /*
-            if (rule_state && rule_state.Lobby) {
-                this.lobby_ready = rule_state.Lobby.ready_states.inner[this.source.player_id];
+            if (rules_state && rules_state.fst.Lobby) {
+                this.lobby_ready = rules_state.fst.Lobby.ready_states.inner[this.source.player_id];
             }
             else {
                 this.lobby_ready = false;

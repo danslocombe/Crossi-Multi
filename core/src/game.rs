@@ -1,7 +1,7 @@
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use crate::player_id_map::PlayerIdMap;
-use crate::crossy_ruleset::CrossyRulesetFST;
+use crate::crossy_ruleset::{RulesState};
 use crate::map::Map;
 
 use crate::player::*;
@@ -176,7 +176,7 @@ pub struct GameState {
     pub frame_id : u32,
 
     pub player_states: PlayerIdMap<PlayerState>,
-    pub ruleset_state : CrossyRulesetFST,
+    pub rules_state : RulesState,
     pub player_inputs: PlayerInputs,
     //pub frame_id: f64,
 }
@@ -187,18 +187,18 @@ impl GameState {
             time_us: 0,
             player_states: PlayerIdMap::new(),
             player_inputs: PlayerInputs::new(),
-            ruleset_state: CrossyRulesetFST::start(),
+            rules_state: RulesState::default(),
             frame_id: 0,
         }
     }
 
-    pub fn from_server_parts(frame_id : u32, time_us: u32, player_states_def: Vec<PlayerState>, ruleset_state : CrossyRulesetFST) -> Self {
+    pub fn from_server_parts(frame_id : u32, time_us: u32, player_states_def: Vec<PlayerState>, rules_state : RulesState) -> Self {
         let player_states = PlayerIdMap::from_definition(player_states_def.into_iter().map(|x| (x.id, x)).collect());
         GameState {
             time_us,
             player_states,
             player_inputs: PlayerInputs::new(),
-            ruleset_state,
+            rules_state,
             frame_id,
         }
     }
@@ -223,12 +223,12 @@ impl GameState {
         self.player_states.get_populated()
     }
 
-    pub fn get_rule_state(&self) -> &CrossyRulesetFST {
-        &self.ruleset_state
+    pub fn get_rule_state(&self) -> &RulesState {
+        &self.rules_state
     }
 
     pub fn get_round_id(&self) -> u8 {
-        self.ruleset_state.get_round_id()
+        self.rules_state.fst.get_round_id()
     }
 
     pub fn add_player(&self, id: PlayerId, pos: Pos) -> Self {
@@ -280,7 +280,7 @@ impl GameState {
             }
         }
 
-        self.ruleset_state = self.ruleset_state.tick(dt_us, self.time_us, &mut self.player_states, map);
+        self.rules_state = self.rules_state.tick(dt_us, self.time_us, &mut self.player_states, map);
     }
 
     pub fn space_occupied_with_player(&self, pos : Pos, ignore_id : Option<PlayerId>) -> bool {
@@ -303,7 +303,7 @@ impl GameState {
         false 
     }
 
-    pub(crate) fn can_push(&self, id : PlayerId, dir : Input, time_us : u32, rule_state : &CrossyRulesetFST, map : &Map) -> bool {
+    pub(crate) fn can_push(&self, id : PlayerId, dir : Input, time_us : u32, rule_state : &RulesState, map : &Map) -> bool {
         let player = self.get_player(id).unwrap();
 
         match map.try_apply_input(time_us, &rule_state, &player.pos, dir)
@@ -328,7 +328,7 @@ mod tests {
             frame_id : 0,
             player_states,
             player_inputs: PlayerInputs::default(),
-            ruleset_state : CrossyRulesetFST::start(),
+            rules_state : RulesState::default(),
         }
     }
 

@@ -118,13 +118,13 @@ export function create_intro_ui_bg() {
     return {
         visible : false,
         proportion : 0,
-        tick : function(rule_state) {
+        tick : function(rules_state) {
             this.visible = false;
             this.proportion = 0;
-            if (rule_state && rule_state.Lobby)
+            if (rules_state && rules_state.fst.Lobby)
             {
                 this.visible = true;
-                this.proportion = rule_state.Lobby.time_with_all_players_in_ready_zone / 120;
+                this.proportion = rules_state.fst.Lobby.time_with_all_players_in_ready_zone / 120;
             }
         },
         draw : function(froggy_draw_ctx) {

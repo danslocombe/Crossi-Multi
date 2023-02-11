@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use crate::crossy_ruleset::CrossyRulesetFST;
+use crate::crossy_ruleset::{CrossyRulesetFST, RulesState};
 use crate::map::Map;
 use crate::game::*;
 use crate::player::PlayerState;
@@ -65,10 +65,10 @@ impl Timeline {
         frame_id : u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
-        ruleset_state : CrossyRulesetFST
+        rules_state : RulesState
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(frame_id, time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(frame_id, time_us, player_states, rules_state));
         Timeline {
             states,
             map: Map::new(seed),
@@ -80,10 +80,10 @@ impl Timeline {
         frame_id : u32,
         time_us: u32,
         player_states: Vec<PlayerState>,
-        ruleset_state : CrossyRulesetFST
+        rules_state: RulesState
     ) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::from_server_parts(frame_id, time_us, player_states, ruleset_state));
+        states.push_front(GameState::from_server_parts(frame_id, time_us, player_states, rules_state));
         Timeline {
             states,
             map: Map::exact_seed(seed),

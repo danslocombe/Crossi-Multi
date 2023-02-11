@@ -21,14 +21,14 @@ export function create_countdown(audio_manager) {
         go_time : 0,
         audio_manager : audio_manager,
 
-        tick : function (rule_state) {
-            if (!rule_state) {
+        tick : function (rules_state) {
+            if (!rules_state) {
                 return;
             }
 
-            if (rule_state.RoundWarmup) {
-                const time = Math.ceil(rule_state.RoundWarmup.remaining_us / 1000000);
-                //console.log(rule_state.RoundWarmup);
+            if (rules_state.fst.RoundWarmup) {
+                const time = Math.ceil(rules_state.fst.RoundWarmup.remaining_us / 1000000);
+                //console.log(rules_state.fst.RoundWarmup);
                 if (time != this.time) {
                     this.audio_manager.play(snd_countdown);
                 }
@@ -36,7 +36,7 @@ export function create_countdown(audio_manager) {
                 this.enabled = true;
                 this.go_time = 60;
             }
-            else if (rule_state.Round) {
+            else if (rules_state.fst.Round) {
                 if (this.go_time > 0) {
                     if (this.time == 1) {
                         // First tick of "go"
@@ -75,14 +75,14 @@ export function create_countdown_font(audio_manager, font_controller) {
         font_controller : font_controller,
         text: "",
 
-        tick : function (rule_state) {
-            if (!rule_state) {
+        tick : function (rules_state) {
+            if (!rules_state) {
                 return;
             }
 
-            if (rule_state.RoundWarmup) {
-                const time = Math.ceil(rule_state.RoundWarmup.remaining_us / 1000000);
-                //console.log(rule_state.RoundWarmup);
+            if (rules_state.fst.RoundWarmup) {
+                const time = Math.ceil(rules_state.fst.RoundWarmup.remaining_us / 1000000);
+                //console.log(rules_state.fst.RoundWarmup);
                 if (time != this.time) {
                     this.audio_manager.play(snd_countdown);
                 }
@@ -90,7 +90,7 @@ export function create_countdown_font(audio_manager, font_controller) {
                 this.enabled = true;
                 this.go_time = 60;
             }
-            else if (rule_state.Round) {
+            else if (rules_state.fst.Round) {
                 if (this.go_time > 0) {
                     if (this.time == 1) {
                         // First tick of "go"
@@ -160,7 +160,7 @@ export function create_winner_ui() {
             //this.is_alive = false;
         },
 
-        tick : function (rule_state) {
+        tick : function (rules_state) {
             this.t += 1;
 
             if (this.t < this.fade_in_time) {
@@ -234,7 +234,7 @@ export function create_winner_ui_font(font_controller) {
             this.no_winner = true;
         },
 
-        tick : function (rule_state) {
+        tick : function (rules_state) {
             this.t += 1;
         },
 
@@ -262,7 +262,7 @@ export function create_game_winner_ui(font_controller, winning_player_name) {
             return this.is_alive;
         },
 
-        tick : function (rule_state) {
+        tick : function (rules_state) {
             this.t += 1;
         },
 

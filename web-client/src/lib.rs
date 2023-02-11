@@ -56,7 +56,7 @@ pub struct Client {
     last_sent_frame_id : u32,
 
     // This seems like a super hacky solution
-    trusted_rule_state : Option<crossy_ruleset::CrossyRulesetFST>,
+    trusted_rules_state : Option<crossy_ruleset::RulesState>,
 
     queued_time_info : Option<interop::TimeRequestEnd>,
 
@@ -75,7 +75,7 @@ impl Client {
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
 
         let estimated_current_frame_id = server_frame_id + estimated_latency_us / 16_666;
-        let timeline = timeline::Timeline::from_server_parts(seed, estimated_current_frame_id, server_time_us, vec![], crossy_ruleset::CrossyRulesetFST::start());
+        let timeline = timeline::Timeline::from_server_parts(seed, estimated_current_frame_id, server_time_us, vec![], Default::default());
 
         // Estimate server start
         let client_start = WasmInstant::now();
@@ -91,7 +91,7 @@ impl Client {
             estimated_latency_us : estimated_latency_us as f32,
             local_player_info : None,
             last_sent_frame_id : server_frame_id,
-            trusted_rule_state: None,
+            trusted_rules_state: None,
             queued_time_info: Default::default(),
             queued_server_linden_messages: Default::default(),
             ai_agent : None,
@@ -220,7 +220,7 @@ impl Client {
 
     fn process_linden_server_message(&mut self, linden_server_tick : &interop::LindenServerTick)
     {
-        //let mut should_reset = self.trusted_rule_state.as_ref().map(|x| !x.same_variant(&linden_server_tick.rule_state)).unwrap_or(false);
+        //let mut should_reset = self.trusted_rules_state.as_ref().map(|x| !x.same_variant(&linden_server_tick.rules_state)).unwrap_or(false);
         //should_reset |= self.timeline.top_state().player_states.count_populated() != linden_server_tick.latest.states.len();
 
         let should_reset = false;
@@ -232,14 +232,14 @@ impl Client {
                 linden_server_tick.latest.frame_id,
                 linden_server_tick.latest.time_us,
                 linden_server_tick.latest.states.clone(),
-                linden_server_tick.rule_state.clone());
+                linden_server_tick.rules_state.clone());
         }
         else
         {
             if let Some(client_state_at_lkg_time) = (self.timeline.try_get_state(linden_server_tick.lkg_state.frame_id))
             {
                 let mismatch_player_states = linden_server_tick.lkg_state.player_states != client_state_at_lkg_time.player_states;
-                let mismatch_rulestate = linden_server_tick.lkg_state.ruleset_state != client_state_at_lkg_time.ruleset_state;
+                let mismatch_rulestate = linden_server_tick.lkg_state.rules_state != client_state_at_lkg_time.rules_state;
                 if (mismatch_player_states || mismatch_rulestate)
                 {
                     if (mismatch_player_states)
@@ -267,15 +267,15 @@ impl Client {
             self.timeline.propagate_inputs(linden_server_tick.delta_inputs.clone());
         }
 
-        self.trusted_rule_state = Some(linden_server_tick.rule_state.clone());
+        self.trusted_rules_state = Some(linden_server_tick.rules_state.clone());
     }
 
     fn get_round_id(&self) -> u8 {
-        self.trusted_rule_state.as_ref().map(|x| x.get_round_id()).unwrap_or(0)
+        self.trusted_rules_state.as_ref().map(|x| x.fst.get_round_id()).unwrap_or(0)
     }
 
     fn get_river_spawn_times(&self) -> &RiverSpawnTimes {
-        self.trusted_rule_state.as_ref().map(|x| x.get_river_spawn_times()).unwrap_or(&crossy_multi_core::map::river::EMPTY_RIVER_SPAWN_TIMES)
+        self.trusted_rules_state.as_ref().map(|x| x.fst.get_river_spawn_times()).unwrap_or(&crossy_multi_core::map::river::EMPTY_RIVER_SPAWN_TIMES)
     }
 
     pub fn recv(&mut self, server_tick : &[u8])
@@ -375,8 +375,8 @@ impl Client {
         self.local_player_info.as_ref().map(|x| x.player_id.0 as i32).unwrap_or(-1)
     }
 
-    pub fn get_rule_state_json(&self) -> String {
-        match self.get_latest_server_rule_state() {
+    pub fn get_rules_state_json(&self) -> String {
+        match self.get_latest_server_rules_state() {
             Some(x) => {
                 serde_json::to_string(x).unwrap()
             }
@@ -386,8 +386,8 @@ impl Client {
         }
     }
 
-    fn get_latest_server_rule_state(&self) -> Option<&crossy_ruleset::CrossyRulesetFST> {
-        self.trusted_rule_state.as_ref()
+    fn get_latest_server_rules_state(&self) -> Option<&crossy_ruleset::RulesState> {
+        self.trusted_rules_state.as_ref()
     }
 
     pub fn get_rows_json(&mut self) -> String {
@@ -396,7 +396,7 @@ impl Client {
 
     fn get_rows(&mut self) -> Vec<(i32, map::Row)> {
         let mut vec = Vec::with_capacity(32);
-        let screen_y = self.trusted_rule_state.as_ref().map(|x| x.get_screen_y()).unwrap_or(0);
+        let screen_y = self.trusted_rules_state.as_ref().map(|x| x.fst.get_screen_y()).unwrap_or(0);
         let range_min = screen_y;
         let range_max = (screen_y + 160/8 + 6).min(160/8);
         for i in range_min..range_max {
@@ -427,8 +427,8 @@ impl Client {
         // For remote players we want to wait for confirmation from the server.
         // For local player we can probably make this decision earlier. (Weird edge case where player pushing you in gets interrupted before they can?)
 
-        self.get_latest_server_rule_state().map(|x| {
-            x.get_player_alive(PlayerId(player_id as u8))
+        self.get_latest_server_rules_state().map(|x| {
+            x.fst.get_player_alive(PlayerId(player_id as u8))
         }).unwrap_or(AliveState::Unknown)
     }
 

@@ -188,12 +188,12 @@ export function create_dialogue_controller(audio_manager, font_controller) {
 
         round_cooldown_first_tick : true,
 
-        tick : function(rule_state, players, simple_entities) {
-            if (rule_state && rule_state.Lobby) {
+        tick : function(rules_state, players, simple_entities) {
+            if (rules_state && rules_state.fst.Lobby) {
                 this.tick_lobby(players, simple_entities);
             }
             else {
-                this.tick_game(players, rule_state, simple_entities);
+                this.tick_game(players, rules_state, simple_entities);
             }
 
             if (this.dialogue_instance)
@@ -206,14 +206,14 @@ export function create_dialogue_controller(audio_manager, font_controller) {
             }
         },
 
-        tick_game : function(players, rule_state, simple_entities) {
-            if (rule_state && rule_state.RoundCooldown) {
+        tick_game : function(players, rules_state, simple_entities) {
+            if (rules_state && rules_state.fst.RoundCooldown) {
                 let alive_player = false;
                 let alive_player_id = 0;
 
                 // Up to one alive player
-                for (let i in rule_state.RoundCooldown.round_state.alive_states.inner) {
-                    if (rule_state.RoundCooldown.round_state.alive_states.inner[i] === 'Alive') {
+                for (let i in rules_state.fst.RoundCooldown.round_state.alive_states.inner) {
+                    if (rules_state.fst.RoundCooldown.round_state.alive_states.inner[i] === 'Alive') {
                         alive_player = true;
                         alive_player_id = parseInt(i);
                     }
@@ -240,7 +240,7 @@ export function create_dialogue_controller(audio_manager, font_controller) {
                         this.winner_ui_instance.trigger_no_winner();
                     }
 
-                    if (this.dialogue_instance && (!alive_player || rule_state.RoundCooldown.remaining_us < 20000)) {
+                    if (this.dialogue_instance && (!alive_player || rules_state.fst.RoundCooldown.remaining_us < 20000)) {
                         this.dialogue_instance.trigger_close();
                     }
                 }
