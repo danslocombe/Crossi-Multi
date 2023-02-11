@@ -35,6 +35,10 @@ export function get_round_id_from_rules_state(rules_state) {
     else if (rules_state.fst.RoundCooldown) {
         return rules_state.fst.RoundCooldown.round_id;
     }
+    else if (rules_state.fst.EndWinner || rules_state.fst.EndAllLeft)
+    {
+        return -2;
+    }
 
     return -1;
 }

@@ -97,7 +97,8 @@ export function create_prop(x, y, prop_name) {
 
 export function create_prop_controller() {
     return {
-        last_generated_round : -2,
+        last_generated_round : -1,
+        last_generated_game : -1,
         gen_to: 20,
 
         tick : function(rules_state, simple_entities, client) {
@@ -106,10 +107,16 @@ export function create_prop_controller() {
             }
 
             const round_id = get_round_id_from_rules_state(rules_state);
+            const game_id = rules_state.game_id;
+
             //if (round_id >= 0 && this.last_generated_round != round_id) {
-            if (this.last_generated_round != round_id) {
+            if (this.last_generated_round != round_id || this.last_generated_game != game_id) {
                 console.log("Creating props");
                 this.last_generated_round = round_id;
+                this.last_generated_game = game_id;
+
+                console.log("Round Id " + round_id);
+                console.log("Game Id " + game_id);
 
                 const stand_left = create_prop(4, 10*SCALE, "stand");
                 const stand_right = create_prop(14* SCALE + 4, 10*SCALE, "stand");
