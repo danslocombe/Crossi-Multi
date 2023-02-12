@@ -114,6 +114,7 @@ export function create_prop_controller() {
                 console.log("Creating props");
                 this.last_generated_round = round_id;
                 this.last_generated_game = game_id;
+                this.gen_to = 20;
 
                 console.log("Round Id " + round_id);
                 console.log("Game Id " + game_id);
@@ -168,9 +169,6 @@ export function create_prop_controller() {
                         rand_push_spectator(xx, yy, true, prob_below, simple_entities);
                     }
                 }
-            }
-            else if (rules_state.fst.RoundCooldown){
-                this.gen_to = 20;
             }
 
             const gen_to_target = get_target_y_from_rules_state(rules_state);

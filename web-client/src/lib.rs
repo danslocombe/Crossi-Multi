@@ -398,7 +398,7 @@ impl Client {
         let mut vec = Vec::with_capacity(32);
         let screen_y = self.trusted_rules_state.as_ref().map(|x| x.fst.get_screen_y()).unwrap_or(0);
         let range_min = screen_y;
-        let range_max = (screen_y + 160/8 + 6).min(160/8);
+        let range_max = (screen_y + (2 * 160)/8 + 6).min(160/8);
         for i in range_min..range_max {
             let y = i;
             vec.push((y as i32, self.timeline.map.get_row(self.get_round_id(), y).clone()));

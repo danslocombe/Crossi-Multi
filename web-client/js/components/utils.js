@@ -22,7 +22,8 @@ export function get_target_y_from_rules_state(rules_state) {
         //return rules_state.fst.RoundCooldown.round_state.screen_y;
     }
 
-    return undefined;
+    //return undefined;
+    return 0;
 }
 
 export function get_round_id_from_rules_state(rules_state) {
