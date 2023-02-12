@@ -15,8 +15,8 @@ pub struct GameConfig {
 impl GameConfig {
     pub fn new() -> Self {
         Self {
-            //required_win_count : 3,
-            required_win_count : 1,
+            required_win_count : 3,
+            //required_win_count : 1,
         }
     }
 }
