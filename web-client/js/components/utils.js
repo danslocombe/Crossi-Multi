@@ -11,29 +11,34 @@ export function diff(x, y) {
 }
 
 // These are so ugly
-export function get_target_y_from_rule_state(rule_state) {
-    if (rule_state.Round) {
-        return rule_state.Round.screen_y;
+export function get_target_y_from_rules_state(rules_state) {
+    if (rules_state.fst.Round) {
+        return rules_state.fst.Round.screen_y;
     }
-    else if (rule_state.RoundWarmup) {
+    else if (rules_state.fst.RoundWarmup) {
         return 0;
     }
-    else if (rule_state.RoundCooldown) {
-        //return rule_state.RoundCooldown.round_state.screen_y;
+    else if (rules_state.fst.RoundCooldown) {
+        //return rules_state.fst.RoundCooldown.round_state.screen_y;
     }
 
-    return undefined;
+    //return undefined;
+    return 0;
 }
 
-export function get_round_id_from_rule_state(rule_state) {
-    if (rule_state.Round) {
-        return rule_state.Round.round_id;
+export function get_round_id_from_rules_state(rules_state) {
+    if (rules_state.fst.Round) {
+        return rules_state.fst.Round.round_id;
     }
-    else if (rule_state.RoundWarmup) {
-        return rule_state.RoundWarmup.round_id;
+    else if (rules_state.fst.RoundWarmup) {
+        return rules_state.fst.RoundWarmup.round_id;
     }
-    else if (rule_state.RoundCooldown) {
-        return rule_state.RoundCooldown.round_id;
+    else if (rules_state.fst.RoundCooldown) {
+        return rules_state.fst.RoundCooldown.round_id;
+    }
+    else if (rules_state.fst.EndWinner || rules_state.fst.EndAllLeft)
+    {
+        return -2;
     }
 
     return -1;

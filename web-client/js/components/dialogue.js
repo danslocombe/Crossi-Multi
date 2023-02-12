@@ -1,4 +1,4 @@
-import { create_winner_ui } from "./game_ui";
+import { create_winner_ui, create_winner_ui_font } from "./game_ui";
 import { dan_lerp, ease_in_quad } from "./utils";
 import { create_whiteout } from "./visual_effects";
 
@@ -46,7 +46,7 @@ for (let sound_group of win_sounds) {
 let snd_join = new Audio('/sounds/snd_join.wav');
 snd_join.volume = 0.2;
 
-function create_dialogue(sprite_name, duration = undefined) {
+function create_dialogue(sprite_name, audio_manager, duration = undefined) {
     console.log("Creating dialogue for " + sprite_name);
     let sprite = dialogue_sprites[sprite_name];
     if (!sprite) {
@@ -73,6 +73,7 @@ function create_dialogue(sprite_name, duration = undefined) {
 
     return {
         sprite : sprite,
+        audio_manager : audio_manager,
         win_sound : win_sound,
         is_alive : true,
         t : 0,
@@ -102,7 +103,7 @@ function create_dialogue(sprite_name, duration = undefined) {
                     if (this.t > sound_delay && !this.played_sound) {
                         this.played_sound = true;
                         if (this.win_sound) {
-                            this.win_sound.play();
+                            this.audio_manager.play(this.win_sound)
                         }
                     }
                 }
@@ -173,8 +174,10 @@ function create_dialogue(sprite_name, duration = undefined) {
     };
 }
 
-export function create_dialogue_controller() {
+export function create_dialogue_controller(audio_manager, font_controller) {
     return {
+        audio_manager : audio_manager,
+        font_controller : font_controller,
         dialogue_instance : undefined,
         winner_ui_instance : undefined,
         no_winner_ui_instance : undefined,
@@ -185,12 +188,12 @@ export function create_dialogue_controller() {
 
         round_cooldown_first_tick : true,
 
-        tick : function(rule_state, players, simple_entities) {
-            if (rule_state && rule_state.Lobby) {
+        tick : function(rules_state, players, simple_entities) {
+            if (rules_state && rules_state.fst.Lobby) {
                 this.tick_lobby(players, simple_entities);
             }
             else {
-                this.tick_game(players, rule_state, simple_entities);
+                this.tick_game(players, rules_state, simple_entities);
             }
 
             if (this.dialogue_instance)
@@ -203,14 +206,14 @@ export function create_dialogue_controller() {
             }
         },
 
-        tick_game : function(players, rule_state, simple_entities) {
-            if (rule_state && rule_state.RoundCooldown) {
+        tick_game : function(players, rules_state, simple_entities) {
+            if (rules_state && rules_state.fst.RoundCooldown) {
                 let alive_player = false;
                 let alive_player_id = 0;
 
                 // Up to one alive player
-                for (let i in rule_state.RoundCooldown.round_state.alive_states.inner) {
-                    if (rule_state.RoundCooldown.round_state.alive_states.inner[i] === 'Alive') {
+                for (let i in rules_state.fst.RoundCooldown.round_state.alive_states.inner) {
+                    if (rules_state.fst.RoundCooldown.round_state.alive_states.inner[i] === 'Alive') {
                         alive_player = true;
                         alive_player_id = parseInt(i);
                     }
@@ -225,8 +228,9 @@ export function create_dialogue_controller() {
                         simple_entities.push(whiteout);
                         if (players.has(alive_player_id)) {
                             const sprite_name = players.get(alive_player_id).sprite_name;
-                            this.dialogue_instance = create_dialogue(sprite_name);
-                            this.winner_ui_instance = create_winner_ui();
+                            this.dialogue_instance = create_dialogue(sprite_name, this.audio_manager);
+                            //this.winner_ui_instance = create_winner_ui();
+                            this.winner_ui_instance = create_winner_ui_font(this.font_controller);
                             simple_entities.push(this.winner_ui_instance);
                         }
                     }
@@ -236,7 +240,7 @@ export function create_dialogue_controller() {
                         this.winner_ui_instance.trigger_no_winner();
                     }
 
-                    if (this.dialogue_instance && (!alive_player || rule_state.RoundCooldown.remaining_us < 20000)) {
+                    if (this.dialogue_instance && (!alive_player || rules_state.fst.RoundCooldown.remaining_us < 20000)) {
                         this.dialogue_instance.trigger_close();
                     }
                 }
@@ -257,7 +261,7 @@ export function create_dialogue_controller() {
                                 this.lobby_join_queue.push(player.sprite_name);
                                 const whiteout = create_whiteout()
                                 simple_entities.push(whiteout);
-                                snd_join.play();
+                                this.audio_manager.play(snd_join);
                             }
                         }
                     }
@@ -267,7 +271,7 @@ export function create_dialogue_controller() {
             if (this.lobby_join_queue.length > 0) {
                 if (!this.dialogue_instance) {
                     const sprite = this.lobby_join_queue.shift();
-                    this.dialogue_instance = create_dialogue(sprite, 90);
+                    this.dialogue_instance = create_dialogue(sprite, this.audio_manager, 90);
                 }
             }
 

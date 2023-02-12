@@ -1,4 +1,4 @@
-import { dan_lerp, get_target_y_from_rule_state } from "./utils";
+import { dan_lerp, get_target_y_from_rules_state } from "./utils";
 
 export function create_camera() {
 
@@ -12,9 +12,9 @@ export function create_camera() {
             this.screen_shake_t = 6;
         },
 
-        tick : function(rule_state) {
-            if (rule_state) {
-                const new_target_y = get_target_y_from_rule_state(rule_state);
+        tick : function(rules_state) {
+            if (rules_state) {
+                const new_target_y = get_target_y_from_rules_state(rules_state);
                 if (new_target_y !== undefined) {
                     this.target_y = new_target_y;
                 }

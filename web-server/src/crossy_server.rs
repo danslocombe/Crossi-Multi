@@ -309,7 +309,7 @@ impl Server {
                 lkg_state : lkg_state.clone(),
                 delta_inputs: delta_inputs.iter().cloned().collect(),
                 last_client_frame_id,
-                rule_state: top_state.get_rule_state().clone(),
+                rules_state: top_state.get_rule_state().clone(),
             });
 
             self.outbound_tx.send(linden_tick).unwrap();

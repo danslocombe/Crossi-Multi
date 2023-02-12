@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use crate::game::Input;
 use crate::timeline::RemoteTickState;
 use crate::player_id_map::PlayerIdMap;
-use crate::crossy_ruleset::CrossyRulesetFST;
+use crate::crossy_ruleset::RulesState;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CrossyMessage {
@@ -75,7 +75,7 @@ pub struct LindenServerTick {
     pub lkg_state : crate::game::GameState,
     pub delta_inputs : Vec<crate::timeline::RemoteInput>,
     pub last_client_frame_id : PlayerIdMap<u32>,
-    pub rule_state : CrossyRulesetFST,
+    pub rules_state : RulesState,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]

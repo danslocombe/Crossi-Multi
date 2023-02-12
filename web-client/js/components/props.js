@@ -1,6 +1,6 @@
 import { SCALE } from "./constants"
 import { rand_push_spectator } from "./spectator";
-import { get_target_y_from_rule_state, get_round_id_from_rule_state } from "./utils";
+import { get_target_y_from_rules_state, get_round_id_from_rules_state } from "./utils";
 
 var sprite_map_def = {
     "foliage" : {w: SCALE, y : SCALE, frames : 6, depth : 250},
@@ -97,20 +97,27 @@ export function create_prop(x, y, prop_name) {
 
 export function create_prop_controller() {
     return {
-        run_this_round : false,
         last_generated_round : -1,
+        last_generated_game : -1,
         gen_to: 20,
 
-        tick : function(rule_state, simple_entities, client) {
-            if (!rule_state) {
+        tick : function(rules_state, simple_entities, client) {
+            if (!rules_state) {
                 return;
             }
 
-            const round_id = get_round_id_from_rule_state(rule_state);
-            if (!this.run_this_round && round_id >= 0 && this.last_generated_round != round_id) {
+            const round_id = get_round_id_from_rules_state(rules_state);
+            const game_id = rules_state.game_id;
+
+            //if (round_id >= 0 && this.last_generated_round != round_id) {
+            if (this.last_generated_round != round_id || this.last_generated_game != game_id) {
                 console.log("Creating props");
-                this.run_this_round = true;
                 this.last_generated_round = round_id;
+                this.last_generated_game = game_id;
+                this.gen_to = 20;
+
+                console.log("Round Id " + round_id);
+                console.log("Game Id " + game_id);
 
                 const stand_left = create_prop(4, 10*SCALE, "stand");
                 const stand_right = create_prop(14* SCALE + 4, 10*SCALE, "stand");
@@ -163,12 +170,8 @@ export function create_prop_controller() {
                     }
                 }
             }
-            else if (rule_state.RoundCooldown){
-                this.run_this_round = false;
-                this.gen_to = 20;
-            }
 
-            const gen_to_target = get_target_y_from_rule_state(rule_state);
+            const gen_to_target = get_target_y_from_rules_state(rules_state);
             if (gen_to_target !== undefined)
             {
                 while (this.gen_to > gen_to_target - 4) {

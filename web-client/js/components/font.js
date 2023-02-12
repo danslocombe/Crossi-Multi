@@ -1,6 +1,4 @@
 
-//let spr_font = new Image(16 * 26, 22);
-//spr_font.src = '/sprites/spr_font_blob.png';
 
 let font_width = 10;
 let font_height = 12;
@@ -10,13 +8,43 @@ spr_font.src = '/sprites/spr_font_small.png';
 let spr_font_2 = new Image(font_width * 26, font_height);
 spr_font_2.src = '/sprites/spr_font_small_2.png';
 
+let small_font = {
+    width: 10,
+    height: 12,
+    sprite_0 : spr_font,
+    sprite_1 : spr_font_2,
+}
+
+let spr_font_blob = new Image(16 * 22, 22);
+spr_font_blob.src = '/sprites/spr_font_blob.png';
+
+let spr_font_blob_2 = new Image(16 * 22, 22);
+spr_font_blob_2.src = '/sprites/spr_font_blob_2.png';
+
+let blob_font = {
+    width: 16,
+    height: 22,
+    sprite_0 : spr_font_blob,
+    sprite_1 : spr_font_blob_2,
+}
+
 export function create_font_controller() {
     return {
         t : 0,
-        text_height : font_height,
+        font : small_font,
+
+        set_Font_small : function() {
+            this.font = small_font;
+        },
+
+        set_font_blob: function() {
+            this.font = blob_font;
+        },
+
         tick : function() {
             this.t += 1;
         },
+
         text : function(ctx, str, x, y) {
             for (let i = 0; i < str.length; i++)
             {
@@ -40,14 +68,22 @@ export function create_font_controller() {
                 {
                     const x_off = 0;
                     const y_off = 0;
-                    let sprite = spr_font;
+                    let sprite = this.font.sprite_0;
                     if ((Math.floor(this.t / 8) % 2) == 0) {
-                        sprite = spr_font_2;
+                        sprite = this.font.sprite_1;
                     }
-                    ctx.ctx.drawImage(sprite, font_width * frame_id, 0, font_width, font_height, x + x_off, y + y_off, font_width, font_height);
+                    ctx.ctx.drawImage(
+                        sprite,
+                        this.font.width * frame_id, 0,
+                        this.font.width,
+                        this.font.height,
+                        x + x_off,
+                        y + y_off,
+                        this.font.width,
+                        this.font.height);
                 }
 
-                x += font_width;
+                x += this.font.width;
             }
 
         }

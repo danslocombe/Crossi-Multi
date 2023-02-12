@@ -12,7 +12,7 @@ use road::Road;
 use river::{River, RiverSpawnTimes};
 use obstacle_row::{ObstaclePublic, ObstacleRowDescr};
 
-use crate::crossy_ruleset::CrossyRulesetFST;
+use crate::crossy_ruleset::{RulesState, CrossyRulesetFST};
 use crate::game::CoordPos;
 use crate::SCREEN_SIZE;
 use crate::{Pos, PreciseCoords, Input};
@@ -54,6 +54,7 @@ pub struct RiverDescr {
 pub struct PathDescr {
     wall_width : u32,
 }
+
 #[derive(Debug)]
 struct MapRound {
     seed : u32,
@@ -134,7 +135,7 @@ impl Map {
         false
     }
 
-    pub fn solid(&self, time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
+    pub fn solid(&self, time_us : u32, rule_state : &RulesState, pos : CoordPos) -> bool {
         if pos.x < 0 || pos.x >= SCREEN_SIZE {
             return true;
         }
@@ -144,7 +145,7 @@ impl Map {
         }
 
         let mut guard = self.inner.lock().unwrap();
-        let round_id = rule_state.get_round_id();
+        let round_id = rule_state.fst.get_round_id();
         let round = guard.get_mut(round_id);
 
         if (round.seed == 0 && pos.y < 0) {
@@ -197,11 +198,11 @@ impl Map {
         }
     }
 
-    pub fn try_apply_input(&self, time_us : u32, rule_state : &crate::crossy_ruleset::CrossyRulesetFST, pos : &crate::Pos, input : Input) -> Option<Pos> {
-        let round_id = rule_state.get_round_id();
+    pub fn try_apply_input(&self, time_us : u32, rule_state : &crate::crossy_ruleset::RulesState, pos : &crate::Pos, input : Input) -> Option<Pos> {
+        let round_id = rule_state.fst.get_round_id();
         let pos = self.realise_pos(time_us, pos);
         let precise = pos.apply_input(input);
-        let spawn_times = rule_state.get_river_spawn_times();
+        let spawn_times = rule_state.fst.get_river_spawn_times();
 
         if let Some(lillipad_id) = self.lillipad_at_pos(round_id, spawn_times, time_us, precise) {
             Some(Pos::Lillipad(lillipad_id))
@@ -374,7 +375,7 @@ impl MapRound {
 
             // Seed 0 is reserved for lobbies
             // We shouldnt generate any roads / rivers
-            if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.2) {
+            if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.25) {
                 verbose_log!("Generating obtacle row at y={}", row_id.to_y());
 
                 if (rng.gen_unit("feature_type") < 0.5) {
@@ -440,9 +441,9 @@ impl MapRound {
                 }
             }
             else {
-                const WALL_WIDTH_MAX : i32 = 4;
+                const WALL_WIDTH_MAX : i32 = 6;
                 const WALL_WIDTH_MIN : i32 = 1;
-                let new_wall_width = self.gen_state_wall_width + rng.choose("wall_width", &[-1, 0, 0, 1]);
+                let new_wall_width = self.gen_state_wall_width + rng.choose("wall_width", &[-1, -1, 0, 0, 0, 0, 1, 1, 1]);
                 self.gen_state_wall_width = new_wall_width.min(WALL_WIDTH_MAX).max(WALL_WIDTH_MIN);
 
                 self.rows.push_front(Row {
@@ -492,12 +493,12 @@ fn outside_walls(x : i32, wall_width : i32) -> bool {
 }
 
 impl Row {
-    pub fn solid(&self, _time_us : u32, rule_state : &CrossyRulesetFST, pos : CoordPos) -> bool {
+    pub fn solid(&self, _time_us : u32, rule_state : &RulesState, pos : CoordPos) -> bool {
         //debug_log!("Checking {:?} solid, assert value self.row_id.to_y() = {}", pos, self.row_id.to_y());
         assert!(self.row_id.to_y() == pos.y);
         let x = pos.x;
 
-        if let CrossyRulesetFST::Lobby(_) = rule_state {
+        if let CrossyRulesetFST::Lobby(_) = rule_state.fst {
             // Nothing is solid
             return false;
         }
@@ -508,7 +509,7 @@ impl Row {
                 outside_walls(x, s.wall_width as i32)
             },
             RowType::StartingBarrier() => {
-                if let CrossyRulesetFST::RoundWarmup(_) = rule_state {
+                if let CrossyRulesetFST::RoundWarmup(_) = rule_state.fst {
                     // Whole row solid while barrier is up
                     true
                 }

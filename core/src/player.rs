@@ -116,7 +116,7 @@ impl PlayerState {
     }
 
     pub fn push(&self, push : &Push, state : &GameState, map : &Map) -> Self {
-        let m_new_pos = map.try_apply_input(state.time_us, &state.ruleset_state, &self.pos, push.dir);
+        let m_new_pos = map.try_apply_input(state.time_us, &state.rules_state, &self.pos, push.dir);
 
         if let Some(new_pos) = m_new_pos {
             let mut new = self.clone();
@@ -132,7 +132,7 @@ impl PlayerState {
 
     fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>, map : &Map) -> Option<MovingState> {
         let mut push_info = PushInfo::default();
-        let new_pos = map.try_apply_input(state.time_us, &state.ruleset_state, &self.pos, input)?;
+        let new_pos = map.try_apply_input(state.time_us, &state.rules_state, &self.pos, input)?;
 
         for (_, other_player) in state.player_states.iter().filter(|(id, _)| *id != self.id) {
 
@@ -168,7 +168,7 @@ impl PlayerState {
                 return None;
             }
 
-            if (state.can_push(other.id, dir, state.time_us, &state.ruleset_state, map)) {
+            if (state.can_push(other.id, dir, state.time_us, &state.rules_state, map)) {
                 pushes.push(Push {
                     id : other.id,
                     pushed_by : self.id,

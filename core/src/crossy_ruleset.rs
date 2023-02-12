@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{PlayerInputs, Input};
+use crate::{PlayerInputs, Input, player};
 use crate::game::{PlayerId, Pos, CoordPos};
 use crate::player::PlayerState;
 use crate::player_id_map::PlayerIdMap;
@@ -16,6 +16,7 @@ impl GameConfig {
     pub fn new() -> Self {
         Self {
             required_win_count : 3,
+            //required_win_count : 1,
         }
     }
 }
@@ -62,9 +63,31 @@ pub struct CooldownState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EndState {
+pub struct EndWinnerState {
     pub winner_id : PlayerId,
     pub remaining_us : u32,
+}
+
+impl EndWinnerState {
+    fn new(winner_id : PlayerId) -> Self {
+        Self {
+            winner_id,
+            remaining_us: WINNER_TIME_US,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EndAllLeftState {
+    pub remaining_us : u32,
+}
+
+impl Default for EndAllLeftState {
+    fn default() -> Self {
+        Self {
+            remaining_us: WINNER_TIME_US,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -74,7 +97,24 @@ pub enum CrossyRulesetFST
     RoundWarmup(WarmupState),
     Round(RoundState),
     RoundCooldown(CooldownState),
-    End(EndState),
+    EndWinner(EndWinnerState),
+    EndAllLeft(EndAllLeftState),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RulesState
+{
+    pub game_id : u32,
+    pub fst : CrossyRulesetFST,
+}
+
+impl Default for RulesState {
+    fn default() -> Self {
+        Self {
+            game_id: 0,
+            fst: CrossyRulesetFST::start(),
+        }
+    }
 }
 
 const MIN_PLAYERS : usize = 2;
@@ -84,6 +124,31 @@ const WINNER_TIME_US : u32 = 3 * 1_000_000;
 const RIVER_SPAWN_Y_OFFSET : i32 = 12;
 
 use CrossyRulesetFST::*;
+
+impl RulesState
+{
+    pub fn tick(&self, dt : u32, time_us : u32, player_states : &mut PlayerIdMap<PlayerState>, map : &Map) -> Self {
+        let new_fst = self.fst.tick(dt, time_us, player_states, map);
+
+        if (self.fst.in_lobby() && !new_fst.in_lobby())
+        {
+            // Went from non-lobby back to lobby
+            // Increment the game id
+
+            Self {
+                game_id: self.game_id + 1,
+                fst: new_fst,
+            }
+        }
+        else
+        {
+            Self {
+                game_id: self.game_id,
+                fst: new_fst,
+            }
+        }
+    }
+}
 
 impl CrossyRulesetFST
 {
@@ -108,7 +173,7 @@ impl CrossyRulesetFST
                         // Initialize to all zero
                         let win_counts = PlayerIdMap::seed_from(player_states, 0);
                         let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
-                        reset_positions(player_states, true);
+                        reset_positions(player_states, ResetPositionTarget::RacePositions);
 
                         let game_config = GameConfig::new();
 
@@ -126,7 +191,7 @@ impl CrossyRulesetFST
                     }
                 }
                 else {
-                    Lobby(LobbyState { time_with_all_players_in_ready_zone: state.time_with_all_players_in_ready_zone / 2 })
+                    Lobby(LobbyState { time_with_all_players_in_ready_zone: (state.time_with_all_players_in_ready_zone as f32 * 0.8).round() as u32})
                 }
             },
             RoundWarmup(state) => {
@@ -162,6 +227,12 @@ impl CrossyRulesetFST
                 }
             },
             Round(state) => {
+                if (player_states.count_populated() < MIN_PLAYERS)
+                {
+                    // No longer enough players in the game, because people left.
+                    return EndAllLeft(EndAllLeftState::default());
+                }
+
                 let mut new_state = state.clone();
                 // New player joined?
                 new_state.alive_states.seed_missing(player_states, AliveState::NotInGame);
@@ -211,11 +282,8 @@ impl CrossyRulesetFST
                             debug_log!("Going to next round, winner player={:?} count={}", winner_id, new_count);
                             if (new_count >= state.round_state.game_config.required_win_count) {
                                 debug_log!("Going to end state");
-                                reset_positions(player_states, false);
-                                return End(EndState {
-                                    winner_id,
-                                    remaining_us : WINNER_TIME_US,
-                                })
+                                reset_positions(player_states, ResetPositionTarget::LobbyPositions);
+                                return EndWinner(EndWinnerState::new(winner_id));
                             }
                             win_counts.set(winner_id, new_count);
                         }
@@ -223,7 +291,7 @@ impl CrossyRulesetFST
                         // Take into account all players that have joined during the round
                         let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
                         win_counts.seed_missing(player_states, 0);
-                        reset_positions(player_states, true);
+                        reset_positions(player_states, ResetPositionTarget::RacePositions);
 
                         RoundWarmup(WarmupState {
                             remaining_us : COUNTDOWN_TIME_US,
@@ -236,19 +304,32 @@ impl CrossyRulesetFST
                     }
                 }
             },
-            End(state) => {
+            EndWinner(state) => {
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
-                        End(EndState {
+                        EndWinner(EndWinnerState {
                             remaining_us,
                             winner_id : state.winner_id,
                         })
                     }
                     _ => {
                         // Reset to lobby
-                        Lobby(LobbyState {
-                            time_with_all_players_in_ready_zone: 0,
+                        reset_positions(player_states, ResetPositionTarget::LobbyPositions);
+                        Self::start()
+                    }
+                }
+            },
+            EndAllLeft(state) => {
+                match state.remaining_us.checked_sub(dt) {
+                    Some(remaining_us) => {
+                        EndAllLeft(EndAllLeftState {
+                            remaining_us,
                         })
+                    }
+                    _ => {
+                        // Reset to lobby
+                        reset_positions(player_states, ResetPositionTarget::LobbyPositions);
+                        Self::start()
                     }
                 }
             }
@@ -286,7 +367,7 @@ impl CrossyRulesetFST
             RoundCooldown(state) => {
                 state.round_state.alive_states.get_copy(player_id).unwrap_or(AliveState::NotInGame)
             },
-            End(state) => {
+            EndWinner(state) => {
                 if player_id == state.winner_id
                 {
                     AliveState::Alive
@@ -295,7 +376,8 @@ impl CrossyRulesetFST
                 {
                     AliveState::NotInGame
                 }
-            }
+            },
+            EndAllLeft(_) => AliveState::Alive,
         }
     }
      
@@ -305,7 +387,8 @@ impl CrossyRulesetFST
             RoundWarmup(_) => 0,
             Round(state) => state.screen_y,
             RoundCooldown(state) => state.round_state.screen_y,
-            End(_) => 0,
+            EndWinner(_) => 0,
+            EndAllLeft(_) => 0,
         }
     }
 
@@ -315,13 +398,26 @@ impl CrossyRulesetFST
             (RoundWarmup(_), RoundWarmup(_)) => true,
             (Round(_), Round(_)) => true,
             (RoundCooldown(_), RoundCooldown(_)) => true,
-            (End(_), End(_)) => true,
+            (EndWinner(_), EndWinner(_)) => true,
+            (EndAllLeft(_), EndAllLeft(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub fn in_lobby(&self) -> bool {
+        match self {
+            CrossyRulesetFST::Lobby(_) => true,
             _ => false,
         }
     }
 }
 
-fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>, race_starting_positions: bool) {
+enum ResetPositionTarget {
+    LobbyPositions,
+    RacePositions,
+}
+
+fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>, target : ResetPositionTarget) {
     let player_count_for_offset = player_states.iter().map(|(id, _)| id.0 as i32).max().unwrap_or(0);
 
     for id in player_states.valid_ids() {
@@ -329,7 +425,13 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>, race_starting_
 
         let x_off_from_count = (player_count_for_offset / 2);
         let x = player_state.id.0 as i32 + 9 - x_off_from_count;
-        let y = if race_starting_positions { 17 } else { 11 };
+
+        let y = match target
+        {
+            ResetPositionTarget::LobbyPositions => 11,
+            ResetPositionTarget::RacePositions => 16,
+        };
+
         player_state.reset_to_pos(Pos::Coord(CoordPos{x, y}));
     }
 }
@@ -408,7 +510,7 @@ fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<Al
 
 fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
     if let Pos::Coord(CoordPos{x, y}) = player.pos {
-        x >= 6 && x <= 14 && y >= 12 && y <= 16
+        x >= 7 && x <= 12 && y >= 14 && y <= 17
     }
     else
     {
