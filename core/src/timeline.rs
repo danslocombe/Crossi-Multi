@@ -244,7 +244,13 @@ impl Timeline {
 
     fn frame_id_to_frame_offset(&self, frame_id : u32) -> Option<usize>
     {
-        assert!(frame_id <= self.states.front().unwrap().frame_id);
+        //assert!(frame_id <= self.states.front().unwrap().frame_id);
+        let assert_condition = frame_id <= self.states.front().unwrap().frame_id;
+        if (!assert_condition) {
+            let bt = backtrace::Backtrace::new();
+            panic!("Ahhh! frame_id {} states len {} states front {:?}, backtrace {:?}", frame_id, self.states.len(), self.states.front().map(|x| x.frame_id),  bt);
+        }
+
         let first_state = self.states.back()?;
         let offset_back = frame_id.checked_sub(first_state.frame_id)? as usize;
         let offset_front = self.states.len() - offset_back - 1;
