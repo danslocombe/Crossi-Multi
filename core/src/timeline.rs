@@ -202,10 +202,12 @@ impl Timeline {
         // Can we assume its already sorted?
         inputs.sort_by(|x, y| x.frame_id.cmp(&y.frame_id));
 
-        if let Some(x) = inputs.last() {
-            if (x.frame_id > self.top_state().frame_id) {
-                panic!("Trying to propagate inputs from the future! frame_id {} states len {} states front {:?} inputs {:?}", x.frame_id, self.states.len(), self.states.front().map(|x| x.frame_id), inputs);
-            }
+        let last_propagating_frame_id = inputs.last().unwrap().frame_id;
+        let current_frame_id = self.top_state().frame_id;
+        debug_log!("Propagating inputs, top frame has delta {}", current_frame_id as i32 - last_propagating_frame_id as i32);
+
+        if (last_propagating_frame_id > current_frame_id) {
+            panic!("Trying to propagate inputs from the future! frame_id {} states len {} states front {:?} inputs {:?}", last_propagating_frame_id, self.states.len(), self.states.front().map(|x| x.frame_id), inputs);
         }
 
         let mut resimulation_frame_id = None;
