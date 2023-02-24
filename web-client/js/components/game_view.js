@@ -308,6 +308,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 //this.froggy_draw_ctx.ctx.fillStyle = "black";
                 //this.froggy_draw_ctx.ctx.fillText(frame_id.toString(), 10, 10);
 
+                /*
                 const local_player_id = this.client.get_local_player_id();
                 if (local_player_id >= 0)
                 {
@@ -318,6 +319,11 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                         this.froggy_draw_ctx.ctx.fillText(`(${Math.round(local_player.source.x)}, ${Math.round(local_player.source.y)})`, 10, 10);
                     }
                 }
+                */
+
+                this.froggy_draw_ctx.ctx.fillStyle = "black";
+                let est_time_seconds = this.client.estimate_time_from_frame_id();
+                this.froggy_draw_ctx.ctx.fillText(`${Math.round(10 * est_time_seconds) / 10}`, 10, 10);
             }
         }
     }

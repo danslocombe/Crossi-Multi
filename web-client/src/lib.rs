@@ -278,6 +278,12 @@ impl Client {
         self.trusted_rules_state.as_ref().map(|x| x.fst.get_river_spawn_times()).unwrap_or(&crossy_multi_core::map::river::EMPTY_RIVER_SPAWN_TIMES)
     }
 
+    pub fn estimate_time_from_frame_id(&self) -> f32 {
+        //let time_ms = self.get_top_frame_id() as f32 / 16.66;
+        //time_ms / 1000.0
+        self.get_top_frame_id() as f32 / 60.0
+    }
+
     pub fn recv(&mut self, server_tick : &[u8])
     {
         if let Some(deserialized) = try_deserialize_message(server_tick)
