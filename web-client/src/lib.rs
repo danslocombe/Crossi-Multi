@@ -63,6 +63,8 @@ pub struct Client {
     queued_server_linden_messages : VecDeque<interop::LindenServerTick>,
 
     ai_agent : Option<RefCell<Box<dyn ai::AIAgent>>>,
+
+    telemetry_buffer : Vec<crossy_multi_core::interop::TelemetryMessage>,
 }
 
 #[wasm_bindgen]
@@ -95,6 +97,7 @@ impl Client {
             queued_time_info: Default::default(),
             queued_server_linden_messages: Default::default(),
             ai_agent : None,
+            telemetry_buffer: Default::default(),
         } 
     }
 
@@ -144,6 +147,11 @@ impl Client {
         self.process_time_info();
 
         while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
+            self.telemetry_buffer.push(interop::TelemetryMessage::ClientReceiveEvent(interop::Telemetry_ClientReceiveEvent {
+                server_send_frame_id : linden_server_tick.latest.frame_id,
+                receive_frame_id : self.timeline.top_state().frame_id,
+            }));
+
             self.process_linden_server_message(&linden_server_tick);
         }
     }
@@ -363,6 +371,22 @@ impl Client {
         interop::CrossyMessage::TimeRequestPacket(interop::TimeRequestPacket {
             client_send_time_us,
         })
+    }
+
+    fn get_telemetry_message_internal(&mut self) -> interop::CrossyMessage
+    {
+        let mut events = Vec::new();
+        std::mem::swap(&mut events, &mut self.telemetry_buffer);
+
+        interop::CrossyMessage::TelemetryMessagePackage(interop::TelemetryMessagePackage{
+            messages: events,
+        })
+    }
+
+    pub fn get_telemetry_message(&mut self) -> Vec<u8>
+    {
+        let message = self.get_telemetry_message_internal();
+        flexbuffers::to_vec(message).unwrap()
     }
 
     pub fn get_players_json(&self) -> String

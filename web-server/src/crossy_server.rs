@@ -46,6 +46,8 @@ pub struct ServerInner {
     next_socket_id: SocketId,
     pub ended: bool,
 
+    tracer : crossy_multi_core::telemetry::TelemetryTracer,
+
     timeline: Timeline,
     input_history : InputHistory,
 }
@@ -55,6 +57,17 @@ impl Server {
         let start = Instant::now();
         let start_utc = Utc::now();
         let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(16);
+
+        let mut tracer = crossy_multi_core::telemetry::TelemetryTracer::new(&format!("logs/{}.log", &id.0));
+        /*
+        tracer.push(crossy_multi_core::telemetry::TelemetryEvent {
+           player_id: crossy_multi_core::PlayerId(100),
+           event : crossy_multi_core::interop::TelemetryMessage::ClientReceiveEvent(crossy_multi_core::interop::Telemetry_ClientReceiveEvent{
+                client_send_frame_id: 100,
+                receive_frame_id: 100,
+           })
+        });
+        */
 
         Server {
             queued_messages: Mutex::new(Vec::new()),
@@ -72,6 +85,8 @@ impl Server {
                 start_utc,
                 next_socket_id: SocketId(0),
                 ended: false,
+
+                tracer,
 
                 timeline: Timeline::from_seed(&id.0),
                 input_history: Default::default(),
@@ -321,6 +336,8 @@ impl Server {
                 inner.empty_ticks = 0;
             }
 
+            inner.tracer.flush();
+
             const EMPTY_TICKS_THRESHOLD: u32 = 60 * 20;
             if (inner.empty_ticks > EMPTY_TICKS_THRESHOLD) {
                 // Noone left listening, shut down
@@ -395,6 +412,15 @@ impl Server {
                     self.outbound_tx
                         .send(CrossyMessage::TimeRequestIntermediate(time_request))
                         .unwrap();
+                }
+                CrossyMessage::TelemetryMessagePackage(telemetry_messages) => {
+                    let player_id = inner.get_client_by_addr(socket_id).unwrap().player_client.as_ref().unwrap().id;
+                    for message in &telemetry_messages.messages {
+                        inner.tracer.push(crossy_multi_core::telemetry::TelemetryEvent {
+                            player_id,
+                            event: message.clone(),
+                        });
+                    }
                 }
                 _ => {}
             }
