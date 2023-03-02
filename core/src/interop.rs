@@ -19,6 +19,8 @@ pub enum CrossyMessage {
     TimeRequestIntermediate(TimeRequestIntermediate),
     TimeResponsePacket(TimeResponsePacket),
 
+    TelemetryMessagePackage(TelemetryMessagePackage),
+
     GoodBye(),
 
     EmptyMessage(),
@@ -108,4 +110,24 @@ pub struct TimeRequestEnd
     pub client_receive_time_us : u32,
     pub server_receive_time_us : u32,
     pub server_send_time_us : u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct TelemetryMessagePackage
+{
+    pub messages : Vec<TelemetryMessage>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub enum TelemetryMessage
+{
+    ClientReceiveEvent(Telemetry_ClientReceiveEvent),
+}
+
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct Telemetry_ClientReceiveEvent
+{
+    pub server_send_frame_id: u32,
+    pub receive_frame_id: u32,
 }
