@@ -76,14 +76,22 @@ impl Client {
         console_error_panic_hook::set_once();
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
 
-        let estimated_current_frame_id = server_frame_id + estimated_latency_us / 16_666;
-        let timeline = timeline::Timeline::from_server_parts(seed, estimated_current_frame_id, server_time_us, vec![], Default::default());
+        let estimated_frame_delta = estimated_latency_us / 16_666;
+        let estimated_server_current_frame_id = server_frame_id + estimated_frame_delta;
+        let timeline = timeline::Timeline::from_server_parts(seed, estimated_server_current_frame_id, server_time_us, vec![], Default::default());
 
         // Estimate server start
         let client_start = WasmInstant::now();
         let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
 
-        log!("Constructing client : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_current_frame_id);
+        log!("Constructing client : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_server_current_frame_id);
+
+        let mut telemetry_buffer = Vec::new();
+        telemetry_buffer.push(interop::TelemetryMessage::LatencyEstimate(interop::Telemetry_LatencyEstimate {
+            estimated_latency_us,
+            estimated_frame_delta,
+            estimated_server_current_frame_id,
+        }));
 
 
         Client {
@@ -97,7 +105,7 @@ impl Client {
             queued_time_info: Default::default(),
             queued_server_linden_messages: Default::default(),
             ai_agent : None,
-            telemetry_buffer: Default::default(),
+            telemetry_buffer,
         } 
     }
 
@@ -147,9 +155,11 @@ impl Client {
         self.process_time_info();
 
         while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
+            let delta_input_server_frame_times = linden_server_tick.delta_inputs.iter().map(|x| x.frame_id).collect::<Vec<_>>();
             self.telemetry_buffer.push(interop::TelemetryMessage::ClientReceiveEvent(interop::Telemetry_ClientReceiveEvent {
                 server_send_frame_id : linden_server_tick.latest.frame_id,
                 receive_frame_id : self.timeline.top_state().frame_id,
+                delta_input_server_frame_times,
             }));
 
             self.process_linden_server_message(&linden_server_tick);
@@ -221,8 +231,16 @@ impl Client {
             let server_start_lerp_k_up = 500. / TIME_REQUEST_INTERVAL as f32;
             let server_start_lerp_k_down = 500. / TIME_REQUEST_INTERVAL as f32;
             self.server_start = WasmInstant(dan_lerp_directional(self.server_start.0 as f32, new_server_start.0 as f32, server_start_lerp_k_up, server_start_lerp_k_down) as i128);
+
             //log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
             //log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
+
+            self.telemetry_buffer.push(interop::TelemetryMessage::PingOutcome(interop::Telemetry_PingOutcome {
+                unlerped_estimated_latency_us : ed,
+                unlerped_estimated_frame_delta : ed / 16_666,
+                estimated_latency_us : self.estimated_latency_us,
+                estimated_frame_delta :self.estimated_latency_us / 16_666.0,
+            }));
         }
     }
 

@@ -122,6 +122,8 @@ pub struct TelemetryMessagePackage
 pub enum TelemetryMessage
 {
     ClientReceiveEvent(Telemetry_ClientReceiveEvent),
+    LatencyEstimate(Telemetry_LatencyEstimate),
+    PingOutcome(Telemetry_PingOutcome),
 }
 
 
@@ -130,4 +132,22 @@ pub struct Telemetry_ClientReceiveEvent
 {
     pub server_send_frame_id: u32,
     pub receive_frame_id: u32,
+    pub delta_input_server_frame_times : Vec<u32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct Telemetry_LatencyEstimate
+{
+    pub estimated_latency_us : u32,
+    pub estimated_frame_delta : u32,
+    pub estimated_server_current_frame_id : u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct Telemetry_PingOutcome
+{
+    pub unlerped_estimated_latency_us : i64,
+    pub unlerped_estimated_frame_delta : i64,
+    pub estimated_latency_us : f32,
+    pub estimated_frame_delta : f32,
 }
