@@ -150,5 +150,9 @@ pub struct Telemetry_PingOutcome
     pub unlerped_estimated_frame_delta : i64,
     pub estimated_latency_us : f32,
     pub estimated_frame_delta : f32,
+
+    pub estimated_server_time_us : u32,
     pub estimated_server_current_frame_id : u32,
+
+    pub current_client_time_us : u32,
 }

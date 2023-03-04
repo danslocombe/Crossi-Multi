@@ -246,13 +246,19 @@ impl Client {
             //log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
             //log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
 
+            let current_time = self.server_start.elapsed();
+            let current_client_time_us = current_time.as_micros() as u32;
+
             self.telemetry_buffer.push(interop::TelemetryMessage::PingOutcome(interop::Telemetry_PingOutcome {
                 unlerped_estimated_latency_us : ed,
                 unlerped_estimated_frame_delta : ed / 16_666,
                 estimated_latency_us : self.estimated_latency_us_lerping,
                 estimated_frame_delta :self.estimated_latency_us_lerping / 16_666.0,
 
+                estimated_server_time_us : estimated_server_time_us,
                 estimated_server_current_frame_id : estimated_server_time_us / 16_666,
+
+                current_client_time_us,
             }));
         }
     }
