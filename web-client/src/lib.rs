@@ -53,6 +53,9 @@ pub struct Client {
     server_start: WasmInstant,
     estimated_latency_us : f32,
 
+    server_start_lerping: WasmInstant,
+    estimated_latency_us_lerping : f32,
+
     timeline: timeline::Timeline,
 
     local_player_info : Option<LocalPlayerInfo>,
@@ -100,7 +103,9 @@ impl Client {
             timeline,
             client_start,
             server_start,
+            server_start_lerping : server_start,
             estimated_latency_us : estimated_latency_us as f32,
+            estimated_latency_us_lerping : estimated_latency_us as f32,
             local_player_info : None,
             last_sent_frame_id : server_frame_id,
             trusted_rules_state: None,
@@ -224,10 +229,10 @@ impl Client {
 
             let latency_lerp_k = 50. / TIME_REQUEST_INTERVAL as f32;
 
-            self.estimated_latency_us = dan_lerp(self.estimated_latency_us, ed as f32, latency_lerp_k);
+            self.estimated_latency_us_lerping = dan_lerp(self.estimated_latency_us_lerping, ed as f32, latency_lerp_k);
 
             let time_now_us = WasmInstant::now().saturating_duration_since(self.client_start).as_micros() as u32;
-            let estimated_server_time_us = t2 as u32 + self.estimated_latency_us as u32;
+            let estimated_server_time_us = t2 as u32 + self.estimated_latency_us_lerping as u32;
 
             let holding_time = time_now_us - t3 as u32;
             //log!("Holding time {}us", holding_time);
@@ -236,7 +241,7 @@ impl Client {
 
             let server_start_lerp_k_up = 500. / TIME_REQUEST_INTERVAL as f32;
             let server_start_lerp_k_down = 500. / TIME_REQUEST_INTERVAL as f32;
-            self.server_start = WasmInstant(dan_lerp_directional(self.server_start.0 as f32, new_server_start.0 as f32, server_start_lerp_k_up, server_start_lerp_k_down) as i128);
+            self.server_start_lerping = WasmInstant(dan_lerp_directional(self.server_start_lerping.0 as f32, new_server_start.0 as f32, server_start_lerp_k_up, server_start_lerp_k_down) as i128);
 
             //log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
             //log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
@@ -244,8 +249,10 @@ impl Client {
             self.telemetry_buffer.push(interop::TelemetryMessage::PingOutcome(interop::Telemetry_PingOutcome {
                 unlerped_estimated_latency_us : ed,
                 unlerped_estimated_frame_delta : ed / 16_666,
-                estimated_latency_us : self.estimated_latency_us,
-                estimated_frame_delta :self.estimated_latency_us / 16_666.0,
+                estimated_latency_us : self.estimated_latency_us_lerping,
+                estimated_frame_delta :self.estimated_latency_us_lerping / 16_666.0,
+
+                estimated_server_current_frame_id : estimated_server_time_us / 16_666,
             }));
         }
     }

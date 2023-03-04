@@ -32,7 +32,7 @@ impl TelemetryTracer
         std::mem::swap(&mut events, &mut self.event_buffer);
 
         for event in events.into_iter() {
-            writeln!(self.file, "{:#?}", event).unwrap();
+            writeln!(self.file, "{:?} - {:#?}", event.player_id, event.event).unwrap();
         }
     }
 }
