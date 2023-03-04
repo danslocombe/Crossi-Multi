@@ -84,8 +84,11 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     const client_tick = this.client.get_client_message();
                     this.ws.send(client_tick);
 
-                    const telemetry_message = this.client.get_telemetry_message();
-                    this.ws.send(telemetry_message);
+                    if (this.client.has_telemetry_messages())
+                    {
+                        const telemetry_message = this.client.get_telemetry_message();
+                        this.ws.send(telemetry_message);
+                    }
 
                     if (this.client.should_get_time_request())
                     {

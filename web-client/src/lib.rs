@@ -43,6 +43,9 @@ pub struct LocalPlayerInfo {
 
 const TIME_REQUEST_INTERVAL : u32 = 13;
 
+const RUN_TELEMETRY : bool = false;
+const RUN_PING_LATENCY_UPDATES : bool = false;
+
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Client {
@@ -64,7 +67,7 @@ pub struct Client {
 
     ai_agent : Option<RefCell<Box<dyn ai::AIAgent>>>,
 
-    telemetry_buffer : Vec<crossy_multi_core::interop::TelemetryMessage>,
+    telemetry_buffer : TelemetryBuffer,
 }
 
 #[wasm_bindgen]
@@ -86,13 +89,12 @@ impl Client {
 
         log!("Constructing client : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_server_current_frame_id);
 
-        let mut telemetry_buffer = Vec::new();
+        let mut telemetry_buffer = TelemetryBuffer::new(RUN_TELEMETRY);
         telemetry_buffer.push(interop::TelemetryMessage::LatencyEstimate(interop::Telemetry_LatencyEstimate {
             estimated_latency_us,
             estimated_frame_delta,
             estimated_server_current_frame_id,
         }));
-
 
         Client {
             timeline,
@@ -207,6 +209,10 @@ impl Client {
     fn process_time_info(&mut self)
     {
         if let Some(time_request_end) = self.queued_time_info.take() {
+            if (!RUN_PING_LATENCY_UPDATES) {
+                return;
+            }
+
             let t0 = time_request_end.client_send_time_us as i64;
             let t1 = time_request_end.server_receive_time_us as i64;
             let t2 = time_request_end.server_send_time_us as i64;
@@ -394,7 +400,7 @@ impl Client {
     fn get_telemetry_message_internal(&mut self) -> interop::CrossyMessage
     {
         let mut events = Vec::new();
-        std::mem::swap(&mut events, &mut self.telemetry_buffer);
+        std::mem::swap(&mut events, &mut self.telemetry_buffer.buffer);
 
         interop::CrossyMessage::TelemetryMessagePackage(interop::TelemetryMessagePackage{
             messages: events,
@@ -405,6 +411,10 @@ impl Client {
     {
         let message = self.get_telemetry_message_internal();
         flexbuffers::to_vec(message).unwrap()
+    }
+
+    pub fn has_telemetry_messages(&self) -> bool {
+        !self.telemetry_buffer.buffer.is_empty()
     }
 
     pub fn get_players_json(&self) -> String
@@ -651,5 +661,25 @@ fn dan_lerp_snap_thresh(x0 : f32, x : f32, k : f32, snap_thresh : f32) -> f32 {
     else
     {
         dan_lerp(x0, x, k)
+    }
+}
+
+#[derive(Debug)]
+struct TelemetryBuffer
+{
+    enabled : bool,
+    buffer: Vec<crossy_multi_core::interop::TelemetryMessage>
+}
+
+impl TelemetryBuffer
+{
+    fn new(enabled : bool) -> Self {
+        Self { enabled, buffer: Default::default() }
+    }
+
+    fn push(&mut self, message: crossy_multi_core::interop::TelemetryMessage) {
+        if (self.enabled) {
+            self.buffer.push(message);
+        }
     }
 }
