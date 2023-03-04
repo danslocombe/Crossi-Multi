@@ -154,5 +154,6 @@ pub struct Telemetry_PingOutcome
     pub estimated_server_time_us : u32,
     pub estimated_server_current_frame_id : u32,
 
-    pub current_client_time_us : u32,
+    pub current_client_time_ms : u32,
+    pub current_client_date_time_ms : u32,
 }
