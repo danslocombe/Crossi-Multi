@@ -18,6 +18,14 @@ extern "C" {
     fn performance_now() -> f64;
 }
 
+#[wasm_bindgen(inline_js = r#"
+export function date_now() {
+  return Date.now();
+}"#)]
+extern "C" {
+    fn date_now() -> f64;
+}
+
 // performance.now returns the number of ms since pageload.
 // But we want to be able to represent times from before the start of pageload
 // So store the number of microseconds as an i128.
@@ -65,3 +73,46 @@ impl ops::Sub<Duration> for WasmInstant { type Output = WasmInstant; fn sub(self
 impl ops::Sub<WasmInstant>  for WasmInstant { type Output = Duration; fn sub(self, other: WasmInstant) -> Duration { self.duration_since(other) } }
 impl ops::AddAssign<Duration> for WasmInstant { fn add_assign(&mut self, other: Duration) { *self = *self + other; } }
 impl ops::SubAssign<Duration> for WasmInstant { fn sub_assign(&mut self, other: Duration) { *self = *self - other; } }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WasmDateInstant(pub i128);
+
+impl WasmDateInstant {
+    pub fn now() -> Self
+    {
+        Self((performance_now() * MS_TO_US) as i128)
+    }
+
+    pub fn duration_since(&self, earlier: WasmDateInstant) -> Duration
+    { 
+        Duration::from_micros((self.0 - earlier.0) as u64)
+    }
+
+    pub fn elapsed(&self) -> Duration
+    {
+        Self::now().duration_since(*self)
+    }
+
+    pub fn checked_add(&self, duration: Duration) -> Option<Self> {
+        match duration.as_micros().try_into() {
+            Ok(duration) => self.0.checked_add(duration).map(|i| Self(i)),
+            Err(_) => None,
+        }
+    }
+    pub fn checked_sub(&self, duration: Duration) -> Option<Self> {
+        match duration.as_micros().try_into() {
+            Ok(duration) => self.0.checked_sub(duration).map(|i| Self(i)),
+            Err(_) => None,
+        }
+    }
+
+    pub fn saturating_duration_since(&self, earlier: WasmDateInstant) -> Duration { 
+        Duration::from_micros(self.0.saturating_sub(earlier.0) as u64)
+    }
+}
+
+impl ops::Add<Duration> for WasmDateInstant { type Output = WasmDateInstant; fn add(self, other: Duration) -> WasmDateInstant { self.checked_add(other).unwrap() } }
+impl ops::Sub<Duration> for WasmDateInstant { type Output = WasmDateInstant; fn sub(self, other: Duration) -> WasmDateInstant { self.checked_sub(other).unwrap() } }
+impl ops::Sub<WasmDateInstant>  for WasmDateInstant { type Output = Duration; fn sub(self, other: WasmDateInstant) -> Duration { self.duration_since(other) } }
+impl ops::AddAssign<Duration> for WasmDateInstant { fn add_assign(&mut self, other: Duration) { *self = *self + other; } }
+impl ops::SubAssign<Duration> for WasmDateInstant { fn sub_assign(&mut self, other: Duration) { *self = *self - other; } }

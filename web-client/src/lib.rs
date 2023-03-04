@@ -13,7 +13,7 @@ use std::time::Duration;
 use std::cell::RefCell;
 
 use std::collections::VecDeque;
-use wasm_instant::WasmInstant;
+use wasm_instant::{WasmInstant, WasmDateInstant};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
@@ -43,14 +43,15 @@ pub struct LocalPlayerInfo {
 
 const TIME_REQUEST_INTERVAL : u32 = 13;
 
-const RUN_TELEMETRY : bool = false;
-const RUN_PING_LATENCY_UPDATES : bool = false;
+const RUN_TELEMETRY : bool = true;
+const RUN_PING_LATENCY_UPDATES : bool = true;
 
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Client {
     client_start : WasmInstant,
     server_start: WasmInstant,
+    server_start_date : WasmDateInstant,
     estimated_latency_us : f32,
 
     server_start_lerping: WasmInstant,
@@ -89,6 +90,8 @@ impl Client {
         // Estimate server start
         let client_start = WasmInstant::now();
         let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
+        let client_start_date = WasmDateInstant::now();
+        let server_start_date = client_start_date - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
 
         log!("Constructing client : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_server_current_frame_id);
 
@@ -103,6 +106,7 @@ impl Client {
             timeline,
             client_start,
             server_start,
+            server_start_date,
             server_start_lerping : server_start,
             estimated_latency_us : estimated_latency_us as f32,
             estimated_latency_us_lerping : estimated_latency_us as f32,
@@ -249,6 +253,9 @@ impl Client {
             let current_time = self.server_start.elapsed();
             let current_client_time_us = current_time.as_micros() as u32;
 
+            let current_date_time = self.server_start_date.elapsed();
+            let current_client_date_time_us = current_date_time.as_micros() as u32;
+
             self.telemetry_buffer.push(interop::TelemetryMessage::PingOutcome(interop::Telemetry_PingOutcome {
                 unlerped_estimated_latency_us : ed,
                 unlerped_estimated_frame_delta : ed / 16_666,
@@ -258,7 +265,8 @@ impl Client {
                 estimated_server_time_us : estimated_server_time_us,
                 estimated_server_current_frame_id : estimated_server_time_us / 16_666,
 
-                current_client_time_us,
+                current_client_time_ms : current_client_time_us / 1000,
+                current_client_date_time_ms : current_client_date_time_us / 1000,
             }));
         }
     }
