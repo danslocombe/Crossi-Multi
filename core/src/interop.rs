@@ -138,8 +138,8 @@ pub struct Telemetry_ClientReceiveEvent
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Telemetry_LatencyEstimate
 {
-    pub estimated_latency_us : u32,
-    pub estimated_frame_delta : u32,
+    pub estimated_latency_us : i32,
+    pub estimated_frame_delta : i32,
     pub estimated_server_current_frame_id : u32,
 }
 

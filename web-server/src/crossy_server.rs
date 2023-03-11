@@ -40,8 +40,6 @@ pub struct ServerInner {
     start: Instant,
     start_utc: DateTime<Utc>,
 
-    last_tick_us : u32,
-
     clients: Vec<Client>,
     next_socket_id: SocketId,
     pub ended: bool,
@@ -78,8 +76,6 @@ impl Server {
                 empty_ticks: 0,
                 clients: Vec::new(),
                 new_players: Vec::new(),
-
-                last_tick_us : 0,
 
                 start,
                 start_utc,
@@ -220,12 +216,11 @@ impl Server {
             let current_time_us = current_time.as_micros() as u32;
 
             loop {
-                let delta_time = current_time_us.saturating_sub(inner.last_tick_us);
+                let last_time = inner.timeline.top_state().time_us;
+                let delta_time = current_time_us.saturating_sub(last_time);
                 if (delta_time > TICK_INTERVAL_US)
                 {
                     inner.timeline.tick(None, TICK_INTERVAL_US);
-                    let tick_time = inner.last_tick_us + TICK_INTERVAL_US;
-                    inner.last_tick_us = tick_time;
                 }
                 else
                 {
