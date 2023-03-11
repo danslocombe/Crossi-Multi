@@ -145,10 +145,14 @@ impl Timeline {
             while offset > 0 {
                 let state = self.states.get(offset).unwrap();
                 //println!("ISF offset {} - player count {}", offset, state.player_inputs.player_count());
-                for id in 0..state.player_inputs.player_count() {
-                    let player_id = PlayerId(id as u8);
+                for (player_id, _player_state) in state.player_states.iter() {
+                //for id in 0..state.player_inputs.player_count() {
+                    //let player_id = PlayerId(id as u8);
                     let input = state.player_inputs.get(player_id);
-                    if input != Input::None {
+
+                    // @NOCHECKIN temporarily add empty inputs to try and break stuff
+                    {
+                    //if input != Input::None {
                         inputs.push(RemoteInput {
                             frame_id : state.frame_id,
                             time_us: state.time_us,
@@ -216,15 +220,25 @@ impl Timeline {
 
             if let Some(frame_offset) = self.frame_id_to_frame_offset(input.frame_id)
             {
-                if (self.states.get_mut(frame_offset).unwrap().player_inputs.set(input.player_id, input.input))
-                {
-                    // There was some change
-                    if let Some(_) = self.frame_id_to_frame_offset(input.frame_id - 1)
-                    {
-                        //debug_log!("Propagate inputs, change on input {:#?}", input);
+                let state_mut = self.states.get_mut(frame_offset).unwrap();
 
-                        let new_resim_frame_id = (input.frame_id - 1).min(resimulation_frame_id.unwrap_or(u32::MAX));
-                        resimulation_frame_id = Some(new_resim_frame_id);
+                // @TEMPORARY please cleanup
+                // To debug issues we have allowed the server to send empty inputs
+                // So we check here to make sure we arent overriding an actual input with an empty one
+                // sent by the server before it has received the real input.
+
+                if (state_mut.player_inputs.get(input.player_id) == Input::None)
+                {
+                    if (self.states.get_mut(frame_offset).unwrap().player_inputs.set(input.player_id, input.input))
+                    {
+                        // There was some change
+                        if let Some(_) = self.frame_id_to_frame_offset(input.frame_id - 1)
+                        {
+                            //debug_log!("Propagate inputs, change on input {:#?}", input);
+
+                            let new_resim_frame_id = (input.frame_id - 1).min(resimulation_frame_id.unwrap_or(u32::MAX));
+                            resimulation_frame_id = Some(new_resim_frame_id);
+                        }
                     }
                 }
             }

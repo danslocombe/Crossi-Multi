@@ -78,14 +78,18 @@ pub struct Client {
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : &str, server_frame_id : u32, server_time_us : u32, estimated_latency_us : u32) -> Self {
+    pub fn new(seed : &str, server_frame_id : i32, server_time_us : i32, mut estimated_latency_us : i32) -> Self {
+
+        // @NOCHECKIN DO NOT KEEP IN - Trying to debug
+        // estimated_latency_us -= 20_000;
+
         // Setup statics
         console_error_panic_hook::set_once();
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
 
         let estimated_frame_delta = estimated_latency_us / 16_666;
-        let estimated_server_current_frame_id = server_frame_id + estimated_frame_delta;
-        let timeline = timeline::Timeline::from_server_parts(seed, estimated_server_current_frame_id, server_time_us, vec![], Default::default());
+        let estimated_server_current_frame_id = (server_frame_id as i32 + estimated_frame_delta) as u32;
+        let timeline = timeline::Timeline::from_server_parts(seed, estimated_server_current_frame_id, server_time_us as u32, vec![], Default::default());
 
         // Estimate server start
         let client_start = WasmInstant::now();
@@ -111,7 +115,7 @@ impl Client {
             estimated_latency_us : estimated_latency_us as f32,
             estimated_latency_us_lerping : estimated_latency_us as f32,
             local_player_info : None,
-            last_sent_frame_id : server_frame_id,
+            last_sent_frame_id : server_frame_id as u32,
             trusted_rules_state: None,
             queued_time_info: Default::default(),
             queued_server_linden_messages: Default::default(),
@@ -146,11 +150,10 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
-
-        let current_time = self.server_start.elapsed();
-        let current_time_us = current_time.as_micros() as u32;
-
         loop {
+            let current_time = self.server_start.elapsed();
+            let current_time_us = current_time.as_micros() as u32;
+
             let last_time = self.timeline.top_state().time_us;
             let delta_time = current_time_us.saturating_sub(last_time);
             if (delta_time > TICK_INTERVAL_US)
@@ -166,6 +169,7 @@ impl Client {
         self.process_time_info();
 
         while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
+            //log!("{:#?}", linden_server_tick);
             let delta_input_server_frame_times = linden_server_tick.delta_inputs.iter().map(|x| x.frame_id).collect::<Vec<_>>();
             self.telemetry_buffer.push(interop::TelemetryMessage::ClientReceiveEvent(interop::Telemetry_ClientReceiveEvent {
                 server_send_frame_id : linden_server_tick.latest.frame_id,
