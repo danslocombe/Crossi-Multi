@@ -142,7 +142,7 @@ impl Timeline {
         {
             let mut inputs = Vec::with_capacity(offset);
 
-            while offset > 0 {
+            loop {
                 let state = self.states.get(offset).unwrap();
                 //println!("ISF offset {} - player count {}", offset, state.player_inputs.player_count());
                 for (player_id, _player_state) in state.player_states.iter() {
@@ -162,7 +162,12 @@ impl Timeline {
                     }
                 }
 
-                offset -= 1;
+                if let Some(offset_updated) = offset.checked_sub(1) {
+                    offset = offset_updated;
+                }
+                else {
+                    break;
+                }
             }
 
             inputs
@@ -195,6 +200,9 @@ impl Timeline {
             new_timeline.tick(Some(inputs), TICK_INTERVAL_US);
         }
 
+        assert!(self.top_state().frame_id == new_timeline.top_state().frame_id);
+        assert!(self.top_state().time_us == new_timeline.top_state().time_us);
+
         new_timeline
     }
 
@@ -208,10 +216,10 @@ impl Timeline {
 
         let last_propagating_frame_id = inputs.last().unwrap().frame_id;
         let current_frame_id = self.top_state().frame_id;
-        debug_log!("Propagating inputs, top frame has delta {}", current_frame_id as i32 - last_propagating_frame_id as i32);
+        //debug_log!("Propagating inputs, top frame has delta {}", current_frame_id as i32 - last_propagating_frame_id as i32);
 
         if (last_propagating_frame_id > current_frame_id) {
-            panic!("Trying to propagate inputs from the future! frame_id {} states len {} states front {:?} inputs {:?}", last_propagating_frame_id, self.states.len(), self.states.front().map(|x| x.frame_id), inputs);
+            panic!("Trying to propagate inputs from the future!\n\n frame_id {}\n states len {}\n\n states {:?}\n\n inputs {:?}", last_propagating_frame_id, self.states.len(), self.top_state(), inputs);
         }
 
         let mut resimulation_frame_id = None;
@@ -298,6 +306,10 @@ impl Timeline {
             let inputs = self.states[i].player_inputs.clone();
             let dt = self.states[i].time_us - self.states[i + 1].time_us;
             let replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32, &self.map);
+
+            assert!(self.states[i].frame_id == replacement_state.frame_id);
+            assert!(self.states[i].time_us == replacement_state.time_us);
+
             self.states[i] = replacement_state;
         }
     }
