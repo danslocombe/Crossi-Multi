@@ -78,7 +78,7 @@ pub struct Client {
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : &str, server_frame_id : i32, server_time_us : i32, mut estimated_latency_us : i32) -> Self {
+    pub fn new(seed : &str, server_frame_id : i32, _server_time_us : i32, mut estimated_latency_us : i32) -> Self {
 
         // @NOCHECKIN DO NOT KEEP IN - Trying to debug
         // estimated_latency_us -= 20_000;
@@ -89,13 +89,16 @@ impl Client {
 
         let estimated_frame_delta = estimated_latency_us / 16_666;
         let estimated_server_current_frame_id = (server_frame_id as i32 + estimated_frame_delta) as u32;
-        let timeline = timeline::Timeline::from_server_parts(seed, estimated_server_current_frame_id, server_time_us as u32, vec![], Default::default());
+        let estimated_server_time_us = estimated_server_current_frame_id * TICK_INTERVAL_US;
+        let timeline = timeline::Timeline::from_server_parts(seed, estimated_server_current_frame_id, estimated_server_time_us as u32, vec![], Default::default());
 
         // Estimate server start
         let client_start = WasmInstant::now();
-        let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
+        //let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
+        let server_start = client_start - Duration::from_micros((estimated_server_time_us) as u64);
         let client_start_date = WasmDateInstant::now();
-        let server_start_date = client_start_date - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
+        //let server_start_date = client_start_date - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
+        let server_start_date = client_start_date - Duration::from_micros((estimated_server_time_us) as u64);
 
         log!("Constructing client : estimated latency {}, server frame_id {}, estimated now server_frame_id {}", estimated_latency_us, server_frame_id, estimated_server_current_frame_id);
 
