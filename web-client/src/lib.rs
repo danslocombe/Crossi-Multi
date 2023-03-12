@@ -41,7 +41,8 @@ pub struct LocalPlayerInfo {
     buffered_input : Input,
 }
 
-const TIME_REQUEST_INTERVAL : u32 = 13;
+//const TIME_REQUEST_INTERVAL : u32 = 13;
+const TIME_REQUEST_INTERVAL : u32 = 2;
 
 const RUN_TELEMETRY : bool = true;
 const RUN_PING_LATENCY_UPDATES : bool = true;
@@ -50,7 +51,7 @@ const RUN_PING_LATENCY_UPDATES : bool = true;
 #[derive(Debug)]
 pub struct Client {
     client_start : WasmInstant,
-    server_start: WasmInstant,
+    server_start: Option<WasmInstant>,
     server_start_date : WasmDateInstant,
     estimated_latency_us : f32,
 
@@ -90,12 +91,14 @@ impl Client {
         let estimated_frame_delta = estimated_latency_us / 16_666;
         let estimated_server_current_frame_id = (server_frame_id as i32 + estimated_frame_delta) as u32;
         let estimated_server_time_us = estimated_server_current_frame_id * TICK_INTERVAL_US;
-        let timeline = timeline::Timeline::from_server_parts(seed, estimated_server_current_frame_id, estimated_server_time_us as u32, vec![], Default::default());
+        //let timeline = timeline::Timeline::from_server_parts(seed, server_frame_id as u32, server_frame_id as u32 * TICK_INTERVAL_US, vec![], Default::default());
+        let timeline = timeline::Timeline::from_server_parts(seed, 0, 0, Default::default(), Default::default());
 
         // Estimate server start
         let client_start = WasmInstant::now();
         //let server_start = client_start - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
         let server_start = client_start - Duration::from_micros((estimated_server_time_us) as u64);
+
         let client_start_date = WasmDateInstant::now();
         //let server_start_date = client_start_date - Duration::from_micros((server_time_us + estimated_latency_us) as u64);
         let server_start_date = client_start_date - Duration::from_micros((estimated_server_time_us) as u64);
@@ -112,7 +115,10 @@ impl Client {
         Client {
             timeline,
             client_start,
-            server_start,
+
+            // @TODO REMEMBER MEEEE
+            server_start : None,
+
             server_start_date,
             server_start_lerping : server_start,
             estimated_latency_us : estimated_latency_us as f32,
@@ -153,35 +159,38 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
-        loop {
-            let current_time = self.server_start.elapsed();
-            let current_time_us = current_time.as_micros() as u32;
+        if let Some(server_start) = self.server_start {
+            debug_log!("Ticking!");
+            loop {
+                let current_time = server_start.elapsed();
+                let current_time_us = current_time.as_micros() as u32;
 
-            let last_time = self.timeline.top_state().time_us;
-            let delta_time = current_time_us.saturating_sub(last_time);
-            if (delta_time > TICK_INTERVAL_US)
-            {
-                self.tick_inner();
+                let last_time = self.timeline.top_state().time_us;
+                let delta_time = current_time_us.saturating_sub(last_time);
+                if (delta_time > TICK_INTERVAL_US)
+                {
+                    self.tick_inner();
+                }
+                else
+                {
+                    break;
+                }
             }
-            else
-            {
-                break;
+
+            while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
+                //log!("{:#?}", linden_server_tick);
+                let delta_input_server_frame_times = linden_server_tick.delta_inputs.iter().map(|x| x.frame_id).collect::<Vec<_>>();
+                self.telemetry_buffer.push(interop::TelemetryMessage::ClientReceiveEvent(interop::Telemetry_ClientReceiveEvent {
+                    server_send_frame_id : linden_server_tick.latest.frame_id,
+                    receive_frame_id : self.timeline.top_state().frame_id,
+                    delta_input_server_frame_times,
+                }));
+
+                self.process_linden_server_message(&linden_server_tick);
             }
         }
 
         self.process_time_info();
-
-        while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
-            //log!("{:#?}", linden_server_tick);
-            let delta_input_server_frame_times = linden_server_tick.delta_inputs.iter().map(|x| x.frame_id).collect::<Vec<_>>();
-            self.telemetry_buffer.push(interop::TelemetryMessage::ClientReceiveEvent(interop::Telemetry_ClientReceiveEvent {
-                server_send_frame_id : linden_server_tick.latest.frame_id,
-                receive_frame_id : self.timeline.top_state().frame_id,
-                delta_input_server_frame_times,
-            }));
-
-            self.process_linden_server_message(&linden_server_tick);
-        }
     }
 
     pub fn tick_inner(&mut self) {
@@ -229,6 +238,8 @@ impl Client {
                 return;
             }
 
+            debug_log!("Processing time info!");
+
             let t0 = time_request_end.client_send_time_us as i64;
             let t1 = time_request_end.server_receive_time_us as i64;
             let t2 = time_request_end.server_send_time_us as i64;
@@ -248,7 +259,14 @@ impl Client {
             let holding_time = time_now_us - t3 as u32;
             //log!("Holding time {}us", holding_time);
 
-            let new_server_start = self.client_start + Duration::from_micros(t3 as u64 + holding_time as u64) - Duration::from_micros(estimated_server_time_us as u64);
+            //let new_server_start = self.client_start + Duration::from_micros(t3 as u64 + holding_time as u64) - Duration::from_micros(estimated_server_time_us as u64);
+            let new_server_start = self.client_start + Duration::from_micros(t3 as u64) - Duration::from_micros(estimated_server_time_us as u64);
+
+            // @TODO DAN TEMP
+            self.server_start = Some(new_server_start);
+
+            debug_log!("FRAME WE SHOULD BE ON FROM LATEST PING {}", new_server_start.elapsed().as_micros() as u32 / TICK_INTERVAL_US);
+            debug_log!("FRAME WE ARE ACTUALLY ON {}", self.get_top_frame_id());
 
             let server_start_lerp_k_up = 500. / TIME_REQUEST_INTERVAL as f32;
             let server_start_lerp_k_down = 500. / TIME_REQUEST_INTERVAL as f32;
@@ -257,7 +275,7 @@ impl Client {
             //log!("estimated latency {}ms", self.estimated_latency_us as f32 / 1000.);
             //log!("estimated server start {}delta_ms", self.server_start.0 as f32 / 1000.);
 
-            let current_time = self.server_start.elapsed();
+            let current_time = self.server_start.unwrap().elapsed();
             let current_client_time_us = current_time.as_micros() as u32;
 
             let current_date_time = self.server_start_date.elapsed();
@@ -324,6 +342,7 @@ impl Client {
                 }
             }
             //log!("Propagating inputs {:#?}", linden_server_tick.delta_inputs);
+
             self.timeline.propagate_inputs(linden_server_tick.delta_inputs.clone());
         }
 
@@ -414,7 +433,6 @@ impl Client {
     {
         let message = self.get_time_request_internal();
         flexbuffers::to_vec(message).unwrap()
-
     }
 
     fn get_time_request_internal(&self) -> interop::CrossyMessage

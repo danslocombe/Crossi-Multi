@@ -161,7 +161,7 @@ function join() {
                     var time_now = Date.now();
                     var dt_actual = time_now - server_start_time;
                     console.log("DT from UTC: " + dt_actual);
-                    console.log("DT server_us=" + response.server_time_us / 1000 + " estimated_latency=" + estimated_latency_us / 1000);
+                    console.log("JS server_ms=" + response.server_time_us / 1000 + " estimated_latency=" + estimated_latency_us / 1000);
                     client = new Client(game_id, response.server_frame_id, response.server_time_us, estimated_latency_us);
                     //client = new Client(seed, dt_actual * 1000, 0);
 
