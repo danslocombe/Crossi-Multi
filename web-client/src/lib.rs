@@ -166,8 +166,9 @@ impl Client {
                 let current_time_us = current_time.as_micros() as u32;
 
                 let last_time = self.timeline.top_state().time_us;
-                let delta_time = current_time_us.saturating_sub(last_time);
-                if (delta_time > TICK_INTERVAL_US)
+                //let delta_time = current_time_us.saturating_sub(last_time);
+                //if (delta_time > TICK_INTERVAL_US)
+                if (current_time_us > last_time)
                 {
                     self.tick_inner();
                 }
@@ -238,12 +239,16 @@ impl Client {
                 return;
             }
 
+
             debug_log!("Processing time info!");
 
             let t0 = time_request_end.client_send_time_us as i64;
             let t1 = time_request_end.server_receive_time_us as i64;
             let t2 = time_request_end.server_send_time_us as i64;
             let t3 = time_request_end.client_receive_time_us as i64;
+
+            let time_now_us = WasmInstant::now().saturating_duration_since(self.client_start).as_micros() as u32;
+            let holding_time = time_now_us - t3 as u32;
 
             let total_time_in_flight = t3 - t0;
             let total_time_on_server = t2 - t1;
@@ -253,14 +258,16 @@ impl Client {
 
             self.estimated_latency_us_lerping = dan_lerp(self.estimated_latency_us_lerping, ed as f32, latency_lerp_k);
 
-            let time_now_us = WasmInstant::now().saturating_duration_since(self.client_start).as_micros() as u32;
-            let estimated_server_time_us = t2 as u32 + self.estimated_latency_us_lerping as u32;
+            let estimated_server_time_us = t2 as u32 + self.estimated_latency_us_lerping as u32 + holding_time;
 
-            let holding_time = time_now_us - t3 as u32;
             //log!("Holding time {}us", holding_time);
 
             //let new_server_start = self.client_start + Duration::from_micros(t3 as u64 + holding_time as u64) - Duration::from_micros(estimated_server_time_us as u64);
-            let new_server_start = self.client_start + Duration::from_micros(t3 as u64) - Duration::from_micros(estimated_server_time_us as u64);
+            //let new_server_start = self.client_start + Duration::from_micros(t3 as u64) - Duration::from_micros(estimated_server_time_us as u64);
+
+            // Server time now = t2 + estimated latency + holding_time
+            // Client time now = client_start + time_now
+            let new_server_start = self.client_start + Duration::from_micros(time_now_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
 
             // @TODO DAN TEMP
             self.server_start = Some(new_server_start);
