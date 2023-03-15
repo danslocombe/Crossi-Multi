@@ -160,7 +160,7 @@ impl Client {
 
     pub fn tick(&mut self) {
         if let Some(server_start) = self.server_start {
-            debug_log!("Ticking!");
+            //debug_log!("Ticking!");
             loop {
                 let current_time = server_start.elapsed();
                 let current_time_us = current_time.as_micros() as u32;
@@ -248,7 +248,7 @@ impl Client {
             let t3 = time_request_end.client_receive_time_us as i64;
 
             let time_now_us = WasmInstant::now().saturating_duration_since(self.client_start).as_micros() as u32;
-            let holding_time = time_now_us - t3 as u32;
+            let holding_time_us = time_now_us - t3 as u32;
 
             let total_time_in_flight = t3 - t0;
             let total_time_on_server = t2 - t1;
@@ -257,8 +257,10 @@ impl Client {
             let latency_lerp_k = 50. / TIME_REQUEST_INTERVAL as f32;
 
             self.estimated_latency_us_lerping = dan_lerp(self.estimated_latency_us_lerping, ed as f32, latency_lerp_k);
+            //let estimated_latency_us_blablah = estimated_latency_us_lerping;
+            let estimated_latency_us_blablah = ed;
 
-            let estimated_server_time_us = t2 as u32 + self.estimated_latency_us_lerping as u32 + holding_time;
+            let estimated_server_time_us = t2 as u32 + estimated_latency_us_blablah as u32 + holding_time_us;
 
             //log!("Holding time {}us", holding_time);
 
@@ -270,10 +272,14 @@ impl Client {
             let new_server_start = self.client_start + Duration::from_micros(time_now_us as u64) - Duration::from_micros(estimated_server_time_us as u64);
 
             // @TODO DAN TEMP
-            self.server_start = Some(new_server_start);
+            if (self.server_start.is_none())
+            {
+                debug_log!("Setting latency up: t2 : {}, estimated_latency_ms: {}, holding_time_ms: {}", t2, estimated_latency_us_blablah / 1000, holding_time_us / 1000);
+                self.server_start = Some(new_server_start);
+            }
 
-            debug_log!("FRAME WE SHOULD BE ON FROM LATEST PING {}", new_server_start.elapsed().as_micros() as u32 / TICK_INTERVAL_US);
-            debug_log!("FRAME WE ARE ACTUALLY ON {}", self.get_top_frame_id());
+            //debug_log!("FRAME WE SHOULD BE ON FROM LATEST PING {}", new_server_start.elapsed().as_micros() as u32 / TICK_INTERVAL_US);
+            //debug_log!("FRAME WE ARE ACTUALLY ON {}", self.get_top_frame_id());
 
             let server_start_lerp_k_up = 500. / TIME_REQUEST_INTERVAL as f32;
             let server_start_lerp_k_down = 500. / TIME_REQUEST_INTERVAL as f32;
