@@ -8,11 +8,13 @@ macro_rules! log {
 
 mod wasm_instant;
 mod ai;
+mod realtime_graph;
 
 use std::time::Duration;
 use std::cell::RefCell;
 
 use std::collections::VecDeque;
+use realtime_graph::RealtimeGraph;
 use wasm_instant::{WasmInstant, WasmDateInstant};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
@@ -48,7 +50,6 @@ const RUN_TELEMETRY : bool = true;
 const RUN_PING_LATENCY_UPDATES : bool = true;
 
 #[wasm_bindgen]
-#[derive(Debug)]
 pub struct Client {
     client_start : WasmInstant,
     server_start: Option<WasmInstant>,
@@ -73,6 +74,8 @@ pub struct Client {
     ai_agent : Option<RefCell<Box<dyn ai::AIAgent>>>,
 
     telemetry_buffer : TelemetryBuffer,
+    
+    server_time_offset_graph : RealtimeGraph,
 }
 
 #[wasm_bindgen]
@@ -130,6 +133,8 @@ impl Client {
             queued_server_linden_messages: Default::default(),
             ai_agent : None,
             telemetry_buffer,
+
+            server_time_offset_graph : RealtimeGraph::new(60 * 10),
         } 
     }
 
@@ -176,6 +181,15 @@ impl Client {
                 {
                     break;
                 }
+            }
+
+            if let Some(top_linden_message) = self.queued_server_linden_messages.front() {
+                let delta = self.timeline.top_state().frame_id as f32 - top_linden_message.latest.frame_id as f32;
+                self.server_time_offset_graph.push(delta);
+            }
+            else
+            {
+                self.server_time_offset_graph.repeat();
             }
 
             while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
@@ -239,8 +253,7 @@ impl Client {
                 return;
             }
 
-
-            debug_log!("Processing time info!");
+            //debug_log!("Processing time info!");
 
             let t0 = time_request_end.client_send_time_us as i64;
             let t1 = time_request_end.server_receive_time_us as i64;
@@ -435,6 +448,12 @@ impl Client {
         }
 
         interop::CrossyMessage::ClientTick(ticks)
+    }
+
+    pub fn get_server_time_offset_graph_json(&self) -> String
+    {
+        let snapshot = self.server_time_offset_graph.snapshot();
+        serde_json::to_string(&snapshot).unwrap()
     }
 
     pub fn should_get_time_request(&self) -> bool {
