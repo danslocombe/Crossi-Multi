@@ -28,6 +28,7 @@ export function create_intro_ui(font_controller, client) {
         tick : function(players) {
             if (this.in_lobby)
             {
+                // SeizureDome style text movement based on local player position.
                 const local_player_id = client.get_local_player_id();
                 if (local_player_id >= 0)
                 {
@@ -62,6 +63,10 @@ export function create_intro_ui(font_controller, client) {
                         }
                     }
                 }
+
+                // DAN @TMP figure out how to layer intro text with new background
+                // for now just keep at the top
+                this.draw_upper = true;
 
                 let target_y = 160 - 30;
                 if (this.draw_upper)

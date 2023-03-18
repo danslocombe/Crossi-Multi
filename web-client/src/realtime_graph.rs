@@ -47,13 +47,13 @@ impl RealtimeGraph
         for i in 0..to_index {
             let offset = to_index - i - 1;
             let sample = self.data.get(-(offset as i32));
-            all.push(self.rescale_sample(sample));
+            all.push(self.normalize_sample(sample));
         }
 
         all
     }
 
-    fn rescale_sample(&self, sample : f32) -> f32 {
+    fn normalize_sample(&self, sample : f32) -> f32 {
         if (self.max == self.min)
         {
             sample - self.min

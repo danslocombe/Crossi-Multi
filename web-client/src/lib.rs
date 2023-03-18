@@ -195,10 +195,14 @@ impl Client {
             while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
                 //log!("{:#?}", linden_server_tick);
                 let delta_input_server_frame_times = linden_server_tick.delta_inputs.iter().map(|x| x.frame_id).collect::<Vec<_>>();
+
                 self.telemetry_buffer.push(interop::TelemetryMessage::ClientReceiveEvent(interop::Telemetry_ClientReceiveEvent {
                     server_send_frame_id : linden_server_tick.latest.frame_id,
                     receive_frame_id : self.timeline.top_state().frame_id,
-                    delta_input_server_frame_times,
+                    //delta_input_server_frame_times,
+                    delta_input_server_frame_times_count: delta_input_server_frame_times.len() as u32,
+                    delta_input_server_frame_times_min: delta_input_server_frame_times.first().cloned(),
+                    delta_input_server_frame_times_max: delta_input_server_frame_times.last().cloned(),
                 }));
 
                 self.process_linden_server_message(&linden_server_tick);
