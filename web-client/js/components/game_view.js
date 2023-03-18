@@ -12,6 +12,7 @@ import { create_from_lilly_overlay } from "./lilly_move_hints"
 import { create_font_controller } from "./font"
 import { create_intro_ui, create_intro_ui_bg } from "./intro_ui"
 import { create_audio_manager } from "./audio_manager"
+import { create_graph } from "./graphs";
 
 
 const audio_crowd = new Audio('/sounds/snd_win.wav');
@@ -280,7 +281,6 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                             draw_with_depth.push(c);
                         }
                     }
-
                     const lilly_drawstate_json = this.client.get_lilly_drawstate_json();
                     if (lilly_drawstate_json && lilly_drawstate_json.length > 0)
                     {
@@ -296,6 +296,12 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     if (player) {
                         draw_with_depth.push(player);
                     }
+                }
+
+                const server_offset_graph_json = this.client.get_server_time_offset_graph_json();
+                if (server_offset_graph_json && server_offset_graph_json.length > 0) {
+                    const server_offset_graph = JSON.parse(server_offset_graph_json);
+                    draw_with_depth.push(create_graph(10, 64, server_offset_graph));
                 }
 
                 draw_with_depth.sort(sort_depth);
