@@ -47,9 +47,9 @@ export function create_graph(x, y, graph_data) {
             ctx.stroke()
             ctx.closePath();
 
-            ctx.strokeStyle = "black";
-            ctx.strokeText(this.graph_data.y_min.toString(), this.x - 8, this.y + this.height);
-            ctx.strokeText(this.graph_data.y_max.toString(), this.x - 8, this.y);
+            ctx.fillStyle = "black";
+            ctx.fillText(this.graph_data.y_min.toString(), this.x - 8, this.y + this.height);
+            ctx.fillText(this.graph_data.y_max.toString(), this.x - 8, this.y);
         }
     }
 }

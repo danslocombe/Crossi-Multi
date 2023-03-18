@@ -301,7 +301,13 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 const server_offset_graph_json = this.client.get_server_time_offset_graph_json();
                 if (server_offset_graph_json && server_offset_graph_json.length > 0) {
                     const server_offset_graph = JSON.parse(server_offset_graph_json);
-                    draw_with_depth.push(create_graph(10, 64, server_offset_graph));
+                    draw_with_depth.push(create_graph(10, 16, server_offset_graph));
+                }
+
+                const server_message_count_graph_json = this.client.get_server_message_count_graph_json();
+                if (server_message_count_graph_json && server_message_count_graph_json.length > 0) {
+                    const server_message_count_graph = JSON.parse(server_message_count_graph_json);
+                    draw_with_depth.push(create_graph(10, 60, server_message_count_graph));
                 }
 
                 draw_with_depth.sort(sort_depth);

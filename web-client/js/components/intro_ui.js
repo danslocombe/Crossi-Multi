@@ -80,6 +80,10 @@ export function create_intro_ui(font_controller, client) {
 
         draw : function(froggy_draw_ctx) {
             const xoff = 24; 
+            
+            // TODO @dan
+            // Disabling for now
+            return;
 
             /*
             froggy_draw_ctx.ctx.fillStyle = "#FFFFFF";
