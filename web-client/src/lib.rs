@@ -148,6 +148,10 @@ impl Client {
     }
 
     pub fn buffer_input_json(&mut self, input_json : &str) {
+        if (input_json == "\"Kill\"") {
+            panic!("Manual kill signal");
+        }
+
         let input = serde_json::from_str(input_json).map_err(|e| log!("{} {:?}", input_json, e)).unwrap_or(Input::None);
         self.buffer_input(input);
     }
