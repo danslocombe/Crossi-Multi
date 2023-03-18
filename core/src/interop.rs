@@ -1,3 +1,6 @@
+// We have some combersome names that are easier to read with underscores.
+#![allow(non_camel_case_types)]
+
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -132,7 +135,10 @@ pub struct Telemetry_ClientReceiveEvent
 {
     pub server_send_frame_id: u32,
     pub receive_frame_id: u32,
-    pub delta_input_server_frame_times : Vec<u32>,
+    //pub delta_input_server_frame_times : Vec<u32>,
+    pub delta_input_server_frame_times_min : Option<u32>,
+    pub delta_input_server_frame_times_max : Option<u32>,
+    pub delta_input_server_frame_times_count : u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]

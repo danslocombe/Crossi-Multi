@@ -49,6 +49,7 @@ export function fetch_json(url) {
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+/*
 // Ping server to estimate latency before we start
 console.log("Starting pinging");
 var ping_ws = new WebSocket(ws_endpoint + "/ping");
@@ -91,6 +92,9 @@ function ping(initial_ping) {
         start_game();
     }
 }
+*/
+
+start_game();
 
 /////////////////////////////////////////////////////////////////////////////////////
 

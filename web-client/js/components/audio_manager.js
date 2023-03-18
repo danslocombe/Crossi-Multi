@@ -1,9 +1,10 @@
-
 export function create_audio_manager()
 {
     return {
 
-        sounds_enabled : true,
+        // @TMP dan
+        sounds_enabled : false,
+        //sounds_enabled : true,
 
         // Browsers will block audio of pages that try and play sounds before there have been user inputs
         // So we don't try and play any before there is a user input
