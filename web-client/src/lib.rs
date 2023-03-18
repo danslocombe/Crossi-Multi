@@ -76,6 +76,7 @@ pub struct Client {
     telemetry_buffer : TelemetryBuffer,
     
     server_time_offset_graph : RealtimeGraph,
+    server_message_count_graph : RealtimeGraph,
 }
 
 #[wasm_bindgen]
@@ -135,6 +136,7 @@ impl Client {
             telemetry_buffer,
 
             server_time_offset_graph : RealtimeGraph::new(60 * 10),
+            server_message_count_graph : RealtimeGraph::new(60 * 10),
         } 
     }
 
@@ -191,6 +193,8 @@ impl Client {
             {
                 self.server_time_offset_graph.repeat();
             }
+
+            self.server_message_count_graph.push(self.queued_server_linden_messages.len() as f32);
 
             while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
                 //log!("{:#?}", linden_server_tick);
@@ -459,6 +463,13 @@ impl Client {
         let snapshot = self.server_time_offset_graph.snapshot();
         serde_json::to_string(&snapshot).unwrap()
     }
+
+    pub fn get_server_message_count_graph_json(&self) -> String
+    {
+        let snapshot = self.server_message_count_graph.snapshot();
+        serde_json::to_string(&snapshot).unwrap()
+    }
+
 
     pub fn should_get_time_request(&self) -> bool {
         let frame_id = self.timeline.top_state().frame_id;
