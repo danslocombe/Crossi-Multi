@@ -101,6 +101,11 @@ impl Timeline {
     }
 
     pub fn add_player(&mut self, player_id: PlayerId, pos: Pos) {
+        // @TMP DAN trying to remove below 
+        let mut new_front = self.states.front().unwrap().add_player(player_id, pos);
+        std::mem::swap(self.states.front_mut().unwrap(), &mut new_front);
+
+        /*
         // This is kinda hacky but we add the new player to all the states in memory (lol)
         // Otherwise we might get input from a state where we have to propagate forward
         // a state where the player isnt there
@@ -111,6 +116,7 @@ impl Timeline {
             let new = state.add_player(player_id, pos);
             self.states.push_back(new);
         }
+        */
     }
 
     pub fn remove_player(&mut self, player_id: PlayerId) {
@@ -206,9 +212,9 @@ impl Timeline {
         new_timeline
     }
 
-    pub fn propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) {
+    pub fn try_propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) -> bool {
         if (inputs.is_empty()) {
-            return;
+            return true;
         }
 
         // Can we assume its already sorted?
@@ -219,7 +225,8 @@ impl Timeline {
         //debug_log!("Propagating inputs, top frame has delta {}", current_frame_id as i32 - last_propagating_frame_id as i32);
 
         if (last_propagating_frame_id > current_frame_id) {
-            panic!("Trying to propagate inputs from the future!\n\n frame_id {}\n states len {}\n\n states {:?}\n\n inputs {:?}", last_propagating_frame_id, self.states.len(), self.top_state(), inputs);
+            debug_log!("Trying to propagate inputs from the future!\n\n frame_id {}\n states len {}\n\n states {:?}\n\n inputs {:?}", last_propagating_frame_id, self.states.len(), self.top_state(), inputs);
+            return false;
         }
 
         let mut resimulation_frame_id = None;
@@ -270,6 +277,8 @@ impl Timeline {
                 //debug_log!("After {:#?}", self.current_state().player_states);
             }
         }
+
+        true
     }
 
     fn frame_id_to_frame_offset(&self, frame_id : u32) -> Option<usize>

@@ -231,6 +231,7 @@ impl GameState {
         self.rules_state.fst.get_round_id()
     }
 
+    #[must_use]
     pub fn add_player(&self, id: PlayerId, pos: Pos) -> Self {
         let mut new = self.clone();
 
@@ -245,12 +246,14 @@ impl GameState {
         new
     }
 
+    #[must_use]
     pub fn remove_player(&self, id: PlayerId) -> Self {
         let mut new = self.clone();
         new.player_states.remove(id);
         new
     }
 
+    #[must_use]
     pub fn simulate(&self, input: Option<PlayerInputs>, dt_us: u32, map : &crate::map::Map) -> Self {
         let mut new = self.clone();
         new.simulate_mut(input, dt_us, map);

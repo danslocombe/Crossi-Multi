@@ -77,6 +77,8 @@ pub struct Client {
     
     server_time_offset_graph : RealtimeGraph,
     server_message_count_graph : RealtimeGraph,
+
+    tick_id : u32,
 }
 
 #[wasm_bindgen]
@@ -137,6 +139,8 @@ impl Client {
 
             server_time_offset_graph : RealtimeGraph::new(60 * 10),
             server_message_count_graph : RealtimeGraph::new(60 * 10),
+
+            tick_id : 0,
         } 
     }
 
@@ -170,6 +174,8 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
+        self.tick_id += 1;
+
         if let Some(server_start) = self.server_start {
             //debug_log!("Ticking!");
             loop {
@@ -207,6 +213,8 @@ impl Client {
 
             self.server_message_count_graph.push(self.queued_server_linden_messages.len() as f32);
 
+            let mut requeued_server_messages = VecDeque::new();
+
             while let Some(linden_server_tick) = self.queued_server_linden_messages.pop_back() {
                 //log!("{:#?}", linden_server_tick);
                 let delta_input_server_frame_times = linden_server_tick.delta_inputs.iter().map(|x| x.frame_id).collect::<Vec<_>>();
@@ -220,8 +228,12 @@ impl Client {
                     delta_input_server_frame_times_max: delta_input_server_frame_times.last().cloned(),
                 }));
 
-                self.process_linden_server_message(&linden_server_tick);
+                if (!self.try_process_linden_server_message(&linden_server_tick)) {
+                    requeued_server_messages.push_front(linden_server_tick);
+                }
             }
+
+            self.queued_server_linden_messages = requeued_server_messages;
         }
 
         self.process_time_info();
@@ -341,7 +353,7 @@ impl Client {
         }
     }
 
-    fn process_linden_server_message(&mut self, linden_server_tick : &interop::LindenServerTick)
+    fn try_process_linden_server_message(&mut self, linden_server_tick : &interop::LindenServerTick) -> bool
     {
         //let mut should_reset = self.trusted_rules_state.as_ref().map(|x| !x.same_variant(&linden_server_tick.rules_state)).unwrap_or(false);
         //should_reset |= self.timeline.top_state().player_states.count_populated() != linden_server_tick.latest.states.len();
@@ -350,6 +362,7 @@ impl Client {
 
         if (should_reset)
         {
+            log!("Resetting!");
             self.timeline = timeline::Timeline::from_server_parts_exact_seed(
                 self.timeline.map.get_seed(),
                 linden_server_tick.latest.frame_id,
@@ -365,6 +378,8 @@ impl Client {
                 let mismatch_rulestate = linden_server_tick.lkg_state.rules_state != client_state_at_lkg_time.rules_state;
                 if (mismatch_player_states || mismatch_rulestate)
                 {
+                    log!("Tick Id: {}", self.tick_id);
+
                     if (mismatch_player_states)
                     {
                         log!("Mismatch in LKG! frame_id {}", client_state_at_lkg_time.frame_id);
@@ -374,8 +389,8 @@ impl Client {
                     }
                     else
                     {
-                        //log!("Mismatch rules local {:#?} lkg {:#?}", client_state_at_lkg_time.ruleset_state, linden_server_tick.lkg_state.ruleset_state);
-                        log!("Mismatch rules");
+                        log!("Mismatch in rules\n\nlocal:\n{:#?} \n\n lkg:\n {:#?}", client_state_at_lkg_time.rules_state, linden_server_tick.lkg_state.rules_state);
+                        //log!("Mismatch rules");
                     }
 
 
@@ -388,10 +403,13 @@ impl Client {
             }
             //log!("Propagating inputs {:#?}", linden_server_tick.delta_inputs);
 
-            self.timeline.propagate_inputs(linden_server_tick.delta_inputs.clone());
+            if !self.timeline.try_propagate_inputs(linden_server_tick.delta_inputs.clone()) {
+                return false;
+            }
         }
 
         self.trusted_rules_state = Some(linden_server_tick.rules_state.clone());
+        true
     }
 
     fn get_round_id(&self) -> u8 {
@@ -591,7 +609,7 @@ impl Client {
 
         self.get_latest_server_rules_state().map(|x| {
             x.fst.get_player_alive(PlayerId(player_id as u8))
-        }).unwrap_or(AliveState::Unknown)
+        }).unwrap_or(AliveState::NotInGame)
     }
 
     pub fn is_river(&self, y : f64) -> bool {

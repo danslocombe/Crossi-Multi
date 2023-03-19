@@ -285,10 +285,8 @@ impl Server {
             }
 
             if (nonempty_updates.len() > 0) {
-                inner
-                    .timeline
-                    .propagate_inputs(nonempty_updates.into_iter().map(|(x, _)| x).collect());
-
+                let propagate_result = inner.timeline.try_propagate_inputs(nonempty_updates.into_iter().map(|(x, _)| x).collect());
+                assert!(propagate_result);
             }
 
             for new_player in new_players {
