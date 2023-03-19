@@ -145,12 +145,16 @@ function start_game() {
 
 function join() {
 
+    /*
     fetch_json('/start_time_utc?game_id=' + game_id)
         .then(response => response.json())
         .then(response => {
             console.log("start time utc response");
             console.log(response);
             let server_start_time = Date.parse(response);
+            */
+
+            console.log("Calling join...");
 
             fetch_json('/join?game_id=' + game_id + '&name=' + player_name)
                 .then(response => response.json())
@@ -160,9 +164,9 @@ function join() {
                     socket_id = response.socket_id;
 
                     console.log("Creating client");
-                    var time_now = Date.now();
-                    var dt_actual = time_now - server_start_time;
-                    console.log("DT from UTC: " + dt_actual);
+                    //var time_now = Date.now();
+                    //var dt_actual = time_now - server_start_time;
+                    //console.log("DT from UTC: " + dt_actual);
                     console.log("JS server_ms=" + response.server_time_us / 1000 + " estimated_latency=" + estimated_latency_us / 1000);
                     client = new Client(game_id, response.server_frame_id, response.server_time_us, estimated_latency_us);
                     //client = new Client(seed, dt_actual * 1000, 0);
@@ -170,7 +174,9 @@ function join() {
                     play();
                     connect_ws();
                 });
+                /*
         });
+        */
 }
 
 function play() {

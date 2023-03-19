@@ -190,11 +190,12 @@ impl Client {
             }
 
             if let Some(top_linden_message) = self.queued_server_linden_messages.front() {
-
+                /*
                 if (top_linden_message.latest.frame_id > self.timeline.top_state().frame_id)
                 {
                     panic!("Got message with latest frame id in the future!!\n\n frame_id {}\n top states {:?}\n\n state {:?}", top_linden_message.latest.frame_id, self.timeline.top_state(), top_linden_message.latest);
                 }
+                */
 
                 let delta = self.timeline.top_state().frame_id as f32 - top_linden_message.latest.frame_id as f32;
                 self.server_time_offset_graph.push(delta);
