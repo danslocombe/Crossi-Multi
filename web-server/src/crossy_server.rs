@@ -228,6 +228,17 @@ impl Server {
                 }
             }
 
+            for (update, _) in client_updates.iter() {
+
+                if (update.frame_id > inner.timeline.top_state().frame_id)
+                {
+                    panic!("Got client update with frame id in the future!!\n\n frame_id {}\n top state {:?}\n\n update {:?}",
+                        update.frame_id,
+                        inner.timeline.top_state(),
+                        update);
+                }
+            }
+
             let nonempty_updates: Vec<_> = client_updates
                 .iter()
                 .filter(|(x, _)| x.input != game::Input::None)
