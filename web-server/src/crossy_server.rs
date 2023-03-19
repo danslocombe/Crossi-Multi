@@ -56,7 +56,7 @@ impl Server {
         let start_utc = Utc::now();
         let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(16);
 
-        let mut tracer = crossy_multi_core::telemetry::TelemetryTracer::new(&format!("logs/{}.log", &id.0));
+        let tracer = crossy_multi_core::telemetry::TelemetryTracer::new(&format!("logs/{}.log", &id.0));
         /*
         tracer.push(crossy_multi_core::telemetry::TelemetryEvent {
            player_id: crossy_multi_core::PlayerId(100),
@@ -204,35 +204,69 @@ impl Server {
         // Still have client listeners
         loop {
             let tick_start = Instant::now();
-            let (client_updates, dropped_players) = self.receive_updates().await;
+            let mut new_players = Vec::new();
 
-            let mut inner = self.inner.lock().await;
+            {
+                let mut inner = self.inner.lock().await;
 
-            // Fetch + clear list of new players
-            let new_players = std::mem::take(&mut inner.new_players);
+                // Fetch + clear list of new players
+                new_players = std::mem::take(&mut inner.new_players);
 
-            // Do simulations
-            let current_time = inner.start.elapsed();
-            let current_time_us = current_time.as_micros() as u32;
+                // Do simulations
+                let current_time = inner.start.elapsed();
+                let current_time_us = current_time.as_micros() as u32;
 
-            loop {
-                let last_time = inner.timeline.top_state().time_us;
-                let delta_time = current_time_us.saturating_sub(last_time);
-                if (delta_time > TICK_INTERVAL_US)
-                {
-                    inner.timeline.tick(None, TICK_INTERVAL_US);
-                }
-                else
-                {
-                    break;
+                loop {
+                    let last_time = inner.timeline.top_state().time_us;
+                    let delta_time = current_time_us.saturating_sub(last_time);
+                    if (delta_time > TICK_INTERVAL_US)
+                    {
+                        inner.timeline.tick(None, TICK_INTERVAL_US);
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
             }
 
-            let nonempty_updates: Vec<_> = client_updates
-                .iter()
-                .filter(|(x, _)| x.input != game::Input::None)
-                .cloned()
-                .collect();
+            let (client_updates, dropped_players) = self.receive_updates().await;
+            let mut inner = self.inner.lock().await;
+
+            let mut nonempty_updates = Vec::with_capacity(client_updates.len());
+
+            let current_frame_id = inner.timeline.top_state().frame_id;
+
+            for (update, time) in client_updates.iter() {
+
+                if (update.input == game::Input::None) {
+                    continue;
+                }
+
+                if (update.frame_id > current_frame_id)
+                {
+                    println!("WARNING: Future input, can happen due to latency approximations. Sending back to queue");
+                    let socket_id = inner.get_socket_id_by_player(update.player_id).unwrap();
+                    self.queue_message(CrossyMessage::ClientTick(vec![
+                        crossy_multi_core::interop::ClientTick {
+                            time_us: update.time_us,
+                            frame_id: update.frame_id,
+                            input : update.input,
+                        }
+                    ]), socket_id).await;
+
+                    /*
+                    panic!("Got client update with frame id in the future!!\n\n frame_id {}\n top state {:?}\n\n update {:?}",
+                        update.frame_id,
+                        inner.timeline.top_state(),
+                        update);
+                        */
+                }
+                else
+                {
+                    nonempty_updates.push((update.clone(), time));
+                }
+            }
 
             for (update, receive_time) in &nonempty_updates {
                 let receive_time_us = receive_time
@@ -350,6 +384,7 @@ impl Server {
         }
     }
 
+
     async fn receive_updates(
         &self,
     ) -> (
@@ -450,6 +485,18 @@ impl ServerInner {
         for client in &self.clients {
             if client.socket_id == id {
                 return Some(client);
+            }
+        }
+
+        None
+    }
+
+    fn get_socket_id_by_player(&self, player_id : game::PlayerId) -> Option<SocketId> {
+        for client in &self.clients {
+            if let Some(player_client) = client.player_client.as_ref() {
+                if (player_client.id == player_id) {
+                    return Some(client.socket_id);
+                }
             }
         }
 

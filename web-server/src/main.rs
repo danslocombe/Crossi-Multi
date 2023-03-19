@@ -329,9 +329,8 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                         Err(e) => {println!("Websocket send error {e}"); break;}
                     }
                 },
-                // Handle dropped so game ended?
                 Err(e) => {
-                    println!("Tick listener dropped {e}");
+                    println!("Tick listener dropped: {e}");
                     break;
                 }
             }
