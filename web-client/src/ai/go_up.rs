@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use std::fmt::Debug;
 
+use crossy_multi_core::map::obstacle_row::ObstaclePublic;
 use crossy_multi_core::{GameState, PlayerId, Input, CoordPos, PreciseCoords, player, Pos, crossy_ruleset};
 use crossy_multi_core::map::{Map, RowType};
 use crossy_multi_core::player::MoveState;
@@ -112,11 +113,13 @@ impl GoUpAI {
             for input in &to_try {
                 let try_pos = player_pos_coords.apply_input(*input);
                 if (is_safe(&try_pos, game_state, map, &mut self.draw_state)) {
+                    log!("AGENT {:?} picking shuffled {:?} as safe", self.player_id, input);
                     return *input;
                 }
             }
 
             // Last resort pick random
+            log!("AGENT {:?} resorting to random", self.player_id);
             return *(to_try.first().unwrap());
         }
 
@@ -147,22 +150,23 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
             const MIN_CAR_DIST : f64 = 3.0;
             const CAR_MOVE_EST : f64 = 0.5;
             let mut result = true; 
-            for car in &cars
+            for ObstaclePublic(car_x, car_y, car_flipped) in cars.iter().cloned()
             {
-                if (car.1 != coordpos.y) {
+                if (car_y != coordpos.y) {
                     continue;
                 }
-                let car_precise = PreciseCoords{ x: car.0, y : coordpos.y};
+
+                let car_precise = PreciseCoords{ x: car_x, y : coordpos.y};
                 let frog_x = coordpos.x as f64 + 0.5;
 
-                let dist_from_movement = if (car.2) {
+                let dist_from_movement = if (car_flipped) {
                     -CAR_MOVE_EST
                 }
                 else {
                     CAR_MOVE_EST
                 };
 
-                let dist = (frog_x - car.0 + dist_from_movement).abs();
+                let dist = (frog_x - car_x + dist_from_movement).abs();
                 if (dist < MIN_CAR_DIST) {
                     draw_state.draw_objs.push(AIDrawObj {
                         precise_pos: car_precise,
