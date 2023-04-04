@@ -1,19 +1,16 @@
 use froggy_rand::FroggyRand;
-use serde::{Deserialize, Serialize};
 
 use crate::map::obstacle_row::*;
 use crate::{LillipadId};
 
 #[derive(Debug)]
 pub struct River {
-    //pub spawn_time : Option<u32>,
     row : ObstacleRow,
 }
 
 const LILLIPAD_WIDTH_TILES : f64 = 1.0;
 const R_WIDTH_MIN : f64 = 0.22;
 const R_WIDTH_MAX : f64 = 0.42;
-//const TIME_SCALE : f64 = 12_000_000.0;
 const TIME_SCALE : f64 = 18_000_000.0;
 
 impl River {
@@ -57,28 +54,14 @@ impl River {
 
         River {
             row : ObstacleRow::new(y, inverted, TIME_SCALE, obstacles, r_width),
-            //spawn_time: None,
         }
     }
 
-    pub fn get_lillipads_public(&self, time_us : u32, spawn_time : Option<u32>) -> Vec<ObstaclePublic> {
-        if let Some(spawn_time) = spawn_time
-        {
-            self.row.get_obstacles_public_filtered(time_us, spawn_time)
-        }
-        else
-        {
-            vec![]
-        }
+    pub fn get_lillipads_public(&self, time_us : u32) -> Vec<ObstaclePublic> {
+        self.row.get_obstacles_public(time_us)
     }
 
-    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : crate::PreciseCoords, spawn_time : Option<u32>) -> Option<LillipadId> {
-        if (spawn_time.is_none())
-        {
-            return None;
-        }
-
-        let spawn_time = spawn_time.unwrap();
+    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : crate::PreciseCoords) -> Option<LillipadId> {
         if (pos.y != self.row.y) {
             return None;
         }
@@ -88,7 +71,7 @@ impl River {
         let mut closest = None;
         let mut closest_dist = f64::MAX;
 
-        for lillipad in self.row.get_obstacles_onscreen_filtered(time_us, spawn_time)
+        for lillipad in self.row.get_obstacles_onscreen(time_us)
         {
             let realised = self.row.realise_obstacle(&lillipad);
             let dist = (frog_centre - realised).abs();
@@ -100,7 +83,6 @@ impl River {
         }
 
         const MARGIN : f64 = LILLIPAD_WIDTH_TILES / 1.9;
-        //debug_log!("Closest {}", closest_dist);
         if (closest_dist < MARGIN) {
             if let Some(id) = closest {
                 let lillipad_id = LillipadId {
@@ -108,8 +90,6 @@ impl River {
                     id : id  as u8,
                     round_id,
                 };
-
-                //debug_log!("Lillipad at pos, {:?}, lillipad {:?}", pos, &lillipad_id);
 
                 return Some(lillipad_id);
             }
@@ -123,32 +103,3 @@ impl River {
         self.row.realise_obstacle(&lillipad)
     }
 }
-
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RiverSpawnTimes
-{
-    spawn_times : Vec<u32>,
-}
-
-impl RiverSpawnTimes
-{
-    pub fn get(&self, i : usize) -> Option<u32>
-    {
-        if (i < self.spawn_times.len())
-        {
-            Some(self.spawn_times[i])
-        }
-        else
-        {
-            None
-        }
-    }
-
-    pub fn set(&mut self, i : usize, val : u32)
-    {
-        assert_eq!(i, self.spawn_times.len());
-        self.spawn_times.push(val);
-    }
-}
-
-pub static EMPTY_RIVER_SPAWN_TIMES : RiverSpawnTimes = RiverSpawnTimes { spawn_times : vec![] };

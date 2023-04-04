@@ -1,11 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{PlayerInputs, Input, player};
 use crate::game::{PlayerId, Pos, CoordPos};
 use crate::player::PlayerState;
 use crate::player_id_map::PlayerIdMap;
 use crate::map::{Map, RowType};
-use crate::map::river::RiverSpawnTimes;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct GameConfig {
@@ -41,7 +39,6 @@ pub struct WarmupState {
     pub alive_states : PlayerIdMap<AliveState>,
     pub win_counts : PlayerIdMap<u8>,
     pub round_id : u8,
-    pub river_spawn_times : RiverSpawnTimes,
     pub game_config : GameConfig,
 }
 
@@ -51,7 +48,6 @@ pub struct RoundState {
     pub alive_states : PlayerIdMap<AliveState>,
     pub win_counts : PlayerIdMap<u8>,
     pub round_id : u8,
-    pub river_spawn_times : RiverSpawnTimes,
     pub game_config : GameConfig,
 }
 
@@ -181,7 +177,6 @@ impl CrossyRulesetFST
                             alive_states,
                             remaining_us : COUNTDOWN_TIME_US,
                             round_id : 1,
-                            river_spawn_times : Default::default(),
                             game_config,
                         })
                     }
@@ -194,13 +189,6 @@ impl CrossyRulesetFST
                 }
             },
             RoundWarmup(state) => {
-                let river_spawn_times = {
-                    // TODO only really need to do this once
-                    let river_spawn_to_y = -RIVER_SPAWN_Y_OFFSET;
-                    let _ = map.get_row(state.round_id, river_spawn_to_y);
-                    map.update_river_spawn_times(&state.river_spawn_times, state.round_id, time_us, river_spawn_to_y)
-                };
-
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
                         RoundWarmup(WarmupState {
@@ -208,7 +196,6 @@ impl CrossyRulesetFST
                             alive_states : state.alive_states.clone(),
                             win_counts : state.win_counts.clone(),
                             round_id : state.round_id,
-                            river_spawn_times,
                             game_config : state.game_config,
                         })
                     }
@@ -219,7 +206,6 @@ impl CrossyRulesetFST
                             alive_states,
                             win_counts: state.win_counts.clone(),
                             round_id : state.round_id,
-                            river_spawn_times,
                             game_config : state.game_config,
                         })
                     }
@@ -245,7 +231,6 @@ impl CrossyRulesetFST
                 // Force evaluation up to screen top
                 let spawn_to_y = new_state.screen_y - RIVER_SPAWN_Y_OFFSET;
                 let _ = map.get_row(new_state.round_id, spawn_to_y);
-                new_state.river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, new_state.round_id, time_us, spawn_to_y);
 
                 if (alive_player_count <= 1) {
                     RoundCooldown(CooldownState {
@@ -297,7 +282,6 @@ impl CrossyRulesetFST
                             win_counts,
                             alive_states,
                             round_id : new_state.round_state.round_id + 1,
-                            river_spawn_times: Default::default(),
                             game_config : new_state.round_state.game_config,
                         })
                     }
@@ -341,15 +325,6 @@ impl CrossyRulesetFST
             Round(x) => x.round_id,
             RoundCooldown(x) => x.round_state.round_id,
             _ => 0,
-        }
-    }
-
-    pub fn get_river_spawn_times(&self) -> &RiverSpawnTimes {
-        match self {
-            RoundWarmup(r) => &r.river_spawn_times,
-            Round(r) => &r.river_spawn_times,
-            RoundCooldown(r) => &r.round_state.river_spawn_times,
-            _ => &crate::map::river::EMPTY_RIVER_SPAWN_TIMES,
         }
     }
 

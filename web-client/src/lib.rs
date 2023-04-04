@@ -21,7 +21,6 @@ use wasm_bindgen::prelude::*;
 
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
-use crossy_multi_core::map::river::RiverSpawnTimes;
 use crossy_multi_core::crossy_ruleset::AliveState;
 
 struct ConsoleDebugLogger();
@@ -416,9 +415,6 @@ impl Client {
         self.trusted_rules_state.as_ref().map(|x| x.fst.get_round_id()).unwrap_or(0)
     }
 
-    fn get_river_spawn_times(&self) -> &RiverSpawnTimes {
-        self.trusted_rules_state.as_ref().map(|x| x.fst.get_river_spawn_times()).unwrap_or(&crossy_multi_core::map::river::EMPTY_RIVER_SPAWN_TIMES)
-    }
 
     pub fn estimate_time_from_frame_id(&self) -> f32 {
         //let time_ms = self.get_top_frame_id() as f32 / 16.66;
@@ -592,7 +588,7 @@ impl Client {
     }
 
     pub fn get_lillipads_json(&self) -> String {
-        let lillipads = self.timeline.map.get_lillipads(self.get_round_id(), self.timeline.top_state().time_us, self.get_river_spawn_times());
+        let lillipads = self.timeline.map.get_lillipads(self.get_round_id(), self.timeline.top_state().time_us);
         serde_json::to_string(&lillipads).unwrap()
     }
 
@@ -703,7 +699,7 @@ impl Client {
                                 },
                             };
 
-                            let lilly_moves = get_lilly_moves(&precise_coords, self.get_river_spawn_times(), top_state.get_round_id(), top_state.time_us, &self.timeline.map);
+                            let lilly_moves = get_lilly_moves(&precise_coords, top_state.get_round_id(), top_state.time_us, &self.timeline.map);
                             Some(lilly_moves)
 
                         }
@@ -734,13 +730,13 @@ struct LillyOverlay {
     input : Input,
 }
 
-fn get_lilly_moves(initial_pos : &PreciseCoords, spawn_times : &RiverSpawnTimes, round_id : u8, time_us : u32, map : &map::Map) -> Vec<LillyOverlay>
+fn get_lilly_moves(initial_pos : &PreciseCoords, round_id : u8, time_us : u32, map : &map::Map) -> Vec<LillyOverlay>
 {
     let mut moves = vec![];
 
     for input in &ALL_INPUTS {
         let applied = initial_pos.apply_input(*input);
-        if let Some(lilly) = map.lillipad_at_pos(round_id, spawn_times, time_us, applied) {
+        if let Some(lilly) = map.lillipad_at_pos(round_id, time_us, applied) {
             let screen_x = map.get_lillipad_screen_x(time_us, &lilly);
             moves.push(LillyOverlay {
                 precise_coords: PreciseCoords {
