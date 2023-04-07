@@ -217,6 +217,7 @@ struct JoinResponse {
 }
 
 async fn join_handler(options : JoinOptions, db: GameDb) -> Result<Response, Rejection>  {
+    println!("Join with options {options:?}");
     let dbinner = db.get(options.game_id).await?;
     let server_description = dbinner.game.get_server_description().await;
     //let last_frame_time_us = dbinner.game.get_last_frame_time_us().await;
@@ -319,7 +320,7 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                     }
                 },
                 Err(e) => {
-                    println!("Tick listener dropped: {e}");
+                    println!("ERROR: DROPPING CLIENT {:?} - Tick listener dropped: {}", socket_id, e);
                     break;
                 }
             }

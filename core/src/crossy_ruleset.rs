@@ -275,7 +275,9 @@ impl CrossyRulesetFST
                         // Take into account all players that have joined during the round
                         let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
                         win_counts.seed_missing(player_states, 0);
+                        println!("CALLING RESET_POSITIONS BEFORE {:#?}", player_states);
                         reset_positions(player_states, ResetPositionTarget::RacePositions);
+                        println!("CALLING RESET_POSITIONS AFTER {:#?}", player_states);
 
                         RoundWarmup(WarmupState {
                             remaining_us : COUNTDOWN_TIME_US,

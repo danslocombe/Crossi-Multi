@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::mem::replace;
 use crate::crossy_ruleset::{CrossyRulesetFST, RulesState};
 use crate::map::Map;
 use crate::game::*;
@@ -104,7 +105,6 @@ impl Timeline {
         // @TMP DAN trying to remove below 
         let mut new_front = self.states.front().unwrap().add_player(player_id, pos);
         std::mem::swap(self.states.front_mut().unwrap(), &mut new_front);
-
         /*
         // This is kinda hacky but we add the new player to all the states in memory (lol)
         // Otherwise we might get input from a state where we have to propagate forward
@@ -195,6 +195,9 @@ impl Timeline {
 
         new_timeline.states.push_back(base.clone());
 
+        // TODO do we need to keep track of added / removed players her?
+        // I think not
+        // Otherwise move call to resimulate up to date.
         while {
             new_timeline.top_state().frame_id < current_frame_id
         } {
@@ -212,7 +215,7 @@ impl Timeline {
         new_timeline
     }
 
-    pub fn try_propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>) -> bool {
+    pub fn try_propagate_inputs(&mut self, mut inputs: Vec<RemoteInput>, is_server : bool) -> bool {
         if (inputs.is_empty()) {
             return true;
         }
@@ -269,7 +272,7 @@ impl Timeline {
             //debug_log!(">> Resimulating!");
             let before = self.current_state().clone();
             let start_frame_offset = self.frame_id_to_frame_offset(resim_id).unwrap();
-            self.simulate_up_to_date(start_frame_offset);
+            self.simulate_up_to_date(start_frame_offset, is_server);
 
             if (self.current_state().player_states == before.player_states) {
                 //debug_log!("Resimulating produced the same top state, probably a problem");
@@ -310,11 +313,44 @@ impl Timeline {
         Some(offset_front)
     }
 
-    fn simulate_up_to_date(&mut self, start_frame_offset: usize) {
+    fn simulate_up_to_date(&mut self, start_frame_offset: usize, is_server : bool) {
+        let mut remove_ids = Vec::new();
+
         for i in (0..start_frame_offset).rev() {
-            let inputs = self.states[i].player_inputs.clone();
+            // TODO replace this with known tick rate
             let dt = self.states[i].time_us - self.states[i + 1].time_us;
-            let replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32, &self.map);
+
+            let inputs = self.states[i].player_inputs.clone();
+            let mut replacement_state = self.states[i + 1].simulate(Some(inputs), dt as u32, &self.map);
+
+            // Add any newly added players between existing state_i+1 and state_i
+            {
+                for (id, player_state) in self.states[i].player_states.iter() {
+                    if (!replacement_state.player_states.contains(id))
+                    {
+                        replacement_state.player_states.set(id, player_state.clone());
+                    }
+                }
+            }
+
+            // Prune any removed players between state_i+1 and state_i
+            // but only on server side
+            if (is_server)
+            {
+                remove_ids.clear();
+                for (id, _) in replacement_state.player_states.iter()
+                {
+                    if (!self.states[i].player_states.contains(id))
+                    {
+                        remove_ids.push(id);
+                    }
+                }
+
+                for id in &remove_ids
+                {
+                    replacement_state = replacement_state.remove_player(*id);
+                }
+            }
 
             assert!(self.states[i].frame_id == replacement_state.frame_id);
             assert!(self.states[i].time_us == replacement_state.time_us);

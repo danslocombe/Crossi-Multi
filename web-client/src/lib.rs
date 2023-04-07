@@ -402,7 +402,7 @@ impl Client {
             }
             //log!("Propagating inputs {:#?}", linden_server_tick.delta_inputs);
 
-            if !self.timeline.try_propagate_inputs(linden_server_tick.delta_inputs.clone()) {
+            if !self.timeline.try_propagate_inputs(linden_server_tick.delta_inputs.clone(), false) {
                 return false;
             }
         }

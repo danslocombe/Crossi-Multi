@@ -137,7 +137,7 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
     let current_row = map.get_row(game_state.get_round_id(), coordpos.y);
     match &current_row.row_type {
         RowType::River(_)  => {
-            if let Some(_lillipad) = map.lillipad_at_pos(game_state.get_round_id(), /*game_state.rules_state.fst.get_river_spawn_times(), */ game_state.time_us, coordpos.to_precise()) {
+            if let Some(_lillipad) = map.lillipad_at_pos(game_state.get_round_id(), game_state.time_us, coordpos.to_precise()) {
                 true
             }
             else {
