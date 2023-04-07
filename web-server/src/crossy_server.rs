@@ -210,9 +210,6 @@ impl Server {
     }
 
     pub async fn run(&self) {
-        // @TMP DAN REMOVE MEEEEE
-        let mut has_three_players = false;
-
         loop {
             let tick_start = Instant::now();
             let mut new_players = Vec::new();
@@ -237,8 +234,8 @@ impl Server {
                     else
                     {
                         // @TMP DAN REMOVE MEE
-                        const DEBUG_THREE_PLAYER_DESYNCS : bool = false;
-                        if (has_three_players && DEBUG_THREE_PLAYER_DESYNCS)
+                        const DEBUG_LOG_ALL_STATES : bool = false;
+                        if (DEBUG_LOG_ALL_STATES)
                         {
                             let glah = inner.timeline.top_state().clone();
                             writeln!(inner.tracer_tmp_file, "LOOP START \n {:#?}", glah).unwrap();
@@ -320,10 +317,6 @@ impl Server {
                     "[{:?}] Spawning new player at {:?}",
                     inner.game_id, spawn_pos
                 );
-
-                if (new_player.0 >= 3) {
-                    has_three_players = true;
-                }
 
                 inner.timeline.add_player(new_player, spawn_pos);
             }

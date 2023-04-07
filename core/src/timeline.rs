@@ -102,21 +102,8 @@ impl Timeline {
     }
 
     pub fn add_player(&mut self, player_id: PlayerId, pos: Pos) {
-        // @TMP DAN trying to remove below 
         let mut new_front = self.states.front().unwrap().add_player(player_id, pos);
         std::mem::swap(self.states.front_mut().unwrap(), &mut new_front);
-        /*
-        // This is kinda hacky but we add the new player to all the states in memory (lol)
-        // Otherwise we might get input from a state where we have to propagate forward
-        // a state where the player isnt there
-        debug_log!("Adding new player {:?} over {:?} states", player_id, self.states.len());
-        let mut states = VecDeque::with_capacity(self.states.len());
-        std::mem::swap(&mut self.states, &mut states);
-        for state in &states {
-            let new = state.add_player(player_id, pos);
-            self.states.push_back(new);
-        }
-        */
     }
 
     pub fn remove_player(&mut self, player_id: PlayerId) {
