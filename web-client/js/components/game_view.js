@@ -15,13 +15,17 @@ import { create_audio_manager } from "./audio_manager"
 import { create_graph } from "./graphs";
 
 
+const PLAY_CROWD_SOUNDS = false;
+
 const audio_crowd = new Audio('/sounds/snd_win.wav');
 const audio_crowd_max = 0.325;
 audio_crowd.addEventListener('timeupdate', function(){
     const buffer = .44
     if (this.currentTime > this.duration - buffer) {
         this.currentTime = 0;
-        this.play();
+        if (PLAY_CROWD_SOUNDS) {
+            this.play();
+        }
     }
 });
 
@@ -148,7 +152,10 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     this.simple_entities = [];
                 }
                 else if (moving_into_warmup) {
-                    audio_crowd.play();
+                    if (PLAY_CROWD_SOUNDS) {
+                        audio_crowd.play();
+                    }
+
                     this.simple_entities = [];
                     for (const [_, player] of this.players) {
                         if (player) {

@@ -1,7 +1,8 @@
 use std::hash::Hash;
 use std::fmt::Debug;
 
-use crossy_multi_core::{GameState, PlayerId, Input, CoordPos, PreciseCoords};
+use crossy_multi_core::map::obstacle_row::ObstaclePublic;
+use crossy_multi_core::{GameState, PlayerId, Input, CoordPos, PreciseCoords, player, Pos, crossy_ruleset};
 use crossy_multi_core::map::{Map, RowType};
 use crossy_multi_core::player::MoveState;
 
@@ -38,6 +39,93 @@ impl GoUpAI {
             *self.rng.choose(("side_random", self.rng_t, &x), &[Input::Left, Input::Right])
         }
     }
+
+    fn think_lobby(&mut self, game_state : &GameState, map : &Map) -> Input
+    {
+        let maybe_player_state = game_state.get_player(self.player_id);
+        if let Some(player_state) = maybe_player_state {
+            if (crossy_ruleset::player_in_lobby_ready_zone(player_state)) {
+                return Input::None;
+            }
+            else {
+                if let Pos::Coord(CoordPos{x, y}) = player_state.pos {
+                    if (x < crossy_ruleset::LOBBY_READ_ZONE_X_MIN) {
+                        return Input::Right;
+                    }
+                    if (x > crossy_ruleset::LOBBY_READ_ZONE_X_MAX) {
+                        return Input::Left;
+                    }
+                    if (y < crossy_ruleset::LOBBY_READ_ZONE_Y_MIN) {
+                        return Input::Down;
+                    }
+                    if (y > crossy_ruleset::LOBBY_READ_ZONE_Y_MAX) {
+                        return Input::Up;
+                    }
+                }
+            }
+        }
+
+        Input::None
+    }
+
+    fn think_game(&mut self, game_state : &GameState, map : &Map) -> Input
+    {
+        let maybe_player_state = game_state.get_player(self.player_id);
+        if let Some(player_state) = maybe_player_state {
+            let player_pos = match &player_state.move_state {
+                MoveState::Stationary => player_state.pos,
+                MoveState::Moving(moving_state) => moving_state.target,
+            };
+
+            let precise_pos = map.realise_pos(game_state.time_us, &player_pos);
+            let player_pos_coords = precise_pos.to_coords();
+            let y_up = precise_pos.y - 1;
+            let test_pos = CoordPos { x : precise_pos.x.round() as i32, y : y_up };
+            if (is_safe(&test_pos, game_state, map, &mut self.draw_state))
+            {
+                let self_pos_safe = is_safe(&player_pos_coords, game_state, map, &mut self.draw_state);
+
+                if (self_pos_safe && should_be_careful(&test_pos, game_state, map) && self.careful_t > 0) {
+                    self.careful_t -= 1;
+                    return Input::None;
+                }
+                else {
+                    //log!("Testing {:?} was safe", &test_pos);
+                    if (self_pos_safe) {
+                        return if (self.rng.gen_unit(("safe_idle", self.rng_t)) < 0.9)
+                        {
+                            //self.careful_t -= 1;
+                            Input::None
+                        }
+                        else {
+                            self.careful_t = 8;
+                            Input::Up
+                        }
+                    }
+                }
+            }
+
+            //log!("Testing {:?} NOT SAFE", &test_pos);
+            // TODO Fix not shuffling last elem correctly
+            let mut to_try = [Input::None, Input::Left, Input::Right, Input::Down];
+            self.rng.shuffle(("shuffle_inputs", self.rng_t), &mut to_try);
+
+            for input in &to_try {
+                let try_pos = player_pos_coords.apply_input(*input);
+                if (is_safe(&try_pos, game_state, map, &mut self.draw_state)) {
+                    log!("AGENT {:?} picking shuffled {:?} as safe", self.player_id, input);
+                    return *input;
+                }
+            }
+
+            // Last resort pick random
+            log!("AGENT {:?} resorting to random", self.player_id);
+            return *(to_try.first().unwrap());
+        }
+
+        // Player dead
+        return Input::None;
+    }
 }
 
 fn should_be_careful(coordpos : &CoordPos, game_state : &GameState, map : &Map) -> bool {
@@ -49,7 +137,7 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
     let current_row = map.get_row(game_state.get_round_id(), coordpos.y);
     match &current_row.row_type {
         RowType::River(_)  => {
-            if let Some(_lillipad) = map.lillipad_at_pos(game_state.get_round_id(), game_state.rules_state.fst.get_river_spawn_times(), game_state.time_us, coordpos.to_precise()) {
+            if let Some(_lillipad) = map.lillipad_at_pos(game_state.get_round_id(), game_state.time_us, coordpos.to_precise()) {
                 true
             }
             else {
@@ -62,22 +150,23 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
             const MIN_CAR_DIST : f64 = 3.0;
             const CAR_MOVE_EST : f64 = 0.5;
             let mut result = true; 
-            for car in &cars
+            for ObstaclePublic(car_x, car_y, car_flipped) in cars.iter().cloned()
             {
-                if (car.1 != coordpos.y) {
+                if (car_y != coordpos.y) {
                     continue;
                 }
-                let car_precise = PreciseCoords{ x: car.0, y : coordpos.y};
+
+                let car_precise = PreciseCoords{ x: car_x, y : coordpos.y};
                 let frog_x = coordpos.x as f64 + 0.5;
 
-                let dist_from_movement = if (car.2) {
+                let dist_from_movement = if (car_flipped) {
                     -CAR_MOVE_EST
                 }
                 else {
                     CAR_MOVE_EST
                 };
 
-                let dist = (frog_x - car.0 + dist_from_movement).abs();
+                let dist = (frog_x - car_x + dist_from_movement).abs();
                 if (dist < MIN_CAR_DIST) {
                     draw_state.draw_objs.push(AIDrawObj {
                         precise_pos: car_precise,
@@ -129,59 +218,15 @@ impl AIAgent for GoUpAI
         self.rng_t += 1;
         self.draw_state.draw_objs.clear();
 
-        let maybe_player_state = game_state.get_player(self.player_id);
-        if let Some(player_state) = maybe_player_state {
-            let player_pos = match &player_state.move_state {
-                MoveState::Stationary => player_state.pos,
-                MoveState::Moving(moving_state) => moving_state.target,
-            };
-
-            let precise_pos = map.realise_pos(game_state.time_us, &player_pos);
-            let player_pos_coords = precise_pos.to_coords();
-            let y_up = precise_pos.y - 1;
-            let test_pos = CoordPos { x : precise_pos.x.round() as i32, y : y_up };
-            if (is_safe(&test_pos, game_state, map, &mut self.draw_state))
-            {
-                let self_pos_safe = is_safe(&player_pos_coords, game_state, map, &mut self.draw_state);
-
-                if (self_pos_safe && should_be_careful(&test_pos, game_state, map) && self.careful_t > 0) {
-                    self.careful_t -= 1;
-                    return Input::None;
-                }
-                else {
-                    //log!("Testing {:?} was safe", &test_pos);
-                    if (self_pos_safe) {
-                        return if (self.rng.gen_unit(("safe_idle", self.rng_t)) < 0.9)
-                        {
-                            //self.careful_t -= 1;
-                            Input::None
-                        }
-                        else {
-                            self.careful_t = 8;
-                            Input::Up
-                        }
-                    }
-                }
+        match game_state.get_rule_state().fst
+        {
+            crossy_ruleset::CrossyRulesetFST::Lobby(_) => {
+                self.think_lobby(game_state, map)
+            },
+            _ => {
+                self.think_game(game_state, map)
             }
-
-            //log!("Testing {:?} NOT SAFE", &test_pos);
-            // TODO Fix not shuffling last elem correctly
-            let mut to_try = [Input::None, Input::Left, Input::Right, Input::Down];
-            self.rng.shuffle(("shuffle_inputs", self.rng_t), &mut to_try);
-
-            for input in &to_try {
-                let try_pos = player_pos_coords.apply_input(*input);
-                if (is_safe(&try_pos, game_state, map, &mut self.draw_state)) {
-                    return *input;
-                }
-            }
-
-            // Last resort pick random
-            return *(to_try.first().unwrap());
         }
-
-        // Player dead
-        return Input::None;
     }
 
     fn get_drawstate(&self) -> &AIDrawState {

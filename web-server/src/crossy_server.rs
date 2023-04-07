@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use warp::hyper::client;
@@ -45,6 +47,7 @@ pub struct ServerInner {
     pub ended: bool,
 
     tracer : crossy_multi_core::telemetry::TelemetryTracer,
+    tracer_tmp_file : std::fs::File,
 
     timeline: Timeline,
     input_history : InputHistory,
@@ -57,6 +60,10 @@ impl Server {
         let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(16);
 
         let tracer = crossy_multi_core::telemetry::TelemetryTracer::new(&format!("logs/{}.log", &id.0));
+
+        // @TMP
+        let tracer_tmp_file = std::fs::OpenOptions::new().write(true).append(true).create(true).open(&format!("logs/TMP_{}.log", &id.0)).unwrap();
+
         /*
         tracer.push(crossy_multi_core::telemetry::TelemetryEvent {
            player_id: crossy_multi_core::PlayerId(100),
@@ -83,6 +90,7 @@ impl Server {
                 ended: false,
 
                 tracer,
+                tracer_tmp_file,
 
                 timeline: Timeline::from_seed(&id.0),
                 input_history: Default::default(),
@@ -127,8 +135,9 @@ impl Server {
 
     pub async fn join(&self) -> SocketId {
         let mut inner = self.inner.lock().await;
-        println!("[{:?}] /join", inner.game_id);
-        inner.add_client()
+        let new_socket = inner.add_client();
+        println!("[{:?}] /join - player_id {:?}", inner.game_id, new_socket);
+        new_socket
     }
 
     pub async fn time_since(&self) -> Duration {
@@ -201,7 +210,9 @@ impl Server {
     }
 
     pub async fn run(&self) {
-        // Still have client listeners
+        // @TMP DAN REMOVE MEEEEE
+        let mut has_three_players = false;
+
         loop {
             let tick_start = Instant::now();
             let mut new_players = Vec::new();
@@ -225,6 +236,14 @@ impl Server {
                     }
                     else
                     {
+                        // @TMP DAN REMOVE MEE
+                        const DEBUG_THREE_PLAYER_DESYNCS : bool = false;
+                        if (has_three_players && DEBUG_THREE_PLAYER_DESYNCS)
+                        {
+                            let glah = inner.timeline.top_state().clone();
+                            writeln!(inner.tracer_tmp_file, "LOOP START \n {:#?}", glah).unwrap();
+                        }
+
                         break;
                     }
                 }
@@ -285,13 +304,11 @@ impl Server {
             }
 
             if (nonempty_updates.len() > 0) {
-                inner
-                    .timeline
-                    .propagate_inputs(nonempty_updates.into_iter().map(|(x, _)| x).collect());
-
+                let propagate_result = inner.timeline.try_propagate_inputs(nonempty_updates.into_iter().map(|(x, _)| x).collect(), true);
+                assert!(propagate_result);
             }
 
-            for new_player in new_players {
+            for new_player in new_players.iter().cloned() {
                 // We need to make sure this gets propagated properly
                 // Weird edge case bugs
                 println!(
@@ -303,6 +320,11 @@ impl Server {
                     "[{:?}] Spawning new player at {:?}",
                     inner.game_id, spawn_pos
                 );
+
+                if (new_player.0 >= 3) {
+                    has_three_players = true;
+                }
+
                 inner.timeline.add_player(new_player, spawn_pos);
             }
 

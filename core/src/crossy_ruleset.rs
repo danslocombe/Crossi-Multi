@@ -1,11 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{PlayerInputs, Input, player};
 use crate::game::{PlayerId, Pos, CoordPos};
 use crate::player::PlayerState;
 use crate::player_id_map::PlayerIdMap;
 use crate::map::{Map, RowType};
-use crate::map::river::RiverSpawnTimes;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct GameConfig {
@@ -29,7 +27,6 @@ pub struct LobbyState {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AliveState
 {
-    Unknown,
     NotInGame,
     Alive,
     Dead,
@@ -42,7 +39,6 @@ pub struct WarmupState {
     pub alive_states : PlayerIdMap<AliveState>,
     pub win_counts : PlayerIdMap<u8>,
     pub round_id : u8,
-    pub river_spawn_times : RiverSpawnTimes,
     pub game_config : GameConfig,
 }
 
@@ -52,7 +48,6 @@ pub struct RoundState {
     pub alive_states : PlayerIdMap<AliveState>,
     pub win_counts : PlayerIdMap<u8>,
     pub round_id : u8,
-    pub river_spawn_times : RiverSpawnTimes,
     pub game_config : GameConfig,
 }
 
@@ -182,7 +177,6 @@ impl CrossyRulesetFST
                             alive_states,
                             remaining_us : COUNTDOWN_TIME_US,
                             round_id : 1,
-                            river_spawn_times : Default::default(),
                             game_config,
                         })
                     }
@@ -195,13 +189,6 @@ impl CrossyRulesetFST
                 }
             },
             RoundWarmup(state) => {
-                let river_spawn_times = {
-                    // TODO only really need to do this once
-                    let river_spawn_to_y = -RIVER_SPAWN_Y_OFFSET;
-                    let _ = map.get_row(state.round_id, river_spawn_to_y);
-                    map.update_river_spawn_times(&state.river_spawn_times, state.round_id, time_us, river_spawn_to_y)
-                };
-
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
                         RoundWarmup(WarmupState {
@@ -209,7 +196,6 @@ impl CrossyRulesetFST
                             alive_states : state.alive_states.clone(),
                             win_counts : state.win_counts.clone(),
                             round_id : state.round_id,
-                            river_spawn_times,
                             game_config : state.game_config,
                         })
                     }
@@ -220,7 +206,6 @@ impl CrossyRulesetFST
                             alive_states,
                             win_counts: state.win_counts.clone(),
                             round_id : state.round_id,
-                            river_spawn_times,
                             game_config : state.game_config,
                         })
                     }
@@ -246,7 +231,6 @@ impl CrossyRulesetFST
                 // Force evaluation up to screen top
                 let spawn_to_y = new_state.screen_y - RIVER_SPAWN_Y_OFFSET;
                 let _ = map.get_row(new_state.round_id, spawn_to_y);
-                new_state.river_spawn_times = map.update_river_spawn_times(&state.river_spawn_times, new_state.round_id, time_us, spawn_to_y);
 
                 if (alive_player_count <= 1) {
                     RoundCooldown(CooldownState {
@@ -291,14 +275,15 @@ impl CrossyRulesetFST
                         // Take into account all players that have joined during the round
                         let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
                         win_counts.seed_missing(player_states, 0);
+                        println!("CALLING RESET_POSITIONS BEFORE {:#?}", player_states);
                         reset_positions(player_states, ResetPositionTarget::RacePositions);
+                        println!("CALLING RESET_POSITIONS AFTER {:#?}", player_states);
 
                         RoundWarmup(WarmupState {
                             remaining_us : COUNTDOWN_TIME_US,
                             win_counts,
                             alive_states,
                             round_id : new_state.round_state.round_id + 1,
-                            river_spawn_times: Default::default(),
                             game_config : new_state.round_state.game_config,
                         })
                     }
@@ -342,15 +327,6 @@ impl CrossyRulesetFST
             Round(x) => x.round_id,
             RoundCooldown(x) => x.round_state.round_id,
             _ => 0,
-        }
-    }
-
-    pub fn get_river_spawn_times(&self) -> &RiverSpawnTimes {
-        match self {
-            RoundWarmup(r) => &r.river_spawn_times,
-            Round(r) => &r.river_spawn_times,
-            RoundCooldown(r) => &r.round_state.river_spawn_times,
-            _ => &crate::map::river::EMPTY_RIVER_SPAWN_TIMES,
         }
     }
 
@@ -439,7 +415,7 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>, target : Reset
 fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>, alive_states : &PlayerIdMap<AliveState>) -> i32 {
     const SCREEN_Y_BUFFER : i32 = 6;
     for (id, player) in player_states.iter() {
-        if alive_states.get_copy(id).unwrap_or(AliveState::Unknown) == AliveState::Alive {
+        if alive_states.get_copy(id).unwrap_or(AliveState::NotInGame) == AliveState::Alive {
             let y = match &player.pos {
                 Pos::Coord(pos) => pos.y,
                 Pos::Lillipad(lilli) => lilli.y,
@@ -497,7 +473,7 @@ fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerS
 
 fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<AliveState>, map : &Map, player_states : &PlayerIdMap<PlayerState>, screen_y : i32) {
     for (id, player_state) in player_states {
-        let alive = alive_states.get_copy(id).unwrap_or(AliveState::Unknown);
+        let alive = alive_states.get_copy(id).unwrap_or(AliveState::NotInGame);
         if (alive != AliveState::Alive) {
             continue;
         }
@@ -508,9 +484,16 @@ fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<Al
     }
 }
 
-fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
+pub const LOBBY_READ_ZONE_X_MIN : i32 = 7;
+pub const LOBBY_READ_ZONE_X_MAX : i32 = 12;
+pub const LOBBY_READ_ZONE_Y_MIN : i32 = 14;
+pub const LOBBY_READ_ZONE_Y_MAX : i32 = 17;
+
+pub fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
     if let Pos::Coord(CoordPos{x, y}) = player.pos {
-        x >= 7 && x <= 12 && y >= 14 && y <= 17
+        x >= LOBBY_READ_ZONE_X_MIN && x <= LOBBY_READ_ZONE_X_MAX 
+        &&
+        y >= LOBBY_READ_ZONE_Y_MIN && y <= LOBBY_READ_ZONE_Y_MAX
     }
     else
     {

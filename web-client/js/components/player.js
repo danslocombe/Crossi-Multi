@@ -262,6 +262,10 @@ function create_player_def(sprites, move_sound, colour, name, source, audio_mana
         tick : function(state, simple_entities, rules_state) {
             this.t += 1;
             const alive_state = this.source.client.player_alive_state_json(this.source.player_id);
+            //console.log("PlayerId: " + this.source.player_id + "  alive_state: " + alive_state);
+            if (alive_state === '"NotInGame"') {
+                return;
+            }
             if (alive_state === '"Dead"') {
                 if (!this.created_corpse) {
                     this.created_corpse = true;
