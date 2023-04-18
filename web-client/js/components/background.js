@@ -1,7 +1,10 @@
 import { SCALE} from "./constants.js";
 
-let spr_tree_top = new Image(SCALE, SCALE);
+let spr_tree_top = new Image(SCALE, 10);
 spr_tree_top.src = '/sprites/spr_tree_top.png';
+
+let spr_bush = new Image(SCALE, SCALE);
+spr_bush.src = '/sprites/spr_bush.png';
 
 let spr_block = new Image(SCALE, SCALE);
 spr_block.src = '/sprites/spr_block.png';
@@ -73,8 +76,33 @@ export function draw_background(froggy_draw_ctx, in_lobby, in_warmup, client) {
         if (row[1].row_type.Path) {
             const wall_width = row[1].row_type.Path.wall_width;
             for (let i = 0; i <= wall_width; i++) {
-                draw_static(froggy_draw_ctx, spr_tree_top, i, y);
-                draw_static_inverted(froggy_draw_ctx, spr_tree_top, i, y);
+                //draw_static(froggy_draw_ctx, spr_tree_top, i, y);
+                //draw_static_inverted(froggy_draw_ctx, spr_tree_top, i, y);
+                let xx = (i * SCALE) + froggy_draw_ctx.x_off;
+                let yy = y * SCALE + froggy_draw_ctx.y_off - 2;
+                froggy_draw_ctx.ctx.drawImage(spr_tree_top, 0, 0, SCALE, 10, xx, yy, SCALE, 10);
+                xx = 152 - (i * SCALE) + froggy_draw_ctx.x_off;
+                yy = y * SCALE + froggy_draw_ctx.y_off - 2;
+                froggy_draw_ctx.ctx.drawImage(spr_tree_top, 0, 0, SCALE, 10, xx, yy, SCALE, 10);
+            }
+        }
+
+        if (row[1].row_type.Bushes) {
+            const wall_width = row[1].row_type.Bushes.path_descr.wall_width;
+            for (let i = 0; i <= wall_width; i++) {
+                let xx = (i * SCALE) + froggy_draw_ctx.x_off;
+                let yy = y * SCALE + froggy_draw_ctx.y_off - 2;
+                froggy_draw_ctx.ctx.drawImage(spr_tree_top, 0, 0, SCALE, 10, xx, yy, SCALE, 10);
+                xx = 152 - (i * SCALE) + froggy_draw_ctx.x_off;
+                yy = y * SCALE + froggy_draw_ctx.y_off - 2;
+                froggy_draw_ctx.ctx.drawImage(spr_tree_top, 0, 0, SCALE, 10, xx, yy, SCALE, 10);
+            }
+
+            let bushes_json = client.get_bushes_row_json(row[0]);
+            const bushes = JSON.parse(bushes_json);
+
+            for (let x of bushes.bushes) {
+                draw_static(froggy_draw_ctx, spr_bush, x, y);
             }
         }
 

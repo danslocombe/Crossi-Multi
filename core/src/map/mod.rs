@@ -7,10 +7,12 @@ use froggy_rand::FroggyRand;
 pub mod road;
 pub mod river;
 pub mod obstacle_row;
+pub mod bushes;
 
 use road::Road;
 use river::{River};
 use obstacle_row::{ObstaclePublic, ObstacleRowDescr};
+use bushes::BushDescr;
 
 use crate::crossy_ruleset::{RulesState, CrossyRulesetFST};
 use crate::game::CoordPos;
@@ -31,6 +33,7 @@ pub enum RowType {
   River(ObstacleRowDescr),
   Path(PathDescr),
   Road(ObstacleRowDescr),
+  Bushes(BushDescr),
   StartingBarrier(),
   Stands(),
 }
@@ -398,12 +401,31 @@ impl MapRound {
                 let new_wall_width = self.gen_state_wall_width + rng.choose("wall_width", &[-1, -1, 0, 0, 0, 0, 1, 1, 1]);
                 self.gen_state_wall_width = new_wall_width.min(WALL_WIDTH_MAX).max(WALL_WIDTH_MIN);
 
-                self.rows.push_front(Row {
-                    row_id,
-                    row_type: RowType::Path(PathDescr {
-                        wall_width : self.gen_state_wall_width as u32,
-                    }),
-                });
+                let path_descr = PathDescr {
+                    wall_width : self.gen_state_wall_width as u32,
+                };
+
+                if (self.seed != 0 && rng.gen_unit("gen_bushes") < 0.25)
+                {
+                    let seed = rng.gen("bush_seed") as u32;
+                    self.rows.push_front(Row {
+                        row_id,
+                        row_type: RowType::Bushes(BushDescr { 
+                            path_descr,
+                            seed,
+                            y : row_id.to_y(),
+                        }),
+                    });
+                }
+                else
+                {
+                    self.rows.push_front(Row {
+                        row_id,
+                        row_type: RowType::Path(PathDescr {
+                            wall_width : self.gen_state_wall_width as u32,
+                        }),
+                    });
+                }
             }
         }
     }
@@ -459,6 +481,9 @@ impl Row {
             RowType::Path(s) => {
                 outside_walls(x, s.wall_width as i32)
             },
+            RowType::Bushes(s) => {
+                outside_walls(x, s.path_descr.wall_width as i32)
+            }
             RowType::StartingBarrier() => {
                 if let CrossyRulesetFST::RoundWarmup(_) = rule_state.fst {
                     // Whole row solid while barrier is up

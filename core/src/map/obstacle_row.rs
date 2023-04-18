@@ -11,11 +11,14 @@ pub struct Obstacle
 {
     pub id : u32,
     pub group_id : u32,
-    // TODO can this be f32?
+    // @TODO can this be f32?
     pub x : f64,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+// @TODO move to proper struct from tuple
+//
+//                       Precise x, row y, [direction] inverted
 pub struct ObstaclePublic(pub f64, pub i32, pub bool);
 
 /// Used for both cars on roads, and lillipads on rivers

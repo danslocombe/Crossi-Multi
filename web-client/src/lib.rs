@@ -14,6 +14,7 @@ use std::time::Duration;
 use std::cell::RefCell;
 
 use std::collections::VecDeque;
+use crossy_multi_core::map::RowType;
 use realtime_graph::RealtimeGraph;
 use wasm_instant::{WasmInstant, WasmDateInstant};
 use serde::Deserialize;
@@ -590,6 +591,18 @@ impl Client {
     pub fn get_lillipads_json(&self) -> String {
         let lillipads = self.timeline.map.get_lillipads(self.get_round_id(), self.timeline.top_state().time_us);
         serde_json::to_string(&lillipads).unwrap()
+    }
+
+    pub fn get_bushes_row_json(&self, row_y : i32) -> String {
+        let round_id = self.get_round_id();
+        let row = self.timeline.map.get_row(round_id, row_y);
+        if let RowType::Bushes(bush_descr) = row.row_type {
+            let hydrated = bush_descr.hydrate();
+            serde_json::to_string(&hydrated).unwrap()
+        }
+        else {
+            panic!("Tried to hydrate bushes over a non-bush row! round_id {} | row_y {} \n rows {:#?}", round_id, row_y, self.timeline.map);
+        }
     }
 
     pub fn player_alive_state_json(&self, player_id : u32) -> String {
