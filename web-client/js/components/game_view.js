@@ -199,7 +199,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     this.background_controller.reset();
                 }
 
-                this.background_controller.tick(this.in_lobby, this.in_warmup, this.client);
+                this.background_controller.tick(this.in_lobby, this.in_warmup, this.simple_entities, this.client);
 
                 let players_with_values = new Set();
 

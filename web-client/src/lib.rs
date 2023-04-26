@@ -574,10 +574,12 @@ impl Client {
     fn get_rows(&mut self) -> Vec<(i32, map::Row)> {
         let mut vec = Vec::with_capacity(32);
         let screen_y = self.trusted_rules_state.as_ref().map(|x| x.fst.get_screen_y()).unwrap_or(0);
-        let range_min = screen_y;
-        let range_max = (screen_y + (2 * 160)/8 + 6).min(160/8);
-        for i in range_min..range_max {
-            let y = i;
+
+        // Starts at zero and goes negative as we progress up the level
+        let range_y_min = screen_y;
+        // Min with known bottom of level to avoid going out of bounds
+        let range_y_max = (screen_y + (2 * 160)/8 + 6).min(160/8);
+        for y in range_y_min..range_y_max {
             vec.push((y as i32, self.timeline.map.get_row(self.get_round_id(), y).clone()));
         }
         vec

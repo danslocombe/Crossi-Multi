@@ -177,6 +177,7 @@ export function create_prop_controller() {
                 while (this.gen_to > gen_to_target - 4) {
                     if (client.is_path(this.gen_to)) {
                         for (let x = 0; x < 20; x++) {
+                            // TODO make a call to the rust rng here so we get a deterministic result across games
                             if (Math.random() < 0.15) {
                                 simple_entities.push(create_prop(x*SCALE, this.gen_to*SCALE, "foliage"));
                             }

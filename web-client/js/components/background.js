@@ -1,4 +1,5 @@
-import { SCALE} from "./constants.js";
+import { SCALE } from "./constants.js";
+import { create_bush} from "./bush.js";
 
 let spr_tree_top = new Image(SCALE, 10);
 spr_tree_top.src = '/sprites/spr_tree_top.png';
@@ -26,22 +27,44 @@ function draw_static_inverted(froggy_draw_ctx, spr, x, y) {
 
 export function create_background_controller() {
     return {
-        generated_to_y : 0,
+        // Bottom of the screen
+        generated_to_y : 160/8,
         in_lobby : true,
         in_warmup : false,
         rows : [],
 
         reset : function() {
-            this.generated_to_y = 0;
+            this.generated_to_y = 160/8;
         },
 
-        tick : function(in_lobby, in_warmup, client) {
+        tick : function(in_lobby, in_warmup, simple_entities, client) {
             this.in_lobby = in_lobby;
             this.in_warmup = in_warmup;
 
             this.rows = []
             if (!in_lobby) {
                 this.rows = JSON.parse(client.get_rows_json());
+
+                const top_row_y = this.rows[0][0];
+                while (top_row_y < this.generated_to_y) {
+                    const index = this.generated_to_y - top_row_y;
+                    if (index >= this.rows.length) {
+                        // Skip creating entities for this row, thats fine as out of view
+                    }
+                    else {
+                        const row = this.rows[index];
+                        const y = row[0];
+                        if (row[1].row_type.Bushes) {
+                            for (let x = 0; x < 20; x++) {
+                                //if (Math.random() < 0.15) {
+                                    simple_entities.push(create_bush(x*SCALE, y*SCALE, "foliage"));
+                                //}
+                            }
+                        }
+                    }
+
+                    this.generated_to_y -= 1;
+                }
             }
             else {
                 for (let i = 0; i < 160 / 8; i++)
@@ -102,6 +125,7 @@ export function create_background_controller() {
                 }
 
                 if (row[1].row_type.Bushes) {
+                    /*
                     const wall_width = row[1].row_type.Bushes.path_descr.wall_width;
                     for (let i = 0; i <= wall_width; i++) {
                         let xx = (i * SCALE) + froggy_draw_ctx.x_off;
@@ -118,6 +142,7 @@ export function create_background_controller() {
                     for (let x of bushes.bushes) {
                         draw_static(froggy_draw_ctx, spr_bush, x, y);
                     }
+                    */
                 }
 
                 if (row[1].row_type.Stands) {
