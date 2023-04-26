@@ -1,6 +1,6 @@
 import { SCALE} from "./constants"
 import { create_player_remote, create_player_local } from "./player";
-import { draw_background } from "./background";
+import { create_background_controller } from "./background";
 import { create_car } from "./car";
 import { create_camera } from "./camera";
 import { create_countdown, create_countdown_font, create_game_winner_ui } from "./game_ui";
@@ -51,6 +51,10 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         intro_ui_bg : create_intro_ui_bg(),
         font_controller : font_controller,
         audio_manager : audio_manager,
+        background_controller : create_background_controller(),
+
+        in_lobby : true,
+        in_warmup : false,
 
         tick : function()
         {
@@ -105,14 +109,14 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 const rules_state_json = this.client.get_rules_state_json()
 
                 let moving_into_lobby = false;
-                let moving_into_warmup = false;
+                let moving_into_new_round = false;
                 let moving_into_end = false;
                 if (rules_state_json) {
-                    const rules_state = JSON.parse(rules_state_json);
+                    const new_rules_state = JSON.parse(rules_state_json);
 
                     if (this.rules_state)
                     {
-                        if (rules_state.fst.Lobby)
+                        if (new_rules_state.fst.Lobby)
                         {
                             this.intro_ui.set_in_lobby();
                         }
@@ -121,28 +125,35 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                             this.intro_ui.set_in_game();
                         }
 
-                        if (rules_state.fst.Lobby && !this.rules_state.fst.Lobby) {
+                        if (new_rules_state.fst.Lobby && !this.rules_state.fst.Lobby) {
                             console.log("Moving into lobby state...");
                             moving_into_lobby = true;
                         }
 
-                        if (rules_state.fst.RoundWarmup && !this.rules_state.fst.RoundWarmup) {
-                            console.log("State is 'RoundWarmup' movnig into warmup state...");
-                            moving_into_warmup = true;
+                        if (new_rules_state.fst.RoundWarmup && !this.rules_state.fst.RoundWarmup) {
+                            console.log("State is 'RoundWarmup' moving into new round via warmup...");
+                            moving_into_new_round = true;
                         }
 
-                        if (rules_state.fst.EndWinner && !this.rules_state.fst.EndWinner) {
+                        if (new_rules_state.fst.Round && !this.rules_state.fst.Round && !this.rules_state.fst.RoundWarmup) {
+                            console.log("State is 'Round' moving into new round skipping warmup...");
+                            moving_into_new_round = true;
+                        }
+
+                        if (new_rules_state.fst.EndWinner && !this.rules_state.fst.EndWinner) {
                             console.log("State is 'EndWinner' movnig into end state...");
                             moving_into_end = true;
                         }
 
-                        if (rules_state.fst.EndAllLeft && !this.rules_state.fst.EndAllLeft) {
+                        if (new_rules_state.fst.EndAllLeft && !this.rules_state.fst.EndAllLeft) {
                             console.log("State is 'EndAllLeft' movnig into end state...");
                             moving_into_end = true;
                         }
                     }
 
-                    this.rules_state = rules_state;
+                    this.rules_state = new_rules_state;
+                    this.in_lobby = !this.rules_state || this.rules_state.fst.Lobby || this.rules_state.fst.EndWinner || this.rules_state.fst.EndAllLeft;
+                    this.in_warmup = this.rules_state && this.rules_state.fst.RoundWarmup;
                 }
 
                 const players_json = this.client.get_players_json();
@@ -150,18 +161,22 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 if (moving_into_lobby) {
                     this.simple_entities = [];
+                    this.background_controller.reset();
                 }
-                else if (moving_into_warmup) {
+                else if (moving_into_new_round) {
                     if (PLAY_CROWD_SOUNDS) {
                         audio_crowd.play();
                     }
 
                     this.simple_entities = [];
+
                     for (const [_, player] of this.players) {
                         if (player) {
                             player.new_round(this.rules_state.fst.RoundWarmup, this.simple_entities);
                         }
                     }
+
+                    this.background_controller.reset();
                 }
                 else if (moving_into_end)
                 {
@@ -181,7 +196,10 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     }
 
                     this.simple_entities.push(create_game_winner_ui(this.font_controller, winner_name));
+                    this.background_controller.reset();
                 }
+
+                this.background_controller.tick(this.in_lobby, this.in_warmup, this.client);
 
                 let players_with_values = new Set();
 
@@ -219,7 +237,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                 audio_crowd.volume = audio_crowd_max / (1 - 0.25 * this.camera.y);
 
-                let simple_entities_new = [];
+                let simple_entities_still_alive = [];
 
                 // TODO Fix the issue on respawn when camera is moving down
                 // before pruning by camera_y_max
@@ -234,11 +252,11 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     entity.tick(); 
 
                     if (entity.alive(camera_y_max)) {
-                        simple_entities_new.push(entity);
+                        simple_entities_still_alive.push(entity);
                     }
                 }
 
-                this.simple_entities = simple_entities_new;
+                this.simple_entities = simple_entities_still_alive;
 
                 this.camera.tick(this.rules_state);
                 this.froggy_draw_ctx.x_off = Math.round(-SCALE * this.camera.x);
@@ -255,9 +273,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         },
 
         draw : function() {
-            const in_lobby = !this.rules_state || this.rules_state.fst.Lobby || this.rules_state.fst.EndWinner || this.rules_state.fst.EndAllLeft;
-            const in_warmup = this.rules_state && this.rules_state.fst.RoundWarmup;
-            draw_background(this.froggy_draw_ctx, in_lobby, in_warmup, this.client)
+            this.background_controller.draw(this.froggy_draw_ctx, this.client)
             this.intro_ui_bg.draw(this.froggy_draw_ctx);
 
             if (this.client) {
@@ -267,7 +283,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     draw_with_depth.push(entity);
                 }
 
-                if (!in_lobby)
+                if (!this.in_lobby)
                 {
                     const cars = JSON.parse(this.client.get_cars_json());
                     for (const car of cars) {
