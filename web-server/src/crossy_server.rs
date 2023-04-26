@@ -57,7 +57,7 @@ impl Server {
     pub fn new(id: &crate::GameId) -> Self {
         let start = Instant::now();
         let start_utc = Utc::now();
-        let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(16);
+        let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(1024);
 
         let tracer = crossy_multi_core::telemetry::TelemetryTracer::new(&format!("logs/{}.log", &id.0));
 

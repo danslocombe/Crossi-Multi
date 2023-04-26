@@ -319,10 +319,13 @@ async fn websocket_main(ws: WebSocket, db : GameDbInner, socket_id : crossy_serv
                         Err(e) => {println!("Websocket send error {e}"); break;}
                     }
                 },
-                Err(e) => {
-                    println!("ERROR: DROPPING CLIENT {:?} - Tick listener dropped: {}", socket_id, e);
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    println!("[{:?}] Underlying game closed", socket_id);
                     break;
-                }
+                },
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(x)) => {
+                    println!("[{:?}] Client lagged by {}", socket_id, x);
+                },
             }
         }
     });
