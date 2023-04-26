@@ -31,22 +31,24 @@ for (const key in sprite_map_def) {
     sprite_map[key] = create_sprites(key, def);
 }
 
-function get_sprite(sprite_name) {
+function get_sprite(x, y, sprite_name, client) {
     const lookup_result = sprite_map[sprite_name];
     if (Array.isArray(lookup_result)) {
-        const i = Math.floor(Math.random() * lookup_result.length);
+        const rand = client.rand_for_prop_unit(x, y, "get_sprite");
+        const i = Math.floor(rand * lookup_result.length);
         return lookup_result[i];
     }
     
     return lookup_result;
 }
 
-export function create_prop(x, y, prop_name) {
-    const spr = get_sprite(prop_name);
+export function create_prop(x, y, prop_name, client) {
+    const spr = get_sprite(x, y, prop_name, client);
     const frames = sprite_map_def[prop_name].frames;
     let frame = 0;
     if (frames !== undefined) {
-        frame = Math.floor(Math.random() * frames);
+        const rand = client.rand_for_prop_unit(x, y, "prop_frame");
+        frame = Math.floor(rand * frames);
     }
 
     let prop = {
@@ -119,8 +121,8 @@ export function create_prop_controller() {
                 console.log("Round Id " + round_id);
                 console.log("Game Id " + game_id);
 
-                const stand_left = create_prop(4, 10*SCALE, "stand");
-                const stand_right = create_prop(14* SCALE + 4, 10*SCALE, "stand");
+                const stand_left = create_prop(4, 10*SCALE, "stand", client);
+                const stand_right = create_prop(14* SCALE + 4, 10*SCALE, "stand", client);
                 stand_right.flipped = true;
                 simple_entities.push(stand_left);
                 simple_entities.push(stand_right);
@@ -131,7 +133,7 @@ export function create_prop_controller() {
                     for (let iy = 0; iy < 4; iy++) {
                         const x = stand_left.x + ix * SCALE;
                         const y = ymin + x / 2 + 4 + SCALE * iy;
-                        rand_push_spectator(x + 4, y, false, prob_stands, simple_entities);
+                        rand_push_spectator(x + 4, y, false, prob_stands, simple_entities, client);
                     }
                 }
 
@@ -139,7 +141,7 @@ export function create_prop_controller() {
                     for (let iy = 0; iy < 4; iy++) {
                         const x = stand_right.x + ix * SCALE;
                         const y = ymin - 4 * ix + 16 + SCALE * iy;
-                        rand_push_spectator(x + 4, y, true, prob_stands, simple_entities);
+                        rand_push_spectator(x + 4, y, true, prob_stands, simple_entities, client);
                     }
                 }
 
@@ -148,11 +150,11 @@ export function create_prop_controller() {
                     // In front of left stand
                     const yy = 13 * SCALE + iy * SCALE;
                     let xx = stand_left.x + 4 * SCALE + 4;
-                    rand_push_spectator(xx, yy, false, prob_front, simple_entities);
+                    rand_push_spectator(xx, yy, false, prob_front, simple_entities, client);
 
                     // In front of right stand
                     xx = 14 * SCALE;
-                    rand_push_spectator(xx, yy, true, prob_front, simple_entities);
+                    rand_push_spectator(xx, yy, true, prob_front, simple_entities, client);
                 }
 
                 const prob_below = 0.2;
@@ -162,11 +164,11 @@ export function create_prop_controller() {
 
                         // Below left stand
                         let xx = stand_left.x + ix * SCALE - SCALE + 4;
-                        rand_push_spectator(xx, yy, false, prob_below, simple_entities);
+                        rand_push_spectator(xx, yy, false, prob_below, simple_entities, client);
 
                         // Below right stand
                         xx = 15 * SCALE + ix * SCALE;
-                        rand_push_spectator(xx, yy, true, prob_below, simple_entities);
+                        rand_push_spectator(xx, yy, true, prob_below, simple_entities, client);
                     }
                 }
             }
@@ -177,9 +179,9 @@ export function create_prop_controller() {
                 while (this.gen_to > gen_to_target - 4) {
                     if (client.is_path(this.gen_to)) {
                         for (let x = 0; x < 20; x++) {
-                            // TODO make a call to the rust rng here so we get a deterministic result across games
-                            if (Math.random() < 0.15) {
-                                simple_entities.push(create_prop(x*SCALE, this.gen_to*SCALE, "foliage"));
+                            const rand = client.rand_for_prop_unit(x, this.gen_to, "foliage");
+                            if (rand < 0.15) {
+                                simple_entities.push(create_prop(x*SCALE, this.gen_to*SCALE, "foliage", client));
                             }
                         }
                     }

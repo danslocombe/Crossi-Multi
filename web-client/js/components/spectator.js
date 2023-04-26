@@ -1,15 +1,17 @@
 import { SCALE} from "./constants.js";
 import { spr_shadow, sprites_list } from "./character_assets.js";
 
-export function rand_push_spectator(x, y, flipped, prob, simple_entities) {
-    if (Math.random() < prob)
+export function rand_push_spectator(x, y, flipped, prob, simple_entities, client) {
+    const rand = client.rand_for_prop_unit(x, y, "create_spectator");
+    if (rand < prob)
     {
-        simple_entities.push(create_spectator(x, y, flipped));
+        simple_entities.push(create_spectator(x, y, flipped, client));
     }
 }
 
-export function create_spectator(x, y, flipped) {
-    const i = Math.floor(Math.random() * sprites_list.length);
+export function create_spectator(x, y, flipped, client) {
+    const rand = client.rand_for_prop_unit(x, y, "spectator_sprite");
+    const i = Math.floor(rand * sprites_list.length);
 
     return {
         i : i,

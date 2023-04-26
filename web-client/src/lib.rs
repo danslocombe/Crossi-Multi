@@ -15,6 +15,7 @@ use std::cell::RefCell;
 
 use std::collections::VecDeque;
 use crossy_multi_core::map::RowType;
+use froggy_rand::FroggyRand;
 use realtime_graph::RealtimeGraph;
 use wasm_instant::{WasmInstant, WasmDateInstant};
 use serde::Deserialize;
@@ -736,6 +737,11 @@ impl Client {
                 "".to_owned()
             }
         }
+    }
+
+    pub fn rand_for_prop_unit(&self, x : i32, y : i32, scenario : &str) -> f32 {
+        let rand = FroggyRand::from_hash((self.timeline.map.get_seed(), self.trusted_rules_state.as_ref().unwrap().game_id, self.trusted_rules_state.as_ref().unwrap().fst.get_round_id()));
+        rand.gen_unit((x, y, scenario)) as f32
     }
 }
 
