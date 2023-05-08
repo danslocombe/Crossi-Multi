@@ -29,7 +29,15 @@ audio_crowd.addEventListener('timeupdate', function(){
     }
 });
 
-export function create_game_view(ctx, client, ws, key_event_source) {
+function create_entities_container()
+{
+    return {
+        simple_entities: [],
+        bushes : [],
+    }
+}
+
+export function create_game(ctx, client, ws, key_event_source) {
     let font_controller = create_font_controller();
     let audio_manager = create_audio_manager();
 
@@ -40,7 +48,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
         froggy_draw_ctx : {ctx: ctx, x_off: 0, y_off: 0},
         key_event_source : key_event_source,
         current_input : "None",
-        simple_entities : [],
+        entities : create_entities_container(),
         rules_state : undefined,
         players : new Map(),
         camera : create_camera(),
@@ -167,7 +175,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 const current_player_states = JSON.parse(players_json);
 
                 if (moving_into_lobby) {
-                    this.simple_entities = [];
+                    this.entities = create_entities_container();
                     this.background_controller.reset();
                 }
                 else if (moving_into_new_round) {
@@ -175,11 +183,11 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                         audio_crowd.play();
                     }
 
-                    this.simple_entities = [];
+                    this.entities = create_entities_container();
 
                     for (const [_, player] of this.players) {
                         if (player) {
-                            player.new_round(this.rules_state.fst, this.simple_entities);
+                            player.new_round(this.rules_state.fst, this.entities.simple_entities);
                         }
                     }
 
@@ -187,7 +195,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 }
                 else if (moving_into_end)
                 {
-                    this.simple_entities = [];
+                    this.entities = create_entities_container();
                     let winner_name = "";
                     if (this.rules_state && this.rules_state.fst.type === "EndWinner") {
                         winner_name = this.players.get(this.rules_state.fst.EndWinner.winner_id).name;
@@ -202,11 +210,11 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                         }
                     }
 
-                    this.simple_entities.push(create_game_winner_ui(this.font_controller, winner_name));
+                    this.entities.simple_entities.push(create_game_winner_ui(this.font_controller, winner_name));
                     this.background_controller.reset();
                 }
 
-                this.background_controller.tick(this.in_lobby, this.in_warmup, this.simple_entities, this.client);
+                this.background_controller.tick(this.in_lobby, this.in_warmup, this.entities, this.client);
 
                 let players_with_values = new Set();
 
@@ -227,7 +235,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                         }
 
                         let player = this.players.get(current_player_state.id);
-                        player.tick(current_player_state, this.simple_entities, this.rules_state);
+                        player.tick(current_player_state, this.entities, this.rules_state);
 
                         players_with_values.add(current_player_state.id);
                     }
@@ -255,7 +263,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     camera_y_max = (this.camera.y + 20) * SCALE;
                 }
 
-                for (let entity of this.simple_entities) {
+                for (let entity of this.entities.simple_entities) {
                     entity.tick(); 
 
                     if (entity.alive(camera_y_max)) {
@@ -263,18 +271,18 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                     }
                 }
 
-                this.simple_entities = simple_entities_still_alive;
+                this.entities.simple_entities = simple_entities_still_alive;
 
                 this.camera.tick(this.rules_state);
                 this.froggy_draw_ctx.x_off = Math.round(-SCALE * this.camera.x);
                 this.froggy_draw_ctx.y_off = Math.round(-SCALE * this.camera.y);
 
                 this.countdown.tick(this.rules_state);
-                this.dialogue.tick(this.rules_state, this.players, this.simple_entities);
+                this.dialogue.tick(this.rules_state, this.players, this.entities.simple_entities);
                 this.intro_ui.tick(this.players);
                 this.intro_ui_bg.tick(this.rules_state);
 
-                this.prop_controller.tick(this.rules_state, this.simple_entities, this.client);
+                this.prop_controller.tick(this.rules_state, this.entities.simple_entities, this.client);
                 this.font_controller.tick();
             }
         },
@@ -286,7 +294,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
             if (this.client) {
                 let draw_with_depth = [];
 
-                for (let entity of this.simple_entities) {
+                for (let entity of this.entities.simple_entities) {
                     draw_with_depth.push(entity);
                 }
 

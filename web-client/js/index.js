@@ -1,6 +1,6 @@
 "use strict";
 
-import { create_game_view }  from "./components/game_view.js"
+import { create_game }  from "./components/game.js"
 import { Client } from "../pkg/index.js"
 import ClipboardJS from 'clipboard';
 
@@ -198,7 +198,7 @@ function connect_ws() {
     console.log("Opening ws");
 
     ws.onopen = () => {
-        setup_view();
+        setup_game();
         console.log("WS Open");
     };
 
@@ -282,12 +282,12 @@ canvas.style = canvasStyle;
 
 /////////////////////////////////////////////////////////////////////////////////////
 
-function setup_view() {
-    let view = create_game_view(ctx, client, ws, key_event_source);
+function setup_game() {
+    let game = create_game(ctx, client, ws, key_event_source);
 
     let tick = () => {
-        view.tick();
-        view.draw();
+        game.tick();
+        game.draw();
         window.requestAnimationFrame(tick);
     }
 

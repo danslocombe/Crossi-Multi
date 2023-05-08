@@ -37,7 +37,7 @@ export function create_background_controller() {
             this.generated_to_y = 160/8;
         },
 
-        tick : function(in_lobby, in_warmup, simple_entities, client) {
+        tick : function(in_lobby, in_warmup, entities, client) {
             this.in_lobby = in_lobby;
             this.in_warmup = in_warmup;
 
@@ -57,7 +57,9 @@ export function create_background_controller() {
                         if (row[1].row_type.Bushes) {
                             for (let x = 0; x < 20; x++) {
                                 //if (Math.random() < 0.15) {
-                                    simple_entities.push(create_bush(x*SCALE, y*SCALE, "foliage"));
+                                    let bush = create_bush(x*SCALE, y*SCALE, "foliage");
+                                    entities.simple_entities.push(bush);
+                                    entities.bushes.push(bush);
                                 //}
                             }
                         }

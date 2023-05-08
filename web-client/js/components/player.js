@@ -41,7 +41,7 @@ function lerp_snap(x0, y0, x1, y1)
     }
 }
 
-function move_effects(x, y, simple_entities, player_def, audio_manager) {
+function move_effects(x, y, simple_entities, player_actor, audio_manager) {
     for (let i = 0; i < 2; i++) {
         const dust_off = Math.random() * (3 / SCALE);
         const dust_dir = Math.random() * 2 * 3.141;
@@ -50,7 +50,7 @@ function move_effects(x, y, simple_entities, player_def, audio_manager) {
         simple_entities.push(create_dust(dust_x, dust_y));
     }
 
-    audio_manager.play(player_def.move_sound);
+    audio_manager.play(player_actor.move_sound);
 }
 
 export function create_player_remote(client, player_id, audio_manager) {
@@ -65,7 +65,7 @@ export function create_player_remote(client, player_id, audio_manager) {
         frame_id : 0,
         audio_manager : audio_manager,
 
-        tick : function(player_state, simple_entities, player_def) {
+        tick : function(player_state, simple_entities, player_actor) {
             // dumb implementation
             // basically inverse kinomatics, play back animations to match movement
             // Lerp to current pos
@@ -103,7 +103,7 @@ export function create_player_remote(client, player_id, audio_manager) {
             }
 
             if (moving && !this.moving) {
-                move_effects(x, y, simple_entities, player_def, this.audio_manager);
+                move_effects(x, y, simple_entities, player_actor, this.audio_manager);
             }
 
             this.moving = moving;
@@ -113,7 +113,7 @@ export function create_player_remote(client, player_id, audio_manager) {
         }
     };
 
-    return player_def_from_player_id(player_id, source, audio_manager)
+    return create_player_actor_from_id_and_source(player_id, source, audio_manager)
 }
 
 export function create_player_local(client, key_event_source, audio_manager) {
@@ -128,7 +128,7 @@ export function create_player_local(client, key_event_source, audio_manager) {
         frame_id : 0,
         audio_manager : audio_manager,
 
-        tick : function(player_state, simple_entities, player_def) {
+        tick : function(player_state, simple_entities, player_actor) {
             const x0 = player_state.x;
             const y0 = player_state.y;
 
@@ -161,7 +161,7 @@ export function create_player_local(client, key_event_source, audio_manager) {
             // Started moving
             if (player_state.moving && !this.moving) {
 
-                move_effects(x, y, simple_entities, player_def, this.audio_manager);
+                move_effects(x, y, simple_entities, player_actor, this.audio_manager);
 
                 if (player_state.pushing >= 0) {
                     this.audio_manager.play(snd_push);
@@ -184,16 +184,16 @@ export function create_player_local(client, key_event_source, audio_manager) {
         }
     };
 
-    return player_def_from_player_id(player_id, source, audio_manager)
+    return create_player_actor_from_id_and_source(player_id, source, audio_manager)
 }
 
-function player_def_from_player_id(id, source, audio_manager) {
+function create_player_actor_from_id_and_source(id, source, audio_manager) {
     // player ids start from 1
     const sprites = sprites_list[id - 1];
     const move_sound = move_sounds_list[id - 1];
     const colour = colours_list[id - 1];
     const name = names[id - 1];
-    return create_player_def(sprites, move_sound, colour, name, source, audio_manager)
+    return create_player_actor(sprites, move_sound, colour, name, source, audio_manager)
 }
 
 function create_crown(owning_player, i) {
@@ -241,7 +241,7 @@ function create_crown(owning_player, i) {
     }
 }
 
-function create_player_def(sprites, move_sound, colour, name, source, audio_manager) {
+function create_player_actor(sprites, move_sound, colour, name, source, audio_manager) {
     return {
         sprite : sprites.spr,
         sprite_dead : sprites.spr_dead,
@@ -259,7 +259,7 @@ function create_player_def(sprites, move_sound, colour, name, source, audio_mana
         //lobby_ready : false,
         pinwheel : null,
 
-        tick : function(state, simple_entities, rules_state) {
+        tick : function(state, entities, rules_state) {
             this.t += 1;
             const alive_state = this.source.client.player_alive_state_json(this.source.player_id);
             //console.log("PlayerId: " + this.source.player_id + "  alive_state: " + alive_state);
@@ -273,7 +273,7 @@ function create_player_def(sprites, move_sound, colour, name, source, audio_mana
                     if (!is_river)
                     {
                         const corpse = create_corpse(this.x, this.y, this.sprite_dead);
-                        simple_entities.push(corpse);
+                        entities.simple_entities.push(corpse);
                         this.audio_manager.play(snd_hit_car);
                     }
                     else {
@@ -282,20 +282,20 @@ function create_player_def(sprites, move_sound, colour, name, source, audio_mana
                             const bubble_dir = Math.random() * 2 * 3.141;
                             const bubble_x = this.source.x + bubble_off * Math.cos(bubble_dir);
                             const bubble_y = this.source.y + bubble_off * Math.sin(bubble_dir);
-                            simple_entities.push(create_bubble(bubble_x, bubble_y));
+                            entities.simple_entities.push(create_bubble(bubble_x, bubble_y));
                         }
 
                         this.audio_manager.play(snd_drown);
                     }
 
                     const whiteout = create_whiteout()
-                    simple_entities.push(whiteout);
+                    entities.simple_entities.push(whiteout);
 
                 }
 
                 return;
             }
-            this.source.tick(state, simple_entities, this, rules_state);
+            this.source.tick(state, entities.simple_entities, this, rules_state);
 
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
