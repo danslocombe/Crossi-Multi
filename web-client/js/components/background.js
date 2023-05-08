@@ -57,8 +57,9 @@ export function create_background_controller() {
                         if (row[1].row_type.Bushes) {
                             for (let x = 0; x < 20; x++) {
                                 //if (Math.random() < 0.15) {
-                                    let bush = create_bush(x*SCALE, y*SCALE, "foliage");
+                                    let bush = create_bush(x*SCALE, y*SCALE);
                                     entities.simple_entities.push(bush);
+                                    entities.simple_entities.push(bush.foreground);
                                     entities.bushes.push(bush);
                                 //}
                             }

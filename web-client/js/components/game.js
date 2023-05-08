@@ -198,7 +198,7 @@ export function create_game(ctx, client, ws, key_event_source) {
                     this.entities = create_entities_container();
                     let winner_name = "";
                     if (this.rules_state && this.rules_state.fst.type === "EndWinner") {
-                        winner_name = this.players.get(this.rules_state.fst.EndWinner.winner_id).name;
+                        winner_name = this.players.get(this.rules_state.fst.winner_id).name;
                     }
                     else
                     {

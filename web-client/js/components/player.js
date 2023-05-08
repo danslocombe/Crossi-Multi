@@ -258,6 +258,7 @@ function create_player_actor(sprites, move_sound, colour, name, source, audio_ma
         t : 0,
         //lobby_ready : false,
         pinwheel : null,
+        in_bush : false,
 
         tick : function(state, entities, rules_state) {
             this.t += 1;
@@ -278,6 +279,7 @@ function create_player_actor(sprites, move_sound, colour, name, source, audio_ma
                     }
                     else {
                         for (let i = 0; i < 2; i++) {
+                            // @CLEANUP we use source.x which is in game-coordinates not screen coords and multiplied in bubble draw
                             const bubble_off = Math.random() * (3 / SCALE);
                             const bubble_dir = Math.random() * 2 * 3.141;
                             const bubble_x = this.source.x + bubble_off * Math.cos(bubble_dir);
@@ -299,7 +301,17 @@ function create_player_actor(sprites, move_sound, colour, name, source, audio_ma
 
             this.x = this.source.x * SCALE;
             this.y = this.source.y * SCALE;
+
             this.dynamic_depth = this.y;
+
+            const bush = get_colliding_bush(this.x, this.y, entities.bushes);
+            if (bush) {
+                bush.mark_in();
+                this.in_bush = true;
+            }
+            else {
+                this.in_bush = false;
+            }
 
             /*
             if (rules_state && rules_state.fst.Lobby) {
@@ -376,11 +388,30 @@ function create_player_actor(sprites, move_sound, colour, name, source, audio_ma
 
             // TODO make transparent
             // do in sprite
-            froggy_draw_ctx.ctx.drawImage(spr_shadow, x, y + 2);
+            if (!this.in_bush)
+            {
+                froggy_draw_ctx.ctx.drawImage(spr_shadow, x, y + 2);
+            }
 
             froggy_draw_ctx.ctx.drawImage(sprite, SCALE*frame_id, 0, SCALE, SCALE, x, y, SCALE, SCALE);
 
             froggy_draw_ctx.ctx.restore();
         },
     }
+}
+
+function get_colliding_bush(x, y, bushes)
+{
+    const xx = x + SCALE / 2;
+    const yy = y + SCALE / 2;
+    for (let bush of bushes)
+    {
+        if (xx >= bush.x && xx < bush.x + SCALE &&
+            yy >= bush.y && yy < bush.y + SCALE)
+        {
+            return bush;
+        }
+    }
+
+    return null;
 }
