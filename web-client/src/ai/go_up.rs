@@ -220,7 +220,7 @@ impl AIAgent for GoUpAI
 
         match game_state.get_rule_state().fst
         {
-            crossy_ruleset::CrossyRulesetFST::Lobby(_) => {
+            crossy_ruleset::CrossyRulesetFST::Lobby{..} => {
                 self.think_lobby(game_state, map)
             },
             _ => {

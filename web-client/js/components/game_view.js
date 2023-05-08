@@ -113,10 +113,14 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 let moving_into_end = false;
                 if (rules_state_json) {
                     const new_rules_state = JSON.parse(rules_state_json);
+                    const new_state = new_rules_state.fst.type;
+                    let old_state = "";
 
                     if (this.rules_state)
                     {
-                        if (new_rules_state.fst.Lobby)
+                        old_state = this.rules_state.fst.type;
+
+                        if (new_state === "Lobby")
                         {
                             this.intro_ui.set_in_lobby();
                         }
@@ -125,35 +129,38 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                             this.intro_ui.set_in_game();
                         }
 
-                        if (new_rules_state.fst.Lobby && !this.rules_state.fst.Lobby) {
-                            console.log("Moving into lobby state...");
-                            moving_into_lobby = true;
-                        }
+                        if (new_state !== old_state)
+                        {
+                            if (new_state === "Lobby") {
+                                console.log("Moving into lobby state...");
+                                moving_into_lobby = true;
+                            }
 
-                        if (new_rules_state.fst.RoundWarmup && !this.rules_state.fst.RoundWarmup) {
-                            console.log("State is 'RoundWarmup' moving into new round via warmup...");
-                            moving_into_new_round = true;
-                        }
+                            if (new_state === "RoundWarmup") {
+                                console.log("State is 'RoundWarmup' moving into new round via warmup...");
+                                moving_into_new_round = true;
+                            }
 
-                        if (new_rules_state.fst.Round && !this.rules_state.fst.Round && !this.rules_state.fst.RoundWarmup) {
-                            console.log("State is 'Round' moving into new round skipping warmup...");
-                            moving_into_new_round = true;
-                        }
+                            if (new_state === "EndWinner") {
+                                console.log("State is 'EndWinner' movnig into end state...");
+                                moving_into_end = true;
+                            }
 
-                        if (new_rules_state.fst.EndWinner && !this.rules_state.fst.EndWinner) {
-                            console.log("State is 'EndWinner' movnig into end state...");
-                            moving_into_end = true;
-                        }
+                            if (new_state === "EndAllLeft") {
+                                console.log("State is 'EndAllLeft' movnig into end state...");
+                                moving_into_end = true;
+                            }
 
-                        if (new_rules_state.fst.EndAllLeft && !this.rules_state.fst.EndAllLeft) {
-                            console.log("State is 'EndAllLeft' movnig into end state...");
-                            moving_into_end = true;
+                            if (new_state === "Round" && old_state !== "RoundWarmup") {
+                                console.log("State is 'Round' moving into new round skipping warmup...");
+                                moving_into_new_round = true;
+                            }
                         }
                     }
 
                     this.rules_state = new_rules_state;
-                    this.in_lobby = !this.rules_state || this.rules_state.fst.Lobby || this.rules_state.fst.EndWinner || this.rules_state.fst.EndAllLeft;
-                    this.in_warmup = this.rules_state && this.rules_state.fst.RoundWarmup;
+                    this.in_lobby = new_state === "Lobby" || new_state === "EndWinner" || new_state === "EndAllLeft";
+                    this.in_warmup = new_state === "RoundWarmup";
                 }
 
                 const players_json = this.client.get_players_json();
@@ -172,7 +179,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
 
                     for (const [_, player] of this.players) {
                         if (player) {
-                            player.new_round(this.rules_state.fst.RoundWarmup, this.simple_entities);
+                            player.new_round(this.rules_state.fst, this.simple_entities);
                         }
                     }
 
@@ -182,7 +189,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 {
                     this.simple_entities = [];
                     let winner_name = "";
-                    if (this.rules_state && this.rules_state.fst.EndWinner) {
+                    if (this.rules_state && this.rules_state.fst.type === "EndWinner") {
                         winner_name = this.players.get(this.rules_state.fst.EndWinner.winner_id).name;
                     }
                     else
@@ -243,7 +250,7 @@ export function create_game_view(ctx, client, ws, key_event_source) {
                 // before pruning by camera_y_max
                 const CAMERA_Y_MAX_BUGFIX = 160;
                 let camera_y_max = CAMERA_Y_MAX_BUGFIX;
-                if (this.rules_state && this.rules_state.fst.Round) {
+                if (this.rules_state && this.rules_state.fst.type === "Round") {
                     // Do proper pruning if we are in a round where camera cant go down
                     camera_y_max = (this.camera.y + 20) * SCALE;
                 }

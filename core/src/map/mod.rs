@@ -471,7 +471,7 @@ impl Row {
         assert!(self.row_id.to_y() == pos.y);
         let x = pos.x;
 
-        if let CrossyRulesetFST::Lobby(_) = rule_state.fst {
+        if let CrossyRulesetFST::Lobby{..} = rule_state.fst {
             // Nothing is solid
             return false;
         }

@@ -86,9 +86,10 @@ impl Default for EndAllLeftState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type")]
 pub enum CrossyRulesetFST
 {
-    Lobby(LobbyState),
+    Lobby{time_with_all_players_in_ready_zone : u32},
     RoundWarmup(WarmupState),
     Round(RoundState),
     RoundCooldown(CooldownState),
@@ -148,19 +149,19 @@ impl RulesState
 impl CrossyRulesetFST
 {
     pub fn start() -> Self {
-        Lobby(LobbyState {
+        Lobby{
             time_with_all_players_in_ready_zone: 0,
-        })
+        }
     }
 
     pub fn tick(&self, dt : u32, time_us : u32, player_states : &mut PlayerIdMap<PlayerState>, map : &Map) -> Self {
         match self {
-            Lobby(state) => {
+            Lobby{time_with_all_players_in_ready_zone} => {
                 let enough_players = player_states.count_populated() >= MIN_PLAYERS;
                 let all_in_ready_zone = player_states.iter().all(|(_, x)| player_in_lobby_ready_zone(x));
 
                 if (enough_players && all_in_ready_zone) {
-                    if (state.time_with_all_players_in_ready_zone > 120) { 
+                    if (*time_with_all_players_in_ready_zone > 120) { 
 
                         debug_log!("Starting Game! ...");
                         debug_log!("Player States {:?}", player_states);
@@ -181,11 +182,11 @@ impl CrossyRulesetFST
                         })
                     }
                     else {
-                        Lobby(LobbyState { time_with_all_players_in_ready_zone: state.time_with_all_players_in_ready_zone + 1 })
+                        Lobby{ time_with_all_players_in_ready_zone: time_with_all_players_in_ready_zone + 1 }
                     }
                 }
                 else {
-                    Lobby(LobbyState { time_with_all_players_in_ready_zone: (state.time_with_all_players_in_ready_zone as f32 * 0.8).round() as u32})
+                    Lobby{ time_with_all_players_in_ready_zone: (*time_with_all_players_in_ready_zone as f32 * 0.8).round() as u32}
                 }
             },
             RoundWarmup(state) => {
@@ -332,7 +333,7 @@ impl CrossyRulesetFST
 
     pub fn get_player_alive(&self, player_id : PlayerId) -> AliveState {
         match self {
-            Lobby(_) => AliveState::Alive,
+            Lobby{..} => AliveState::Alive,
             RoundWarmup(state) => {
                 // Only players who joined before
                 state.alive_states.get_copy(player_id).unwrap_or(AliveState::NotInGame)
@@ -359,7 +360,7 @@ impl CrossyRulesetFST
      
     pub fn get_screen_y(&self) -> i32 {
         match self {
-            Lobby(_) => 0,
+            Lobby{..} => 0,
             RoundWarmup(_) => 0,
             Round(state) => state.screen_y,
             RoundCooldown(state) => state.round_state.screen_y,
@@ -370,7 +371,7 @@ impl CrossyRulesetFST
 
     pub fn same_variant(&self, other : &Self) -> bool {
         match (self, other) {
-            (Lobby(_), Lobby(_)) => true,
+            (Lobby{..}, Lobby{..}) => true,
             (RoundWarmup(_), RoundWarmup(_)) => true,
             (Round(_), Round(_)) => true,
             (RoundCooldown(_), RoundCooldown(_)) => true,
@@ -382,7 +383,7 @@ impl CrossyRulesetFST
 
     pub fn in_lobby(&self) -> bool {
         match self {
-            CrossyRulesetFST::Lobby(_) => true,
+            CrossyRulesetFST::Lobby{..} => true,
             _ => false,
         }
     }

@@ -10,36 +10,22 @@ export function diff(x, y) {
     return Math.abs(x - y);
 }
 
-// These are so ugly
 export function get_target_y_from_rules_state(rules_state) {
-    if (rules_state.fst.Round) {
-        return rules_state.fst.Round.screen_y;
-    }
-    else if (rules_state.fst.RoundWarmup) {
-        return 0;
-    }
-    else if (rules_state.fst.RoundCooldown) {
-        //return rules_state.fst.RoundCooldown.round_state.screen_y;
+    let target_y = rules_state.fst.screen_y;
+    if (target_y == null)
+    {
+        target_y = 0;
     }
 
-    //return undefined;
-    return 0;
+    return target_y;
 }
 
 export function get_round_id_from_rules_state(rules_state) {
-    if (rules_state.fst.Round) {
-        return rules_state.fst.Round.round_id;
-    }
-    else if (rules_state.fst.RoundWarmup) {
-        return rules_state.fst.RoundWarmup.round_id;
-    }
-    else if (rules_state.fst.RoundCooldown) {
-        return rules_state.fst.RoundCooldown.round_id;
-    }
-    else if (rules_state.fst.EndWinner || rules_state.fst.EndAllLeft)
+    let round = rules_state.fst.round_id;
+    if (round == null)
     {
-        return -2;
+        round = -1;
     }
 
-    return -1;
+    return round;
 }
