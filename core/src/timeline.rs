@@ -107,7 +107,7 @@ impl Timeline {
     }
 
     pub fn remove_player(&mut self, player_id: PlayerId) {
-        // Same as add_player, hacky
+        // Remove from history, is this the correct thing to do?
         debug_log!("Dropping player {player_id:?}");
         let mut states = VecDeque::with_capacity(self.states.len());
         std::mem::swap(&mut self.states, &mut states);
@@ -137,15 +137,13 @@ impl Timeline {
 
             loop {
                 let state = self.states.get(offset).unwrap();
-                //println!("ISF offset {} - player count {}", offset, state.player_inputs.player_count());
                 for (player_id, _player_state) in state.player_states.iter() {
-                //for id in 0..state.player_inputs.player_count() {
-                    //let player_id = PlayerId(id as u8);
+
                     let input = state.player_inputs.get(player_id);
 
-                    // @NOCHECKIN temporarily add empty inputs to try and break stuff
+                    const ALLOW_EMPTY_INPUTS_FOR_TESTING : bool = false;
+                    if (ALLOW_EMPTY_INPUTS_FOR_TESTING || input != Input::None)
                     {
-                    //if input != Input::None {
                         inputs.push(RemoteInput {
                             frame_id : state.frame_id,
                             time_us: state.time_us,
@@ -304,7 +302,6 @@ impl Timeline {
         let mut remove_ids = Vec::new();
 
         for i in (0..start_frame_offset).rev() {
-            // TODO replace this with known tick rate
             let dt = self.states[i].time_us - self.states[i + 1].time_us;
 
             let inputs = self.states[i].player_inputs.clone();
