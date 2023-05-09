@@ -41,7 +41,7 @@ export function create_game(ctx, client, ws, key_event_source) {
     let font_controller = create_font_controller();
     let audio_manager = create_audio_manager();
 
-    let view = {
+    let game = {
         client : client,
         ws : ws,
         ctx : ctx,
@@ -63,6 +63,9 @@ export function create_game(ctx, client, ws, key_event_source) {
 
         in_lobby : true,
         in_warmup : false,
+
+        debug_draw_graphs : false,
+        debug_draw_time : false,
 
         tick : function()
         {
@@ -336,16 +339,19 @@ export function create_game(ctx, client, ws, key_event_source) {
                     }
                 }
 
-                const server_offset_graph_json = this.client.get_server_time_offset_graph_json();
-                if (server_offset_graph_json && server_offset_graph_json.length > 0) {
-                    const server_offset_graph = JSON.parse(server_offset_graph_json);
-                    draw_with_depth.push(create_graph(10, 16, server_offset_graph));
-                }
+                if (this.debug_draw_graphs)
+                {
+                    const server_offset_graph_json = this.client.get_server_time_offset_graph_json();
+                    if (server_offset_graph_json && server_offset_graph_json.length > 0) {
+                        const server_offset_graph = JSON.parse(server_offset_graph_json);
+                        draw_with_depth.push(create_graph(10, 16, server_offset_graph));
+                    }
 
-                const server_message_count_graph_json = this.client.get_server_message_count_graph_json();
-                if (server_message_count_graph_json && server_message_count_graph_json.length > 0) {
-                    const server_message_count_graph = JSON.parse(server_message_count_graph_json);
-                    draw_with_depth.push(create_graph(10, 60, server_message_count_graph));
+                    const server_message_count_graph_json = this.client.get_server_message_count_graph_json();
+                    if (server_message_count_graph_json && server_message_count_graph_json.length > 0) {
+                        const server_message_count_graph = JSON.parse(server_message_count_graph_json);
+                        draw_with_depth.push(create_graph(10, 60, server_message_count_graph));
+                    }
                 }
 
                 draw_with_depth.sort(sort_depth);
@@ -377,20 +383,37 @@ export function create_game(ctx, client, ws, key_event_source) {
                 }
                 */
 
-                this.froggy_draw_ctx.ctx.fillStyle = "black";
-                let est_time_seconds = this.client.estimate_time_from_frame_id();
-                this.froggy_draw_ctx.ctx.fillText(`${Math.round(10 * est_time_seconds) / 10}`, 10, 10);
+                if (this.debug_draw_time)
+                {
+                    this.froggy_draw_ctx.ctx.fillStyle = "black";
+                    let est_time_seconds = this.client.estimate_time_from_frame_id();
+                    this.froggy_draw_ctx.ctx.fillText(`${Math.round(10 * est_time_seconds) / 10}`, 10, 10);
+                }
             }
         }
     }
 
     let listener = key_event_source.add_input_listener();
+    listener.game_entity = game;
     listener.on_input_keydown = function(input) {
-        view.current_input = input;
-        view.audio_manager.webpage_has_inputs = true;
+        this.game_entity.current_input = input;
+        this.game_entity.audio_manager.webpage_has_inputs = true;
     }
 
-    return view;
+    let debug_draw_listener = key_event_source.add_input_listener();
+    debug_draw_listener.game_entity = game;
+    debug_draw_listener.on_input_keydown = function(input) {
+        if (input === "F")
+        {
+            this.game_entity.debug_draw_time = !this.game_entity.debug_draw_time;
+        }
+        if (input === "G")
+        {
+            this.game_entity.debug_draw_graphs = !this.game_entity.debug_draw_graphs;
+        }
+    }
+
+    return game;
 }
 
 function sort_depth(a, b) {
