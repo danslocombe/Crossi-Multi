@@ -17,61 +17,68 @@ export function create_intro_ui(font_controller, client) {
 
         multiple_players : false,
 
-        set_in_lobby : function() {
-            this.in_lobby = true;
-        },
+        t : 0,
 
-        set_in_game : function() {
-            this.in_lobby = false;
-        },
+        visible : false,
 
-        tick : function(players) {
-            if (this.in_lobby)
+        tick : function(rules_state, players) {
+            this.visible = false;
+
+            let local_player_exists = false;
+
+            // @FIXME move this logic somewhere or inject local_player instance.
+            const local_player_id = this.client.get_local_player_id();
+            let local_player = null; 
+            if (local_player_id >= 0)
             {
-                // SeizureDome style text movement based on local player position.
-                const local_player_id = client.get_local_player_id();
-                if (local_player_id >= 0)
+                local_player = players.get(local_player_id);
+            }
+
+            const in_lobby = rules_state && rules_state.fst.type === "Lobby";
+
+            if (in_lobby && local_player != null)
+            {
+                // Hacky, add a lil delay before showing to allow the dialogue to dissipate
+                this.t += 1;
+                if (this.t < 80)
                 {
-                    let local_player = players.get(local_player_id);
-                    if (local_player)
+                    return;
+                }
+
+                this.visible = true;
+
+                // SeizureDome style text movement based on local player position.
+                if (!this.local_player_pos_set)
+                {
+                    this.local_player_pos_set = true;
+                    this.local_player_x_0 = local_player.x;
+                    this.local_player_y_0 = local_player.y;
+                }
+                else if (!this.local_player_has_moved && this.t > 160)
+                {
+                    if (local_player.x != this.local_player_x_0 && local_player.y != this.local_player_y_0)
                     {
-                        if (!this.local_player_pos_set)
-                        {
-                            this.local_player_pos_set = true;
-                            this.local_player_x_0 = local_player.x;
-                            this.local_player_y_0 = local_player.y;
-                        }
-                        else if (!this.local_player_has_moved)
-                        {
-                            if (local_player.x != this.local_player_x_0 && local_player.y != this.local_player_y_0)
-                            {
-                                this.local_player_has_moved = true;
-                            }
-                        }
-
-                        this.multiple_players = players.size > 1;
-                        this.local_player_has_readied |= local_player.lobby_ready;
-
-                        let y = local_player.y;
-                        if (y > 160 * 2/3)
-                        {
-                            this.draw_upper = true;
-                        }
-                        if (y < 160 * 1/3)
-                        {
-                            this.draw_upper = false;
-                        }
+                        this.local_player_has_moved = true;
                     }
                 }
 
-                // DAN @TMP figure out how to layer intro text with new background
-                // for now just keep at the top
-                this.draw_upper = true;
+                this.multiple_players = players.size > 1;
+                this.local_player_has_readied |= local_player.lobby_ready;
 
-                let target_y = 160 - 30;
+                let y = local_player.y;
+                if (y > 160 * 3/10)
+                {
+                    this.draw_upper = true;
+                }
+                if (y < 160 * 2.3/10)
+                {
+                    this.draw_upper = false;
+                }
+
+                let target_y = 160 - 80;
                 if (this.draw_upper)
                 {
-                    target_y = 30;
+                    target_y = 20;
                 }
 
                 this.text_y = dan_lerp(this.text_y, target_y, 15);
@@ -80,10 +87,6 @@ export function create_intro_ui(font_controller, client) {
 
         draw : function(froggy_draw_ctx) {
             const xoff = 24; 
-            
-            // TODO @dan
-            // Disabling for now
-            return;
 
             /*
             froggy_draw_ctx.ctx.fillStyle = "#FFFFFF";
@@ -93,10 +96,8 @@ export function create_intro_ui(font_controller, client) {
                 this.font_controller.text(froggy_draw_ctx, "eleven degrees", xoff - 12, this.text_y - this.font_controller.font.height / 2 + 8);
                 */
             
-            if (this.in_lobby)
+            if (this.visible)
             {
-                //return;
-
                 if (!this.local_player_has_moved)
                 {
                     this.font_controller.set_Font_small();
@@ -117,6 +118,11 @@ export function create_intro_ui(font_controller, client) {
                         this.font_controller.text(froggy_draw_ctx, "to ready up", xoff, this.text_y - this.font_controller.font.height / 2 + 8);
                     }
                     */
+                   else
+                   {
+                        this.font_controller.set_Font_small();
+                        this.font_controller.text(froggy_draw_ctx, "go", 10 * SCALE - 12, 16 * SCALE - this.font_controller.font.height / 2);
+                   }
                 }
             }
         },

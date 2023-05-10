@@ -131,15 +131,6 @@ export function create_game(ctx, client, ws, key_event_source) {
                     {
                         old_state = this.rules_state.fst.type;
 
-                        if (new_state === "Lobby")
-                        {
-                            this.intro_ui.set_in_lobby();
-                        }
-                        else
-                        {
-                            this.intro_ui.set_in_game();
-                        }
-
                         if (new_state !== old_state)
                         {
                             if (new_state === "Lobby") {
@@ -282,7 +273,7 @@ export function create_game(ctx, client, ws, key_event_source) {
 
                 this.countdown.tick(this.rules_state);
                 this.dialogue.tick(this.rules_state, this.players, this.entities.simple_entities);
-                this.intro_ui.tick(this.players);
+                this.intro_ui.tick(this.rules_state, this.players);
                 this.intro_ui_bg.tick(this.rules_state);
 
                 this.prop_controller.tick(this.rules_state, this.entities.simple_entities, this.client);
@@ -371,6 +362,7 @@ export function create_game(ctx, client, ws, key_event_source) {
                 //this.froggy_draw_ctx.ctx.fillText(frame_id.toString(), 10, 10);
 
                 /*
+                // Draw player position
                 const local_player_id = this.client.get_local_player_id();
                 if (local_player_id >= 0)
                 {
