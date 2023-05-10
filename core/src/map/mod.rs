@@ -25,17 +25,28 @@ pub struct RowId(u32);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Row {
    pub row_id : RowId,
+
+    #[serde(flatten)]
    pub row_type : RowType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RowWithY {
+    y : i32,
+
+    #[serde(flatten)]
+    row : Row,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum RowType {
   River(ObstacleRowDescr),
-  Path(PathDescr),
   Road(ObstacleRowDescr),
+  Path{ wall_width: u32, },
   Bushes(BushDescr),
-  StartingBarrier(),
-  Stands(),
+  StartingBarrier,
+  Stands,
 }
 
 impl RowType {
@@ -216,6 +227,23 @@ impl Map {
             }
         }
     }
+
+    pub fn get_row_view(&self, round_id : u8, screen_y : i32) -> Vec<RowWithY>
+    {
+        let mut vec = Vec::with_capacity(32);
+
+        // Starts at zero and goes negative as we progress up the level
+        let range_y_min = screen_y;
+        // Min with known bottom of level to avoid going out of bounds
+        let range_y_max = (screen_y + (2 * 160)/8 + 6).min(160/8);
+        for y in range_y_min..range_y_max {
+            vec.push(RowWithY{
+                y: y as i32,
+                row: self.get_row(round_id, y).clone(),
+            });
+        }
+        vec
+    }
 }
 
 impl MapInner {
@@ -257,9 +285,9 @@ impl MapRound {
         for i in 0..12 {
             rows.push_front(Row {
                 row_id : RowId(i),
-                row_type : RowType::Path(PathDescr {
+                row_type : RowType::Path{
                     wall_width : 0,
-                }),
+                },
             });
         }
 
@@ -311,13 +339,13 @@ impl MapRound {
         for i in 0..8 {
             self.rows.push_front(Row {
                 row_id : RowId(i),
-                row_type : RowType::Stands(),
+                row_type : RowType::Stands,
             });
         }
 
         self.rows.push_front(Row {
             row_id : RowId(STANDS_HEIGHT),
-            row_type : RowType::StartingBarrier(),
+            row_type : RowType::StartingBarrier,
         })
     }
 
@@ -421,9 +449,9 @@ impl MapRound {
                 {
                     self.rows.push_front(Row {
                         row_id,
-                        row_type: RowType::Path(PathDescr {
+                        row_type: RowType::Path{
                             wall_width : self.gen_state_wall_width as u32,
-                        }),
+                        },
                     });
                 }
             }
@@ -478,13 +506,13 @@ impl Row {
 
         const STANDS_WIDTH : i32 = 6;
         match &self.row_type {
-            RowType::Path(s) => {
-                outside_walls(x, s.wall_width as i32)
+            RowType::Path{wall_width} => {
+                outside_walls(x, *wall_width as i32)
             },
             RowType::Bushes(s) => {
                 outside_walls(x, s.path_descr.wall_width as i32)
             }
-            RowType::StartingBarrier() => {
+            RowType::StartingBarrier => {
                 if let CrossyRulesetFST::RoundWarmup(_) = rule_state.fst {
                     // Whole row solid while barrier is up
                     true
@@ -493,7 +521,7 @@ impl Row {
                     outside_walls(x, STANDS_WIDTH)
                 }
             }
-            RowType::Stands() => {
+            RowType::Stands => {
                 outside_walls(x, STANDS_WIDTH)
             },
             _ => false,

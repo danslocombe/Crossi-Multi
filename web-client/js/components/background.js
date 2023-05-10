@@ -45,7 +45,7 @@ export function create_background_controller() {
             if (!in_lobby) {
                 this.rows = JSON.parse(client.get_rows_json());
 
-                const top_row_y = this.rows[0][0];
+                const top_row_y = this.rows[0].y;
                 while (top_row_y < this.generated_to_y) {
                     const index = this.generated_to_y - top_row_y;
                     if (index >= this.rows.length) {
@@ -53,8 +53,8 @@ export function create_background_controller() {
                     }
                     else {
                         const row = this.rows[index];
-                        const y = row[0];
-                        if (row[1].row_type.Bushes) {
+                        const y = row.y;
+                        if (row.type === "Bushes") {
                             for (let x = 0; x < 20; x++) {
                                 //if (Math.random() < 0.15) {
                                     let bush = create_bush(x*SCALE, y*SCALE);
@@ -70,9 +70,14 @@ export function create_background_controller() {
                 }
             }
             else {
+                // @TODO hack to render lobby correctly
                 for (let i = 0; i < 160 / 8; i++)
                 {
-                    this.rows.push([i, {row_type: {}, row_id: (i)}]);
+                    this.rows.push({
+                        y : i,
+                        row_id : i,
+                        type: "Lobby",
+                    });
                 }
             }
         },
@@ -83,15 +88,15 @@ export function create_background_controller() {
             ctx.fillRect(0, 0, 160, 160);
 
             for (const row of this.rows) {
-                let y = row[0];
+                let y = row.y;
 
                 let col0, col1;
 
-                if (row[1].row_type.River) {
+                if (row.type === "River") {
                     col0 = "#6c6ce2";
                     col1 = "#5b5be7";
                 }
-                else if (row[1].row_type.Road) {
+                else if (row.type === "Road") {
                     col0 = '#646469';
                     col1 = '#59595d';
                 }
@@ -103,7 +108,7 @@ export function create_background_controller() {
                 for (let i = 0; i < 160 / 8; i++) {
                     let x = i * 8;
 
-                    if ((i + row[1].row_id) % 2 == 0) {
+                    if ((i + row.row_id) % 2 == 0) {
                         ctx.fillStyle = col0
                     }
                     else {
@@ -113,9 +118,8 @@ export function create_background_controller() {
                     ctx.fillRect(x, SCALE*y + froggy_draw_ctx.y_off, x + 8, SCALE);
                 }
 
-                if (row[1].row_type.Path) {
-                    const wall_width = row[1].row_type.Path.wall_width;
-                    for (let i = 0; i <= wall_width; i++) {
+                if (row.type === "Path") {
+                    for (let i = 0; i <= row.wall_width; i++) {
                         //draw_static(froggy_draw_ctx, spr_tree_top, i, y);
                         //draw_static_inverted(froggy_draw_ctx, spr_tree_top, i, y);
                         let xx = (i * SCALE) + froggy_draw_ctx.x_off;
@@ -127,33 +131,12 @@ export function create_background_controller() {
                     }
                 }
 
-                if (row[1].row_type.Bushes) {
-                    /*
-                    const wall_width = row[1].row_type.Bushes.path_descr.wall_width;
-                    for (let i = 0; i <= wall_width; i++) {
-                        let xx = (i * SCALE) + froggy_draw_ctx.x_off;
-                        let yy = y * SCALE + froggy_draw_ctx.y_off - 2;
-                        froggy_draw_ctx.ctx.drawImage(spr_tree_top, 0, 0, SCALE, 10, xx, yy, SCALE, 10);
-                        xx = 152 - (i * SCALE) + froggy_draw_ctx.x_off;
-                        yy = y * SCALE + froggy_draw_ctx.y_off - 2;
-                        froggy_draw_ctx.ctx.drawImage(spr_tree_top, 0, 0, SCALE, 10, xx, yy, SCALE, 10);
-                    }
-
-                    let bushes_json = client.get_bushes_row_json(row[0]);
-                    const bushes = JSON.parse(bushes_json);
-
-                    for (let x of bushes.bushes) {
-                        draw_static(froggy_draw_ctx, spr_bush, x, y);
-                    }
-                    */
-                }
-
-                if (row[1].row_type.Stands) {
+                if (row.type === "Stands") {
                     draw_static(froggy_draw_ctx, spr_block, 6, y);
                     draw_static_inverted(froggy_draw_ctx, spr_block, 6, y);
                 }
 
-                if (row[1].row_type.StartingBarrier) {
+                if (row.type === "StartingBarrier") {
                     for (let i = 0 ; i <= 6; i ++) {
                         draw_static(froggy_draw_ctx, spr_block, i, y);
                         draw_static_inverted(froggy_draw_ctx, spr_block, i, y);

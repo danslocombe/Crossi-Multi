@@ -14,7 +14,7 @@ use std::time::Duration;
 use std::cell::RefCell;
 
 use std::collections::VecDeque;
-use crossy_multi_core::map::RowType;
+use crossy_multi_core::map::{RowType, RowWithY};
 use froggy_rand::FroggyRand;
 use realtime_graph::RealtimeGraph;
 use wasm_instant::{WasmInstant, WasmDateInstant};
@@ -86,11 +86,7 @@ pub struct Client {
 impl Client {
 
     #[wasm_bindgen(constructor)]
-    pub fn new(seed : &str, server_frame_id : i32, _server_time_us : i32, mut estimated_latency_us : i32) -> Self {
-
-        // @NOCHECKIN DO NOT KEEP IN - Trying to debug
-        // estimated_latency_us -= 20_000;
-
+    pub fn new(seed : &str, server_frame_id : i32, _server_time_us : i32, estimated_latency_us : i32) -> Self {
         // Setup statics
         console_error_panic_hook::set_once();
         crossy_multi_core::set_debug_logger(Box::new(ConsoleDebugLogger()));
@@ -572,18 +568,10 @@ impl Client {
         serde_json::to_string(&self.get_rows()).unwrap()
     }
 
-    fn get_rows(&mut self) -> Vec<(i32, map::Row)> {
-        let mut vec = Vec::with_capacity(32);
+    fn get_rows(&mut self) -> Vec<RowWithY> {
         let screen_y = self.trusted_rules_state.as_ref().map(|x| x.fst.get_screen_y()).unwrap_or(0);
-
-        // Starts at zero and goes negative as we progress up the level
-        let range_y_min = screen_y;
-        // Min with known bottom of level to avoid going out of bounds
-        let range_y_max = (screen_y + (2 * 160)/8 + 6).min(160/8);
-        for y in range_y_min..range_y_max {
-            vec.push((y as i32, self.timeline.map.get_row(self.get_round_id(), y).clone()));
-        }
-        vec
+        let round_id = self.get_round_id();
+        self.timeline.map.get_row_view(round_id, screen_y)
     }
 
     pub fn get_cars_json(&self) -> String {
@@ -635,9 +623,9 @@ impl Client {
     pub fn is_path(&self, y : f64) -> bool {
         match self.timeline.map.get_row(self.get_round_id(), y.round() as i32).row_type
         {
-            map::RowType::Path(_) => true,
-            map::RowType::Stands() => true,
-            map::RowType::StartingBarrier() => true,
+            map::RowType::Path{..} => true,
+            map::RowType::Stands => true,
+            map::RowType::StartingBarrier => true,
             _ => false,
         }
     }
