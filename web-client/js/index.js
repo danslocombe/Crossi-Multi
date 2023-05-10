@@ -46,57 +46,6 @@ export function fetch_json(url) {
     });
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
-
-/*
-// Ping server to estimate latency before we start
-console.log("Starting pinging");
-var ping_ws = new WebSocket(ws_endpoint + "/ping");
-ping_ws.onopen = evt => ping(true);
-ping_ws.onmessage = evt => ping(false)
-ping_ws.onclose = evt => {}
-var ping_responses = [];
-var remaining_pings = 5;
-
-
-// t0 - time to send ping
-// t1 - time server receives ping
-// t2 - time server sends pong
-// t3 - time client receives pong
-// Assume zero time on the server for simplicity, so t2-t1 = 0
-var ping_t0 = undefined;
-
-function ping(initial_ping) {
-    if (!initial_ping) {
-        const ping_t3 = performance.now();
-        const latency_ms = (ping_t3 - ping_t0) / 2.0;
-        console.log("Ping with offset " + latency_ms + "ms");
-        ping_responses.push(latency_ms);
-        remaining_pings--;
-    }
-
-    if (remaining_pings > 0) {
-        ping_t0 = performance.now();
-        ping_ws.send("ping");
-    }
-    else {
-        ping_ws.close();
-        
-        ping_responses.sort((a, b) => a - b);
-        console.log(ping_responses);
-        const estimated_latency_ms = ping_responses[Math.floor(ping_responses.length / 2)];
-        estimated_latency_us = estimated_latency_ms * 1000.0;
-
-        console.log("Estimated Offset " + estimated_latency_us / 1000.0 + "ms");
-        start_game();
-    }
-}
-*/
-
-start_game();
-
-/////////////////////////////////////////////////////////////////////////////////////
-
 function create_gameid_url()
 {
     let x_endpoint = "";
@@ -148,41 +97,26 @@ function start_game() {
         });
     }
 }
+start_game();
 
 function join() {
 
-    /*
-    fetch_json('/start_time_utc?game_id=' + game_id)
+    console.log("Calling join...");
+
+    fetch_json('/join?game_id=' + game_id + '&name=' + player_name)
         .then(response => response.json())
         .then(response => {
-            console.log("start time utc response");
+            console.log("/join response");
             console.log(response);
-            let server_start_time = Date.parse(response);
-            */
+            socket_id = response.socket_id;
 
-            console.log("Calling join...");
+            console.log("Creating client");
+            console.log("JS server_ms=" + response.server_time_us / 1000 + " estimated_latency=" + estimated_latency_us / 1000);
+            client = new Client(game_id, response.server_frame_id, response.server_time_us, estimated_latency_us);
 
-            fetch_json('/join?game_id=' + game_id + '&name=' + player_name)
-                .then(response => response.json())
-                .then(response => {
-                    console.log("/join response");
-                    console.log(response);
-                    socket_id = response.socket_id;
-
-                    console.log("Creating client");
-                    //var time_now = Date.now();
-                    //var dt_actual = time_now - server_start_time;
-                    //console.log("DT from UTC: " + dt_actual);
-                    console.log("JS server_ms=" + response.server_time_us / 1000 + " estimated_latency=" + estimated_latency_us / 1000);
-                    client = new Client(game_id, response.server_frame_id, response.server_time_us, estimated_latency_us);
-                    //client = new Client(seed, dt_actual * 1000, 0);
-
-                    play();
-                    connect_ws();
-                });
-                /*
+            play();
+            connect_ws();
         });
-        */
 }
 
 function play() {

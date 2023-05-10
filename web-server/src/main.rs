@@ -149,13 +149,6 @@ async fn main() {
         .and(warp::query::<PlayOptions>())
         .and(with_db(games.clone()))
         .and_then(play_handler).boxed();
-
-    // GET /start_time_utc?game_id=1
-    let get_start_time_utc = warp::path!("start_time_utc")
-        .and(warp::get())
-        .and(warp::query::<StartTimeUtcOptions>())
-        .and(with_db(games.clone()))
-        .and_then(start_time_utc_handler).boxed();
      
     // WS /ws?game_id=1&socket_id=1
     let websocket = warp::path!("ws")
@@ -163,19 +156,12 @@ async fn main() {
         .and(warp::query::<WebSocketJoinOptions>())
         .and(with_db(games.clone()))
         .and_then(ws_handler).boxed();
-
-    // WS /ping
-    let ping = warp::path!("ping")
-        .and(warp::ws())
-        .and_then(ping_handler).boxed();
    
     let routes = get_new
         .or(get_join)
         .or(get_play)
-        .or(get_start_time_utc)
         .or(site)
         .or(websocket)
-        .or(ping)
         .boxed();
 
     let serve_from = ([0, 0, 0, 0], 8080);
@@ -369,37 +355,4 @@ fn parse_client_message(ws_message : &warp::ws::Message) -> Option<interop::Cros
     let bytes = ws_message.as_bytes();
     let r = flexbuffers::Reader::get_root(bytes).map_err(|e| println!("{e}")).ok()?;
     interop::CrossyMessage::deserialize(r).map_err(|e| println!("{e}")).ok()
-}
-
-async fn ping_handler(ws : ws::Ws) -> Result<Response, Rejection> {
-    println!("Ping Handler");
-
-    Ok(ws.on_upgrade(move |socket| {
-        ping_main(socket)
-    }).into_response())
-}
-
-async fn ping_main(ws: WebSocket) {
-
-    let (mut tx, mut rx) = ws.split();
-
-    while let Some(body) = rx.next().await {
-        match body {
-            Ok(msg) => {
-                let send_result = tx.send(msg).await;
-                match send_result {
-                    Ok(_) => {},
-                    Err(_) => {
-                        // Disconnecting here is fine, dont think we need to do anything else?
-                    },
-                }
-            }
-            Err(e) => {
-                println!("Error reading print packet: {e}");
-                break;
-            }
-        };
-    }
-
-    println!("Ping client disconnected")
 }
