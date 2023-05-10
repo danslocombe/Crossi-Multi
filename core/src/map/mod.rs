@@ -47,6 +47,8 @@ pub enum RowType {
   Bushes(BushDescr),
   StartingBarrier,
   Stands,
+  Lobby,
+  LobbyStands,
 }
 
 impl RowType {
@@ -281,26 +283,21 @@ impl MapInner {
 
 impl MapRound {
     fn new(seed : u32, round_id : u8) -> Self {
-        let mut rows = VecDeque::with_capacity(64);
-        for i in 0..12 {
-            rows.push_front(Row {
-                row_id : RowId(i),
-                row_type : RowType::Path{
-                    wall_width : 0,
-                },
-            });
-        }
-
         let mut round = Self {
             seed,
             round_id,
             gen_state_wall_width : 0,
             roads : Vec::with_capacity(24),
             rivers : Vec::with_capacity(24),
-            rows,
+            rows : VecDeque::with_capacity(64),
         };
 
-        round.initial_generate();
+        if (round_id == 0) {
+            round.generate_lobby();
+        }
+        else {
+            round.initial_generate();
+        }
 
         round
     }
@@ -336,7 +333,7 @@ impl MapRound {
 
     fn initial_generate(&mut self) {
         const STANDS_HEIGHT : u32 = 8;
-        for i in 0..8 {
+        for i in 0..STANDS_HEIGHT {
             self.rows.push_front(Row {
                 row_id : RowId(i),
                 row_type : RowType::Stands,
@@ -347,6 +344,23 @@ impl MapRound {
             row_id : RowId(STANDS_HEIGHT),
             row_type : RowType::StartingBarrier,
         })
+    }
+
+    fn generate_lobby(&mut self) {
+        // One extra in lobby as we dont have the starting barrier
+        for i in 0..9 {
+            self.rows.push_front(Row {
+                row_id : RowId(i),
+                row_type : RowType::LobbyStands,
+            });
+        }
+
+        for i in 0..20 {
+            self.rows.push_front(Row {
+                row_id : RowId(9 + i),
+                row_type: RowType::Lobby,
+            })
+        }
     }
 
     fn generate_to_y(&mut self, row_id_target : RowId) {
@@ -499,11 +513,6 @@ impl Row {
         assert!(self.row_id.to_y() == pos.y);
         let x = pos.x;
 
-        if let CrossyRulesetFST::Lobby{..} = rule_state.fst {
-            // Nothing is solid
-            return false;
-        }
-
         const STANDS_WIDTH : i32 = 6;
         match &self.row_type {
             RowType::Path{wall_width} => {
@@ -524,6 +533,10 @@ impl Row {
             RowType::Stands => {
                 outside_walls(x, STANDS_WIDTH)
             },
+            RowType::LobbyStands => {
+                // @FIXME allow going around the top
+                outside_walls(x, STANDS_WIDTH)
+            }
             _ => false,
         }
     }
