@@ -276,7 +276,7 @@ export function create_game(ctx, client, ws, key_event_source) {
                 this.intro_ui.tick(this.rules_state, this.players);
                 this.intro_ui_bg.tick(this.rules_state);
 
-                this.prop_controller.tick(this.rules_state, this.entities.simple_entities, this.client);
+                this.prop_controller.tick(this.rules_state, this.entities, this.client);
                 this.font_controller.tick();
             }
         },

@@ -44,7 +44,7 @@ export function create_background_controller() {
             this.rows = []
             if (!in_lobby) {
                 this.rows = JSON.parse(client.get_rows_json());
-
+                /*
                 const top_row_y = this.rows[0].y;
                 while (top_row_y < this.generated_to_y) {
                     const index = this.generated_to_y - top_row_y;
@@ -68,6 +68,7 @@ export function create_background_controller() {
 
                     this.generated_to_y -= 1;
                 }
+                */
             }
             else {
                 // @TODO hack to render lobby correctly

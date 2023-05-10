@@ -1,6 +1,7 @@
 import { SCALE } from "./constants"
 import { rand_push_spectator } from "./spectator";
 import { get_target_y_from_rules_state, get_round_id_from_rules_state } from "./utils";
+import { create_bush} from "./bush.js";
 
 var sprite_map_def = {
     "foliage" : {w: SCALE, y : SCALE, frames : 6, depth : 250},
@@ -103,7 +104,7 @@ export function create_prop_controller() {
         last_generated_game : -1,
         gen_to: 20,
 
-        tick : function(rules_state, simple_entities, client) {
+        tick : function(rules_state, entities, client) {
             if (!rules_state) {
                 return;
             }
@@ -124,8 +125,8 @@ export function create_prop_controller() {
                 const stand_left = create_prop(4, 10*SCALE, "stand", client);
                 const stand_right = create_prop(14* SCALE + 4, 10*SCALE, "stand", client);
                 stand_right.flipped = true;
-                simple_entities.push(stand_left);
-                simple_entities.push(stand_right);
+                entities.simple_entities.push(stand_left);
+                entities.simple_entities.push(stand_right);
 
                 const prob_stands = 0.7;
                 const ymin = stand_left.y + 8;
@@ -133,7 +134,7 @@ export function create_prop_controller() {
                     for (let iy = 0; iy < 4; iy++) {
                         const x = stand_left.x + ix * SCALE;
                         const y = ymin + x / 2 + 4 + SCALE * iy;
-                        rand_push_spectator(x + 4, y, false, prob_stands, simple_entities, client);
+                        rand_push_spectator(x + 4, y, false, prob_stands, entities.simple_entities, client);
                     }
                 }
 
@@ -141,7 +142,7 @@ export function create_prop_controller() {
                     for (let iy = 0; iy < 4; iy++) {
                         const x = stand_right.x + ix * SCALE;
                         const y = ymin - 4 * ix + 16 + SCALE * iy;
-                        rand_push_spectator(x + 4, y, true, prob_stands, simple_entities, client);
+                        rand_push_spectator(x + 4, y, true, prob_stands, entities.simple_entities, client);
                     }
                 }
 
@@ -150,11 +151,11 @@ export function create_prop_controller() {
                     // In front of left stand
                     const yy = 13 * SCALE + iy * SCALE;
                     let xx = stand_left.x + 4 * SCALE + 4;
-                    rand_push_spectator(xx, yy, false, prob_front, simple_entities, client);
+                    rand_push_spectator(xx, yy, false, prob_front, entities.simple_entities, client);
 
                     // In front of right stand
                     xx = 14 * SCALE;
-                    rand_push_spectator(xx, yy, true, prob_front, simple_entities, client);
+                    rand_push_spectator(xx, yy, true, prob_front, entities.simple_entities, client);
                 }
 
                 const prob_below = 0.2;
@@ -164,11 +165,11 @@ export function create_prop_controller() {
 
                         // Below left stand
                         let xx = stand_left.x + ix * SCALE - SCALE + 4;
-                        rand_push_spectator(xx, yy, false, prob_below, simple_entities, client);
+                        rand_push_spectator(xx, yy, false, prob_below, entities.simple_entities, client);
 
                         // Below right stand
                         xx = 15 * SCALE + ix * SCALE;
-                        rand_push_spectator(xx, yy, true, prob_below, simple_entities, client);
+                        rand_push_spectator(xx, yy, true, prob_below, entities.simple_entities, client);
                     }
                 }
             }
@@ -181,8 +182,20 @@ export function create_prop_controller() {
                         for (let x = 0; x < 20; x++) {
                             const rand = client.rand_for_prop_unit(x, this.gen_to, "foliage");
                             if (rand < 0.15) {
-                                simple_entities.push(create_prop(x*SCALE, this.gen_to*SCALE, "foliage", client));
+                                entities.simple_entities.push(create_prop(x*SCALE, this.gen_to*SCALE, "foliage", client));
                             }
+                        }
+                    }
+
+                    if (client.is_bush(this.gen_to)) {
+                        let hydrated_bushes = JSON.parse(client.get_bushes_row_json(this.gen_to));
+                        for (let x of hydrated_bushes.bushes) {
+                            //if (Math.random() < 0.15) {
+                                let bush = create_bush(x*SCALE, this.gen_to*SCALE);
+                                entities.simple_entities.push(bush);
+                                entities.simple_entities.push(bush.foreground);
+                                entities.bushes.push(bush);
+                            //}
                         }
                     }
 

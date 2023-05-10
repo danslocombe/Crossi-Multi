@@ -620,6 +620,14 @@ impl Client {
         }
     }
 
+    pub fn is_bush(&self, y : f64) -> bool {
+        match self.timeline.map.get_row(self.get_round_id(), y.round() as i32).row_type
+        {
+            map::RowType::Bushes(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_path(&self, y : f64) -> bool {
         match self.timeline.map.get_row(self.get_round_id(), y.round() as i32).row_type
         {
