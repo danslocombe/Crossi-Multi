@@ -11,6 +11,7 @@ const DEBUG_PLAY_LINK = true;
 const query_string = window.location.search;
 const url_params = new URLSearchParams(query_string);
 var game_id = url_params.get('game_id');
+var debug_bypass_lobby = url_params.get('debug_bypass_lobby');
 
 var player_name = "Dan";
 var socket_id = 0;
@@ -130,7 +131,12 @@ function start_game() {
     }
     else
     {
-        fetch_json('/new')
+        //fetch_json('/new')
+        var url = '/new'
+        if (debug_bypass_lobby) {
+            url += '?debug_bypass_lobby=true';
+        }
+        fetch_json(url)
         .then(response => response.json())
         .then(x => {
             console.log("Created game ");

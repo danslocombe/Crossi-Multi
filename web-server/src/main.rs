@@ -5,6 +5,7 @@
 extern crate lazy_static;
 
 use crossy_multi_core::*;
+use crossy_multi_core::crossy_ruleset::GameConfig;
 use std::sync::Arc;
 
 use warp::Filter;
@@ -43,7 +44,7 @@ impl GameDb {
         }
     }
 
-    async fn new_game(&self) -> GameId {
+    async fn new_game(&self, config : GameConfig) -> GameId {
         let mut games = self.games.lock().await;
 
         let id = {
@@ -51,7 +52,7 @@ impl GameDb {
             idgen_lock.next()
         };
 
-        let game = Arc::new(crossy_server::Server::new(&id));
+        let game = Arc::new(crossy_server::Server::new(config, &id));
 
         games.push(GameDbInner {
             id: id.clone(),
@@ -130,6 +131,7 @@ async fn main() {
     // GET /new
     let get_new = warp::path!("new")
         .and(warp::get())
+        .and(warp::query::<NewGameOptions>())
         .and(with_db(games.clone()))
         .and(warp::any())
         .and_then(new_game_handler).boxed();
@@ -188,14 +190,26 @@ fn with_db(db: GameDb) -> impl Filter<Extract = (GameDb,), Error = std::convert:
     warp::any().map(move || db.clone())
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct NewGameOptions {
+    debug_bypass_lobby : Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct NewGameResponse
 {
     pub game_id : GameId,
 }
 
-async fn new_game_handler(db: GameDb) -> Result<Response, std::convert::Infallible>  {
-    let game_id = db.new_game().await;
+async fn new_game_handler(options : NewGameOptions, db: GameDb) -> Result<Response, std::convert::Infallible>  {
+    let mut config = GameConfig::default();
+
+    if let Some(true) = options.debug_bypass_lobby {
+        config.bypass_lobby = true;
+        config.minimum_players = 1;
+    }
+
+    let game_id = db.new_game(config).await;
     let new_game_response = NewGameResponse { game_id };
     let response = warp::reply::json(&new_game_response).into_response();
     println!("/new {:?}", &response);

@@ -1,7 +1,7 @@
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use crate::player_id_map::PlayerIdMap;
-use crate::crossy_ruleset::{RulesState};
+use crate::crossy_ruleset::{RulesState, GameConfig};
 use crate::map::Map;
 
 use crate::player::*;
@@ -182,12 +182,12 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new() -> Self {
+    pub fn new(config : GameConfig) -> Self {
         GameState {
             time_us: 0,
             player_states: PlayerIdMap::new(),
             player_inputs: PlayerInputs::new(),
-            rules_state: RulesState::default(),
+            rules_state: RulesState::new(config),
             frame_id: 0,
         }
     }
@@ -331,7 +331,7 @@ mod tests {
             frame_id : 0,
             player_states,
             player_inputs: PlayerInputs::default(),
-            rules_state : RulesState::default(),
+            rules_state : RulesState::new(Default::default()),
         }
     }
 

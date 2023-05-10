@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use chrono::prelude::*;
+use crossy_multi_core::crossy_ruleset::GameConfig;
 use serde::{Deserialize, Serialize};
 use warp::hyper::client;
 use std::time::{Duration, Instant};
@@ -54,7 +55,7 @@ pub struct ServerInner {
 }
 
 impl Server {
-    pub fn new(id: &crate::GameId) -> Self {
+    pub fn new(config : GameConfig, id: &crate::GameId) -> Self {
         let start = Instant::now();
         let start_utc = Utc::now();
         let (outbound_tx, outbound_rx) = tokio::sync::broadcast::channel(1024);
@@ -92,7 +93,7 @@ impl Server {
                 tracer,
                 tracer_tmp_file,
 
-                timeline: Timeline::from_seed(&id.0),
+                timeline: Timeline::from_seed(config, &id.0),
                 input_history: Default::default(),
             }),
         }

@@ -23,7 +23,7 @@ use wasm_bindgen::prelude::*;
 
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
-use crossy_multi_core::crossy_ruleset::AliveState;
+use crossy_multi_core::crossy_ruleset::{AliveState, RulesState};
 
 struct ConsoleDebugLogger();
 impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
@@ -99,7 +99,7 @@ impl Client {
         let estimated_server_current_frame_id = (server_frame_id as i32 + estimated_frame_delta) as u32;
         let estimated_server_time_us = estimated_server_current_frame_id * TICK_INTERVAL_US;
         //let timeline = timeline::Timeline::from_server_parts(seed, server_frame_id as u32, server_frame_id as u32 * TICK_INTERVAL_US, vec![], Default::default());
-        let timeline = timeline::Timeline::from_server_parts(seed, 0, 0, Default::default(), Default::default());
+        let timeline = timeline::Timeline::from_server_parts(seed, 0, 0, Default::default(), RulesState::new(Default::default()));
 
         // Estimate server start
         let client_start = WasmInstant::now();

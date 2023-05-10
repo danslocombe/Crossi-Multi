@@ -1,11 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::mem::replace;
-use crate::crossy_ruleset::{CrossyRulesetFST, RulesState};
+use crate::crossy_ruleset::{RulesState, GameConfig};
 use crate::map::Map;
 use crate::game::*;
 use crate::player::PlayerState;
-use crate::player_id_map::PlayerIdMap;
 
 const STATE_BUFFER_SIZE: usize = 128;
 
@@ -43,18 +41,18 @@ pub struct Timeline {
 }
 
 impl Timeline {
-    pub fn new() -> Self {
+    pub fn new(config : GameConfig) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::new());
+        states.push_front(GameState::new(config));
         Timeline {
             states,
             map : Map::new(0),
         }
     }
 
-    pub fn from_seed(seed: &str) -> Self {
+    pub fn from_seed(config : GameConfig, seed: &str) -> Self {
         let mut states = VecDeque::new();
-        states.push_front(GameState::new());
+        states.push_front(GameState::new(config));
         Timeline {
             states,
             map : Map::new(seed),
