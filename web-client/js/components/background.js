@@ -120,6 +120,7 @@ export function create_background_controller() {
                 }
 
                 if (row.type === "Path") {
+                    /*
                     for (let i = 0; i <= row.wall_width; i++) {
                         //draw_static(froggy_draw_ctx, spr_tree_top, i, y);
                         //draw_static_inverted(froggy_draw_ctx, spr_tree_top, i, y);
@@ -130,6 +131,7 @@ export function create_background_controller() {
                         yy = y * SCALE + froggy_draw_ctx.y_off - 2;
                         froggy_draw_ctx.ctx.drawImage(spr_tree_top, 0, 0, SCALE, 10, xx, yy, SCALE, 10);
                     }
+                    */
                 }
 
                 if (row.type === "Stands") {

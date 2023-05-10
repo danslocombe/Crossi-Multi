@@ -527,4 +527,12 @@ impl Row {
             _ => false,
         }
     }
+
+    pub fn wall_width(&self) -> Option<u32> {
+        match &self.row_type {
+            RowType::Path{wall_width} => Some(*wall_width),
+            RowType::Bushes(s) => Some(s.path_descr.wall_width),
+            _ => None,
+        }
+    }
 }

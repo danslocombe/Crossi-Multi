@@ -596,6 +596,12 @@ impl Client {
         }
     }
 
+    pub fn get_wall_width(&self, row_y : i32) -> i32 {
+        let round_id = self.get_round_id();
+        let row = self.timeline.map.get_row(round_id, row_y);
+        row.wall_width().map(|x| x as i32).unwrap_or(-1)
+    }
+
     pub fn player_alive_state_json(&self, player_id : u32) -> String {
         serde_json::to_string(&self.player_alive_state(player_id)).unwrap()
     }

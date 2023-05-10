@@ -4,8 +4,9 @@ import { get_target_y_from_rules_state, get_round_id_from_rules_state } from "./
 import { create_bush} from "./bush.js";
 
 var sprite_map_def = {
-    "foliage" : {w: SCALE, y : SCALE, frames : 6, depth : 250},
-    "stand" : {w : 40, y : 74, depth : 100},
+    "foliage" : {w: SCALE, h : SCALE, frames : 6, depth : 250},
+    "stand" : {w : 40, h : 74, depth : 100},
+    "tree_top" : {w : SCALE, h : 10, dynamic_depth : 10},
 };
 
 var sprite_map = {}
@@ -197,6 +198,13 @@ export function create_prop_controller() {
                                 entities.bushes.push(bush);
                             //}
                         }
+                    }
+
+                    let wall_width = client.get_wall_width(this.gen_to);
+                    for (let i = 0; i <= wall_width; i++)
+                    {
+                        entities.simple_entities.push(create_prop(i * SCALE, this.gen_to * SCALE - 2, "tree_top", client));
+                        entities.simple_entities.push(create_prop((20 - (1 + i)) * SCALE, this.gen_to * SCALE - 2, "tree_top", client));
                     }
 
                     this.gen_to -= 1;
