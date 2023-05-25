@@ -61,3 +61,14 @@ export const names = [
     "yellow frog",
     "blue frog",
 ]
+
+export const hat_offsets = [
+    [3, 4, 2, 1, 2, 2],
+]
+
+let wizard_hat = new Image(SCALE, SCALE);
+wizard_hat.src = "/sprites/spr_wizard_hat.png";
+
+export const hat_sprites = [
+    wizard_hat,
+]

@@ -1,7 +1,7 @@
 import { SCALE} from "./constants.js";
 import { dan_lerp, diff} from "./utils.js";
 import { create_whiteout, create_dust, create_corpse, create_bubble, create_pinwheel } from "./visual_effects.js";
-import { MOVE_T, spr_shadow, sprites_list, colours_list, move_sounds_list, names } from "./character_assets.js";
+import { MOVE_T, spr_shadow, sprites_list, colours_list, move_sounds_list, names, hat_sprites, hat_offsets } from "./character_assets.js";
 
 let spr_crown = new Image(8, 6);
 spr_crown.src = '/sprites/spr_crown.png';
@@ -367,6 +367,13 @@ function create_player_actor(sprites, move_sound, colour, name, source, audio_ma
             if (this.source.x_flip == -1) {
                 x = -x - 8;
                 froggy_draw_ctx.ctx.scale(-1, 1);
+            }
+
+            const hat_offset = hat_offsets[0][frame_id];
+            froggy_draw_ctx.ctx.drawImage(hat_sprites[0], x, y-8 + hat_offset);
+
+            if (frame_id != 0) {
+                console.log(frame_id);
             }
 
             /*
