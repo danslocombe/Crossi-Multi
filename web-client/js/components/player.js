@@ -372,10 +372,6 @@ function create_player_actor(sprites, move_sound, colour, name, source, audio_ma
             const hat_offset = hat_offsets[0][frame_id];
             froggy_draw_ctx.ctx.drawImage(hat_sprites[0], x, y-8 + hat_offset);
 
-            if (frame_id != 0) {
-                console.log(frame_id);
-            }
-
             /*
             // Exclamation mark on head
             if (this.lobby_ready) {

@@ -49,6 +49,7 @@ pub enum RowType {
   Stands,
   Lobby,
   LobbyStands,
+  IcyRow{ wall_width : u32 },
 }
 
 impl RowType {

@@ -70,6 +70,7 @@ impl AIAgent for BackAndForth
 {
     fn think(&mut self, game_state : &GameState, _ : &Map) -> Input
     {
+        /*
         if (game_state.frame_id % 60 == 0) {
             Input::Left
         }
@@ -79,6 +80,15 @@ impl AIAgent for BackAndForth
         else {
             Input::None
         }
+        */
+
+        if (game_state.frame_id / 60) % 2 == 0 {
+            Input::Left
+        }
+        else {
+            Input::Right
+        }
+
     }
 
     fn get_drawstate(&self) -> &AIDrawState {

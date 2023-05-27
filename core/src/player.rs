@@ -51,12 +51,19 @@ impl MovingState {
 pub enum MoveState {
     Stationary,
     Moving(MovingState),
+    //Sliding(MovingState),
 }
 
 pub struct Push {
     pub id : PlayerId,
     pub pushed_by : PlayerId,
     pub dir : Input,
+}
+
+enum TryMovePlayerState {
+    Blocked,
+    MoveUnimpeded,
+    MoveWithPush,
 }
 
 // In us
@@ -116,13 +123,23 @@ impl PlayerState {
     }
 
     pub fn push(&self, push : &Push, state : &GameState, map : &Map) -> Self {
-        let m_new_pos = map.try_apply_input(state.time_us, &state.rules_state, &self.pos, push.dir);
+        let mut current_pos = self.pos.clone();
+        if let MoveState::Moving(ms) = &self.move_state {
+            current_pos = ms.target.clone();
+        }
+
+        let m_new_pos = map.try_apply_input(state.time_us, &state.rules_state, &current_pos, push.dir);
 
         if let Some(new_pos) = m_new_pos {
             let mut new = self.clone();
             let mut push_info = PushInfo::default();
             push_info.pushed_by = Some(push.pushed_by);
-            new.move_state = MoveState::Moving(MovingState::with_push(new_pos, push_info));
+
+            // @nocheckin testing
+            let mut moving_state = MovingState::with_push(new_pos, push_info);
+            moving_state.remaining_us = (0.8 * (moving_state.remaining_us as f32)).round() as u32;
+
+            new.move_state = MoveState::Moving(moving_state);
             new
         }
         else {
@@ -152,6 +169,61 @@ impl PlayerState {
         Some(MovingState::with_push(new_pos, push_info))
     }
 
+    fn try_move_player_initial(
+        &self,
+        dir : Input,
+        candidate_pos : Pos,
+        other : &PlayerState,
+        state: &GameState,
+        pushes : &mut Vec<Push>,
+        map : &Map) -> TryMovePlayerState
+    {
+        if other.pos == candidate_pos {
+            // Try to move into some other player
+            if let MoveState::Moving(moving_state) = &other.move_state {
+                // Other play is moving away, if they have gone far enough, let them go
+                if (moving_state.remaining_us as f32) < MOVE_DUR as f32 * 0.4 {
+                    return TryMovePlayerState::MoveUnimpeded;
+                }
+            }
+
+            if (state.can_push(other.id, dir, state.time_us, &state.rules_state, map)) {
+                TryMovePlayerState::MoveWithPush
+            }
+            else {
+                TryMovePlayerState::Blocked
+            }
+        }
+        else {
+            match &other.move_state {
+                MoveState::Moving(moving_state) => {
+                    // Moving to a different position than us, don't care
+                    if (moving_state.target != candidate_pos)
+                    {
+                        TryMovePlayerState::MoveUnimpeded
+                    }
+                    else
+                    {
+                        // Moving to same position
+                        if (moving_state.remaining_us as f32) < MOVE_DUR as f32 * 0.6 {
+                            // Try and push!
+                            if (state.can_push(other.id, dir, state.time_us, &state.rules_state, map)) {
+                                TryMovePlayerState::MoveWithPush
+                            }
+                            else {
+                                TryMovePlayerState::Blocked
+                            }
+                        }
+                        else {
+                            TryMovePlayerState::MoveUnimpeded
+                        }
+                    }
+                },
+                _ => TryMovePlayerState::MoveUnimpeded
+            }
+        }
+    }
+
     fn try_move_player(
         &self,
         dir : Input,
@@ -161,14 +233,11 @@ impl PlayerState {
         pushes : &mut Vec<Push>,
         map : &Map) -> Option<PushInfo>
     {
-        if other.pos == candidate_pos {
-            // Try to move into some other player
-
-            if let MoveState::Moving(_) = &other.move_state {
-                return None;
-            }
-
-            if (state.can_push(other.id, dir, state.time_us, &state.rules_state, map)) {
+        match self.try_move_player_initial(dir, candidate_pos, other, state, pushes, map)
+        {
+            TryMovePlayerState::Blocked => None,
+            TryMovePlayerState::MoveUnimpeded => Some(PushInfo::default()),
+            TryMovePlayerState::MoveWithPush => {
                 pushes.push(Push {
                     id : other.id,
                     pushed_by : self.id,
@@ -179,25 +248,6 @@ impl PlayerState {
                 let mut push_info = PushInfo::default();
                 push_info.pushing = Some(other.id);
                 Some(push_info)
-            }
-            else {
-                None
-            }
-        }
-        else {
-            match &other.move_state {
-                MoveState::Moving(state) => {
-                    // Only allow movement if we are going to a different position to another frog
-                    if (state.target != candidate_pos)
-                    {
-                        Some(PushInfo::default())
-                    }
-                    else
-                    {
-                        None
-                    }
-                },
-                _ => Some(PushInfo::default())
             }
         }
     }
