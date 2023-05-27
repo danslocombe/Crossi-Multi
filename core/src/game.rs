@@ -178,17 +178,16 @@ pub struct GameState {
     pub player_states: PlayerIdMap<PlayerState>,
     pub rules_state : RulesState,
     pub player_inputs: PlayerInputs,
-    //pub frame_id: f64,
 }
 
 impl GameState {
     pub fn new(config : GameConfig) -> Self {
         GameState {
             time_us: 0,
-            player_states: PlayerIdMap::new(),
-            player_inputs: PlayerInputs::new(),
-            rules_state: RulesState::new(config),
             frame_id: 0,
+            player_states: PlayerIdMap::new(),
+            rules_state: RulesState::new(config),
+            player_inputs: PlayerInputs::new(),
         }
     }
 
@@ -268,14 +267,17 @@ impl GameState {
 
         for id in self.player_states.valid_ids() {
             let mut pushes = Vec::new();
+
             let player_input = self.player_inputs.get(id);
 
             // We can safely unwrap as we are iterating over valid_ids()
             let player_state = self.player_states.get(id).unwrap();
+
             let iterated = player_state.tick_iterate(self, player_input, dt_us, &mut pushes, map);
 
             self.set_player_state(id, iterated);
 
+            // @TODO do we want to iterate all pushes?
             if let Some(push) = pushes.first() {
                 let player_state = self.get_player(push.id).unwrap();
                 let pushed = player_state.push(push, self, map);
