@@ -55,6 +55,8 @@ pub struct RoundState {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CooldownState {
     pub remaining_us : u32,
+
+    #[serde(flatten)]
     pub round_state : RoundState,
 }
 
@@ -415,7 +417,7 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>, target : Reset
 fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>, alive_states : &PlayerIdMap<AliveState>) -> i32 {
     const SCREEN_Y_BUFFER : i32 = 6;
     for (id, player) in player_states.iter() {
-        if alive_states.get_copy(id).unwrap_or(AliveState::NotInGame) == AliveState::Alive {
+        if let Some(AliveState::Alive) = alive_states.get_copy(id) {
             let y = match &player.pos {
                 Pos::Coord(pos) => pos.y,
                 Pos::Lillipad(lilli) => lilli.y,

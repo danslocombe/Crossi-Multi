@@ -1,7 +1,7 @@
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use crate::player_id_map::PlayerIdMap;
-use crate::crossy_ruleset::{RulesState, GameConfig};
+use crate::crossy_ruleset::{RulesState, GameConfig, AliveState};
 use crate::map::Map;
 
 use crate::player::*;
@@ -266,6 +266,10 @@ impl GameState {
         self.player_inputs = player_inputs.unwrap_or_default();
 
         for id in self.player_states.valid_ids() {
+            if self.rules_state.fst.get_player_alive(id) != AliveState::Alive {
+                continue;
+            }
+
             let mut pushes = Vec::new();
 
             let player_input = self.player_inputs.get(id);

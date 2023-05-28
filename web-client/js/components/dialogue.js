@@ -212,8 +212,8 @@ export function create_dialogue_controller(audio_manager, font_controller) {
                 let alive_player_id = 0;
 
                 // Up to one alive player
-                for (let i in rules_state.fst.round_state.alive_states.inner) {
-                    if (rules_state.fst.round_state.alive_states.inner[i] === 'Alive') {
+                for (let i in rules_state.fst.alive_states.inner) {
+                    if (rules_state.fst.alive_states.inner[i] === 'Alive') {
                         alive_player = true;
                         alive_player_id = parseInt(i);
                     }
