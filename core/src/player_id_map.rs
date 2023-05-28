@@ -85,7 +85,7 @@ impl<T> PlayerIdMap<T> {
     }
 
     pub fn valid_ids(&self) -> Vec<PlayerId> {
-        let mut vec = Vec::new();
+        let mut vec = Vec::with_capacity(self.inner.len());
         for i in 0..self.inner.len() {
             if self.inner[i].is_some() {
                 vec.push(PlayerId(i as u8));

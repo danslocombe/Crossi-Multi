@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::crossy_ruleset::{CrossyRulesetFST, RulesState, AliveState};
 use crate::map::Map;
 use crate::game::*;
 
@@ -153,7 +154,12 @@ impl PlayerState {
         let mut push_info = PushInfo::default();
         let new_pos = map.try_apply_input(state.time_us, &state.rules_state, &self.pos, input)?;
 
-        for (_, other_player) in state.player_states.iter().filter(|(id, _)| *id != self.id) {
+        for (id, other_player) in state.player_states.iter() {
+            // Skip over self and players not in game.
+            if (id == self.id || state.rules_state.fst.get_player_alive(id) != AliveState::Alive)
+            {
+                continue;
+            }
 
             // Note ? operator here
             // If we fail to push a player we cant move into a given spot

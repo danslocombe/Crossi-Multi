@@ -466,19 +466,19 @@ fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerS
                 let precise_pos = map.get_lillipad_screen_x(time_us, lillypad_id);
                 const KILL_OFF_MAP_THRESH : f64 = 2.5;
                 precise_pos < -KILL_OFF_MAP_THRESH || precise_pos > (160.0 / 8.0 + KILL_OFF_MAP_THRESH)
-            }
+            },
         }
     //}
 }
 
-fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<AliveState>, map : &Map, player_states : &PlayerIdMap<PlayerState>, screen_y : i32) {
-    for (id, player_state) in player_states {
+fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<AliveState>, map : &Map, player_states : &mut PlayerIdMap<PlayerState>, screen_y : i32) {
+    for id in player_states.valid_ids() {
         let alive = alive_states.get_copy(id).unwrap_or(AliveState::NotInGame);
         if (alive != AliveState::Alive) {
             continue;
         }
 
-        if should_kill(time_us, round_id, map, player_state, screen_y) {
+        if should_kill(time_us, round_id, map, player_states.get(id).unwrap(), screen_y) {
             alive_states.set(id, AliveState::Dead);
         }
     }
