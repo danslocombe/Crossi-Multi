@@ -13,8 +13,11 @@ mod realtime_graph;
 use std::time::Duration;
 use std::cell::RefCell;
 
-use std::collections::VecDeque;
+use std::collections::{VecDeque, BTreeMap};
+use ai::AIDrawType;
 use crossy_multi_core::map::{RowType, RowWithY};
+use crossy_multi_core::player::{PushInfo, MoveState};
+use crossy_multi_core::timeline::Timeline;
 use froggy_rand::FroggyRand;
 use realtime_graph::RealtimeGraph;
 use wasm_instant::{WasmInstant, WasmDateInstant};
@@ -24,6 +27,8 @@ use wasm_bindgen::prelude::*;
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
 use crossy_multi_core::crossy_ruleset::{AliveState, RulesState};
+
+use crate::ai::{AIDrawObj, AIDrawColour};
 
 struct ConsoleDebugLogger();
 impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
@@ -78,6 +83,8 @@ pub struct Client {
     
     server_time_offset_graph : RealtimeGraph,
     server_message_count_graph : RealtimeGraph,
+
+    client_seen_pushes : ClientSeenPushManager,
 
     tick_id : u32,
 }
@@ -136,6 +143,8 @@ impl Client {
 
             server_time_offset_graph : RealtimeGraph::new(60 * 10),
             server_message_count_graph : RealtimeGraph::new(60 * 10),
+
+            client_seen_pushes : ClientSeenPushManager::default(),
 
             tick_id : 0,
         } 
@@ -234,6 +243,8 @@ impl Client {
         }
 
         self.process_time_info();
+
+        self.client_seen_pushes.tick(&self.timeline);
     }
 
     pub fn tick_inner(&mut self) {
@@ -674,6 +685,7 @@ impl Client {
     }
 
     fn get_ai_drawstate(&self) -> Option<ai::AIDrawState> {
+        /*
         if let Some(x) = self.local_player_info.as_ref() {
             if (self.player_alive_state(x.player_id.0 as u32) != AliveState::Alive) {
                 return None;
@@ -681,6 +693,19 @@ impl Client {
         }
 
         self.ai_agent.as_ref().map(|x| x.borrow().get_drawstate().clone())
+        */
+
+        // @nocheckin DAN TEMP HACK IN PUSHES
+        let mut draw_state = ai::AIDrawState::default();
+        for (x, y) in &self.client_seen_pushes.pushes {
+            draw_state.draw_objs.push(AIDrawObj {
+                precise_pos: y.pusher_pos,
+                draw_type: AIDrawType::Line(y.pushee_pos),
+                colour: if y.invalidated {AIDrawColour::Red} else {AIDrawColour::Green},
+            });
+        }
+
+        Some(draw_state)
     }
 
     pub fn get_ai_drawstate_json(&self) -> String {
@@ -823,4 +848,82 @@ impl TelemetryBuffer
             self.buffer.push(message);
         }
     }
+}
+
+#[derive(Default)]
+pub struct ClientSeenPushManager {
+    pushes : BTreeMap<PushTriple, PushData>,
+    last_round_id : Option<u8>,
+}
+
+impl ClientSeenPushManager {
+    pub fn tick(&mut self, timeline: &Timeline) {
+        let current_round_id = Some(timeline.top_state().get_round_id());
+        let reset = current_round_id != self.last_round_id;
+        self.last_round_id = current_round_id;
+
+        if (reset) {
+            self.pushes.clear();
+        }
+
+        for (_, v) in self.pushes.iter_mut() {
+            v.invalidated = true;
+        }
+
+        for state in timeline.states.iter().rev() {
+            for (id, player_state) in state.player_states.iter() {
+                if let MoveState::Moving(ms) = &player_state.move_state {
+                    if let Some(pushee_id) = &ms.push_info.pushing {
+                        let push_triple = PushTriple::from_info_with_pushing(id, &ms.push_info);
+                        let pusher_pos = &player_state.pos;
+                        let pushee_pos = &state.player_states.get(*pushee_id).unwrap().pos;
+                        let push_data = PushData {
+                            invalidated: false,
+                            pusher_pos : timeline.map.realise_pos(state.time_us, pusher_pos),
+                            pushee_pos: timeline.map.realise_pos(state.time_us, pushee_pos),
+                        };
+
+                        _ = self.pushes.insert(push_triple, push_data);
+                        /*
+                        if let Some(mut_info) = self.pushes.get_mut(&push_triple) {
+                            mut_info.invalidated = false;
+                        }
+                        else {
+                            self.pushes.insert(push_triple, PushData { invalidated: false });
+                        }
+                        */
+                    }
+                }
+            }
+        }
+
+        //log!("{:?}", self.pushes);
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PushTriple
+{
+    pusher : PlayerId,
+    pushee : PlayerId,
+    frame_id : u32,
+}
+
+impl PushTriple {
+    pub fn from_info_with_pushing(player_id : PlayerId, push_info : &PushInfo) -> Self {
+        assert!(push_info.pushing.is_some());
+
+        Self {
+            pusher : player_id,
+            pushee : push_info.pushing.unwrap(),
+            frame_id: push_info.push_start_frame_id,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PushData {
+    pusher_pos : PreciseCoords,
+    pushee_pos : PreciseCoords,
+    invalidated: bool,
 }

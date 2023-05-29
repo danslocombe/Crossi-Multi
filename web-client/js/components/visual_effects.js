@@ -51,8 +51,9 @@ export function create_dust(x, y) {
         draw : function(froggy_draw_ctx) {
             //const x = this.x + 0 + (1-this.scale)*4 + froggy_draw_ctx.x_off;
             //const y = this.y + 0 + (1-this.scale)*4 + froggy_draw_ctx.y_off;
-            const x = SCALE*(this.x + 0.25) + (1-this.scale) + froggy_draw_ctx.x_off;
-            const y = SCALE*(this.y + 0.25) + (1-this.scale) + froggy_draw_ctx.y_off;
+            const size = SCALE * this.scale;
+            const x = SCALE*(this.x + 0.25) - 0.5*size + froggy_draw_ctx.x_off;
+            const y = SCALE*(this.y + 0.25) - 0.5*size + froggy_draw_ctx.y_off;
             froggy_draw_ctx.ctx.drawImage(spr_dust, SCALE*this.frame_id, 0, SCALE, SCALE, x, y, SCALE*this.scale, SCALE*this.scale);
         }
     };
@@ -79,8 +80,8 @@ export function create_bubble(x, y) {
 
         draw : function(froggy_draw_ctx) {
             this.y -= 0.05;
-            const x = SCALE*(this.x + 0.25) + (1-this.scale) + froggy_draw_ctx.x_off;
-            const y = SCALE*(this.y + 0.25) + (1-this.scale) + froggy_draw_ctx.y_off;
+            const x = SCALE*(this.x + 0.5) + (1-this.scale) + froggy_draw_ctx.x_off;
+            const y = SCALE*(this.y + 0.5) + (1-this.scale) + froggy_draw_ctx.y_off;
             froggy_draw_ctx.ctx.drawImage(spr_bubble, SCALE*this.frame_id, 0, SCALE, SCALE, x, y, SCALE*this.scale, SCALE*this.scale);
         }
     }

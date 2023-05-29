@@ -304,15 +304,6 @@ export function create_game(ctx, client, ws, key_event_source) {
                         draw_with_depth.push(create_lillipad(lillipad));
                     }
 
-                    const ai_overlay_json = this.client.get_ai_drawstate_json();
-                    if (ai_overlay_json && ai_overlay_json.length > 0)
-                    {
-                        const ai_overlay = JSON.parse(ai_overlay_json);
-                        const created = create_from_ai_overlay(ai_overlay);
-                        for (const c of created) {
-                            draw_with_depth.push(c);
-                        }
-                    }
                     const lilly_drawstate_json = this.client.get_lilly_drawstate_json();
                     if (lilly_drawstate_json && lilly_drawstate_json.length > 0)
                     {
@@ -321,6 +312,16 @@ export function create_game(ctx, client, ws, key_event_source) {
                         for (const c of created) {
                             draw_with_depth.push(c);
                         }
+                    }
+                }
+
+                const ai_overlay_json = this.client.get_ai_drawstate_json();
+                if (ai_overlay_json && ai_overlay_json.length > 0)
+                {
+                    const ai_overlay = JSON.parse(ai_overlay_json);
+                    const created = create_from_ai_overlay(ai_overlay);
+                    for (const c of created) {
+                        draw_with_depth.push(c);
                     }
                 }
 

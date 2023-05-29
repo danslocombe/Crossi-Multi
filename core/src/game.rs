@@ -92,7 +92,7 @@ impl PreciseCoords {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, FromPrimitive)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, FromPrimitive)]
 pub struct PlayerId(pub u8);
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
@@ -417,7 +417,7 @@ mod tests {
             },
             PlayerState {
                 id : PlayerId(1),
-                move_state : MoveState::Moving(MovingState::new(Pos::new_coord(1, 1))),
+                move_state : MoveState::Moving(MovingState::new(1, Pos::new_coord(1, 1))),
                 move_cooldown : 0,
                 pos : Pos::new_coord(0, 1),
             },
@@ -451,7 +451,7 @@ mod tests {
             },
             PlayerState {
                 id : PlayerId(1),
-                move_state : MoveState::Moving(MovingState::new(Pos::new_coord(0, 1))),
+                move_state : MoveState::Moving(MovingState::new(1, Pos::new_coord(0, 1))),
                 move_cooldown : 0,
                 pos : Pos::new_coord(1, 1),
             },

@@ -47,10 +47,22 @@ function move_effects(x, y, simple_entities, player_actor, audio_manager) {
         const dust_dir = Math.random() * 2 * 3.141;
         const dust_x = x + dust_off * Math.cos(dust_dir);
         const dust_y = y + dust_off * Math.sin(dust_dir);
-        simple_entities.push(create_dust(dust_x, dust_y));
+        simple_entities.push(create_dust(dust_x, dust_y, 0.5, 0.6));
     }
 
     audio_manager.play(player_actor.move_sound);
+}
+
+function push_effects(x, y, simple_entities, audio_manager) {
+    for (let i = 0; i < 20; i++) {
+        const dust_off = Math.random() * (3 / SCALE);
+        const dust_dir = Math.random() * 2 * 3.141;
+        const dust_x = x + 0.5 + dust_off * Math.cos(dust_dir);
+        const dust_y = y + 0.5 + dust_off * Math.sin(dust_dir);
+        simple_entities.push(create_dust(dust_x, dust_y, 1.5, 0.6));
+    }
+
+    audio_manager.play(snd_push);
 }
 
 export function create_player_remote(client, player_id, audio_manager) {
@@ -164,7 +176,7 @@ export function create_player_local(client, key_event_source, audio_manager) {
                 move_effects(x, y, simple_entities, player_actor, this.audio_manager);
 
                 if (player_state.pushing >= 0) {
-                    this.audio_manager.play(snd_push);
+                    push_effects(x, y, simple_entities, this.audio_manager);
                 }
             }
 

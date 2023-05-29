@@ -52,7 +52,7 @@ function create_ai_overlay(overlay_obj) {
                 ctx.moveTo(xx, yy);
                 const x1 = (this.type.Line.x + 0.5) * SCALE + froggy_draw_ctx.x_off;
                 const y1 = (this.type.Line.y + 0.5) * SCALE + froggy_draw_ctx.y_off;
-                console.log("from " + xx + " " + yy + " | to " + x1 + " " + y1);
+                //console.log("from " + xx + " " + yy + " | to " + x1 + " " + y1);
                 ctx.lineTo(x1, y1);
                 ctx.stroke()
                 ctx.closePath();

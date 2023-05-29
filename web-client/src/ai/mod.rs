@@ -10,18 +10,10 @@ pub trait AIAgent : std::fmt::Debug
     fn get_drawstate(&self) -> &AIDrawState;
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Default, Debug, Serialize, Clone)]
 pub struct AIDrawState
 {
     pub draw_objs : Vec<AIDrawObj>
-}
-
-impl Default for AIDrawState {
-    fn default() -> Self {
-        Self {
-            draw_objs : vec![],
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Clone)]

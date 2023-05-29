@@ -14,12 +14,21 @@ pub struct PlayerState {
     pub pos: Pos,
 }
 
-// TODO a really good idea here
-// if a player being pushed recovers faster than the pusher then stunlock would be lessened
-#[derive(Serialize, Deserialize, PartialEq, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct PushInfo {
+    pub push_start_frame_id : u32,
     pub pushed_by : Option<PlayerId>,
     pub pushing : Option<PlayerId>,
+}
+
+impl PushInfo {
+    pub fn empty_at_frame(frame_id : u32) -> Self {
+        Self {
+            push_start_frame_id: frame_id,
+            pushed_by: None,
+            pushing: None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
@@ -31,10 +40,10 @@ pub struct MovingState
 }
 
 impl MovingState {
-    pub fn new(target : Pos) -> MovingState {
+    pub fn new(frame_id : u32, target : Pos) -> MovingState {
         MovingState {
             remaining_us : MOVE_DUR,
-            push_info : Default::default(),
+            push_info : PushInfo::empty_at_frame(frame_id),
             target,
         }
     }
@@ -135,7 +144,7 @@ impl PlayerState {
 
         if let Some(new_pos) = m_new_pos {
             let mut new = self.clone();
-            let mut push_info = PushInfo::default();
+            let mut push_info = PushInfo::empty_at_frame(state.frame_id);
             push_info.pushed_by = Some(push.pushed_by);
 
             // @nocheckin testing
@@ -151,7 +160,7 @@ impl PlayerState {
     }
 
     fn try_move(&self, input : Input, state : &GameState, pushes : &mut Vec<Push>, map : &Map) -> Option<MovingState> {
-        let mut push_info = PushInfo::default();
+        let mut push_info = PushInfo::empty_at_frame(state.frame_id);
         let new_pos = map.try_apply_input(state.time_us, &state.rules_state, &self.pos, input)?;
 
         for (id, other_player) in state.player_states.iter() {
@@ -259,7 +268,7 @@ impl PlayerState {
         match self.try_move_player_initial(dir, candidate_pos, other, state, map)
         {
             TryMovePlayerState::Blocked => None,
-            TryMovePlayerState::MoveUnimpeded => Some(PushInfo::default()),
+            TryMovePlayerState::MoveUnimpeded => Some(PushInfo::empty_at_frame(state.frame_id)),
             TryMovePlayerState::MoveWithPush => {
                 pushes.push(Push {
                     id : other.id,
@@ -268,8 +277,12 @@ impl PlayerState {
                 });
 
                 // Managed to push
-                let mut push_info = PushInfo::default();
-                push_info.pushing = Some(other.id);
+                let push_info = PushInfo {
+                    push_start_frame_id : state.frame_id,
+                    pushed_by: None,
+                    pushing: Some(other.id),
+                };
+
                 Some(push_info)
             }
         }
