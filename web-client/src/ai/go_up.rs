@@ -169,7 +169,7 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
                 let dist = (frog_x - car_x + dist_from_movement).abs();
                 if (dist < MIN_CAR_DIST) {
                     draw_state.draw_objs.push(AIDrawObj {
-                        precise_pos: car_precise,
+                        pos: DrawCoords::from_precise(car_precise),
                         draw_type : AIDrawType::Circle,
                         colour : AIDrawColour::Red,
                     });
@@ -177,7 +177,7 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
                 }
                 else {
                     draw_state.draw_objs.push(AIDrawObj {
-                        precise_pos: car_precise,
+                        pos: DrawCoords::from_precise(car_precise),
                         draw_type : AIDrawType::Circle,
                         colour : AIDrawColour::Green,
                     });
@@ -195,14 +195,14 @@ fn is_safe(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw_state
 
     if (result) {
         draw_state.draw_objs.push(AIDrawObj {
-            precise_pos: coordpos.to_precise(),
+            pos: DrawCoords::from_precise(coordpos.to_precise()),
             draw_type : AIDrawType::Tick,
             colour : AIDrawColour::Green,
         });
     }
     else {
         draw_state.draw_objs.push(AIDrawObj {
-            precise_pos: coordpos.to_precise(),
+            pos: DrawCoords::from_precise(coordpos.to_precise()),
             draw_type : AIDrawType::Cross,
             colour : AIDrawColour::Red,
         });

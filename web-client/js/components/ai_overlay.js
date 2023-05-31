@@ -2,9 +2,9 @@ import { SCALE} from "./constants.js";
 
 function create_ai_overlay(overlay_obj) {
     return {
-        x : overlay_obj.precise_pos.x,
-        y : overlay_obj.precise_pos.y,
-        dynamic_depth : overlay_obj.precise_pos.y + 20000,
+        x : overlay_obj.pos.x,
+        y : overlay_obj.pos.y,
+        dynamic_depth : overlay_obj.pos.y + 20000,
         type : overlay_obj.draw_type,
         colour : overlay_obj.colour,
         draw : function(froggy_draw_ctx) {

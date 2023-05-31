@@ -16,10 +16,25 @@ pub struct AIDrawState
     pub draw_objs : Vec<AIDrawObj>
 }
 
+#[derive(Debug, Serialize, Copy, Clone)]
+pub struct DrawCoords {
+    pub x : f32,
+    pub y : f32,
+}
+
+impl DrawCoords {
+    pub fn from_precise(precise : PreciseCoords) -> Self {
+        Self {
+            x: precise.x as f32, //x : precise.x as f32 + 0.5,
+            y : precise.y as f32 //y : precise.y as f32 + 0.5,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct AIDrawObj
 {
-    pub precise_pos : PreciseCoords,
+    pub pos : DrawCoords,
     pub draw_type : AIDrawType,
     pub colour : AIDrawColour,
 }
@@ -27,7 +42,7 @@ pub struct AIDrawObj
 #[derive(Debug, Serialize, Copy, Clone)]
 pub enum AIDrawType
 {
-    Line(PreciseCoords),
+    Line(DrawCoords),
     Cross,
     Tick,
     Circle,
@@ -38,6 +53,7 @@ pub enum AIDrawColour
 {
     Green,
     Red,
+    Grey,
     White,
 }
 

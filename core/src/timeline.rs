@@ -5,7 +5,8 @@ use crate::map::Map;
 use crate::game::*;
 use crate::player::PlayerState;
 
-const STATE_BUFFER_SIZE: usize = 128;
+//const STATE_BUFFER_SIZE: usize = 128;
+const STATE_BUFFER_SIZE: usize = 512;
 
 pub const TICK_INTERVAL_US : u32 = 16_666;
 

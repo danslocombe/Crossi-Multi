@@ -28,7 +28,7 @@ use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
 use crossy_multi_core::crossy_ruleset::{AliveState, RulesState};
 
-use crate::ai::{AIDrawObj, AIDrawColour};
+use crate::ai::{AIDrawObj, AIDrawColour, DrawCoords};
 
 struct ConsoleDebugLogger();
 impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
@@ -699,9 +699,13 @@ impl Client {
         let mut draw_state = ai::AIDrawState::default();
         for (x, y) in &self.client_seen_pushes.pushes {
             draw_state.draw_objs.push(AIDrawObj {
-                precise_pos: y.pusher_pos,
-                draw_type: AIDrawType::Line(y.pushee_pos),
-                colour: if y.invalidated {AIDrawColour::Red} else {AIDrawColour::Green},
+                pos: DrawCoords::from_precise(y.pusher_pos),
+                draw_type: AIDrawType::Line(DrawCoords::from_precise(y.pushee_pos)),
+                colour: match &y.state {
+                    PushDataState::Valid => AIDrawColour::Green,
+                    PushDataState::Invalid => AIDrawColour::Red,
+                    PushDataState::Archived => AIDrawColour::Grey,
+                }
             });
         }
 
@@ -866,8 +870,15 @@ impl ClientSeenPushManager {
             self.pushes.clear();
         }
 
-        for (_, v) in self.pushes.iter_mut() {
-            v.invalidated = true;
+        let archive_frame_id = timeline.top_state().frame_id.saturating_sub(512);
+
+        for (k, v) in self.pushes.iter_mut() {
+            v.state = if (k.frame_id < archive_frame_id) {
+                PushDataState::Archived
+            }
+            else {
+                PushDataState::Invalid
+            };
         }
 
         for state in timeline.states.iter().rev() {
@@ -878,7 +889,7 @@ impl ClientSeenPushManager {
                         let pusher_pos = &player_state.pos;
                         let pushee_pos = &state.player_states.get(*pushee_id).unwrap().pos;
                         let push_data = PushData {
-                            invalidated: false,
+                            state: PushDataState::Valid,
                             pusher_pos : timeline.map.realise_pos(state.time_us, pusher_pos),
                             pushee_pos: timeline.map.realise_pos(state.time_us, pushee_pos),
                         };
@@ -922,8 +933,15 @@ impl PushTriple {
 }
 
 #[derive(Debug)]
+enum PushDataState {
+    Valid,
+    Invalid,
+    Archived,
+}
+
+#[derive(Debug)]
 pub struct PushData {
     pusher_pos : PreciseCoords,
     pushee_pos : PreciseCoords,
-    invalidated: bool,
+    state: PushDataState,
 }
