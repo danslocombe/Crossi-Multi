@@ -733,20 +733,20 @@ impl Client {
                 top_state.get_player(x.player_id).and_then(|player| {
                     match &player.move_state {
                         player::MoveState::Stationary => {
-                            let precise_coords = match &player.pos {
+                            let (precise_coords, on_lillypad) = match &player.pos {
                                 Pos::Coord(coord_pos) => {
-                                    coord_pos.to_precise()
+                                    (coord_pos.to_precise(), false)
                                 },
                                 Pos::Lillipad(lilly_id) => {
                                     let x = self.timeline.map.get_lillipad_screen_x(top_state.time_us, &lilly_id);
-                                    PreciseCoords {
+                                    (PreciseCoords {
                                         x,
                                         y : lilly_id.y,
-                                    }
+                                    }, true)
                                 },
                             };
 
-                            let lilly_moves = get_lilly_moves(&precise_coords, top_state.get_round_id(), top_state.time_us, &self.timeline.map);
+                            let lilly_moves = get_lilly_moves(&precise_coords, on_lillypad, top_state.get_round_id(), top_state.time_us, &self.timeline.map);
                             Some(lilly_moves)
 
                         }
@@ -782,12 +782,12 @@ struct LillyOverlay {
     input : Input,
 }
 
-fn get_lilly_moves(initial_pos : &PreciseCoords, round_id : u8, time_us : u32, map : &map::Map) -> Vec<LillyOverlay>
+fn get_lilly_moves(initial_pos : &PreciseCoords, on_lilly: bool, round_id : u8, time_us : u32, map : &map::Map) -> Vec<LillyOverlay>
 {
     let mut moves = vec![];
 
     for input in &ALL_INPUTS {
-        let applied = initial_pos.apply_input(*input);
+        let mut applied = initial_pos.apply_input(*input);
         if let Some(lilly) = map.lillipad_at_pos(round_id, time_us, applied) {
             let screen_x = map.get_lillipad_screen_x(time_us, &lilly);
             moves.push(LillyOverlay {
@@ -797,6 +797,20 @@ fn get_lilly_moves(initial_pos : &PreciseCoords, round_id : u8, time_us : u32, m
                 },
                 input: *input,
             });
+        }
+        else {
+            let row_is_river = match &map.get_row(round_id, applied.y).row_type {
+                RowType::River(_) => true,
+                _ => false,
+            };
+
+            if on_lilly && !row_is_river {
+                applied.x = applied.x.round();
+                moves.push(LillyOverlay {
+                    precise_coords: applied,
+                    input: *input,
+                });
+            }
         }
     }
 
