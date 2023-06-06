@@ -9,6 +9,8 @@ macro_rules! log {
 mod wasm_instant;
 mod ai;
 mod realtime_graph;
+mod client_seen_pushes;
+mod round_end_predictor;
 
 use std::time::Duration;
 use std::cell::RefCell;
@@ -17,12 +19,13 @@ use std::collections::{VecDeque, BTreeMap};
 use ai::AIDrawType;
 use crossy_multi_core::map::{RowType, RowWithY};
 use crossy_multi_core::player::{PushInfo, MoveState};
-use crossy_multi_core::timeline::Timeline;
 use froggy_rand::FroggyRand;
 use realtime_graph::RealtimeGraph;
+use round_end_predictor::RoundEndPredictor;
 use wasm_instant::{WasmInstant, WasmDateInstant};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
+use client_seen_pushes::*;
 
 use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
@@ -71,7 +74,8 @@ pub struct Client {
     last_sent_frame_id : u32,
 
     // This seems like a super hacky solution
-    trusted_rules_state : Option<crossy_ruleset::RulesState>,
+    untrusted_rules_state : Option<crossy_ruleset::RulesState>,
+    lkg_rules_state : Option<crossy_ruleset::RulesState>,
 
     queued_time_info : Option<interop::TimeRequestEnd>,
 
@@ -85,6 +89,7 @@ pub struct Client {
     server_message_count_graph : RealtimeGraph,
 
     client_seen_pushes : ClientSeenPushManager,
+    round_end_predictor : RoundEndPredictor,
 
     tick_id : u32,
 }
@@ -135,7 +140,6 @@ impl Client {
             estimated_latency_us_lerping : estimated_latency_us as f32,
             local_player_info : None,
             last_sent_frame_id : server_frame_id as u32,
-            trusted_rules_state: None,
             queued_time_info: Default::default(),
             queued_server_linden_messages: Default::default(),
             ai_agent : None,
@@ -145,8 +149,12 @@ impl Client {
             server_message_count_graph : RealtimeGraph::new(60 * 10),
 
             client_seen_pushes : ClientSeenPushManager::default(),
+            round_end_predictor : RoundEndPredictor::default(),
 
             tick_id : 0,
+
+            untrusted_rules_state: None,
+            lkg_rules_state: None,
         } 
     }
 
@@ -416,12 +424,14 @@ impl Client {
             }
         }
 
-        self.trusted_rules_state = Some(linden_server_tick.rules_state.clone());
+        self.untrusted_rules_state = Some(linden_server_tick.rules_state.clone());
+        self.lkg_rules_state = Some(linden_server_tick.lkg_state.rules_state.clone());
+
         true
     }
 
     fn get_round_id(&self) -> u8 {
-        self.trusted_rules_state.as_ref().map(|x| x.fst.get_round_id()).unwrap_or(0)
+        self.untrusted_rules_state.as_ref().map(|x| x.fst.get_round_id()).unwrap_or(0)
     }
 
 
@@ -572,7 +582,7 @@ impl Client {
     }
 
     fn get_latest_server_rules_state(&self) -> Option<&crossy_ruleset::RulesState> {
-        self.trusted_rules_state.as_ref()
+        self.untrusted_rules_state.as_ref()
     }
 
     pub fn get_rows_json(&mut self) -> String {
@@ -580,7 +590,7 @@ impl Client {
     }
 
     fn get_rows(&mut self) -> Vec<RowWithY> {
-        let screen_y = self.trusted_rules_state.as_ref().map(|x| x.fst.get_screen_y()).unwrap_or(0);
+        let screen_y = self.untrusted_rules_state.as_ref().map(|x| x.fst.get_screen_y()).unwrap_or(0);
         let round_id = self.get_round_id();
         self.timeline.map.get_row_view(round_id, screen_y)
     }
@@ -770,9 +780,36 @@ impl Client {
         }
     }
 
+
     pub fn rand_for_prop_unit(&self, x : i32, y : i32, scenario : &str) -> f32 {
-        let rand = FroggyRand::from_hash((self.timeline.map.get_seed(), self.trusted_rules_state.as_ref().unwrap().game_id, self.trusted_rules_state.as_ref().unwrap().fst.get_round_id()));
+        let rand = FroggyRand::from_hash((self.timeline.map.get_seed(), self.get_lkg_round_identifier()));
         rand.gen_unit((x, y, scenario)) as f32
+    }
+}
+
+impl Client {
+    pub fn get_lkg_round_identifier(&self) -> RoundIdentifier {
+        RoundIdentifier::from_rulesstate(self.lkg_rules_state.as_ref().unwrap())
+    }
+
+    pub fn get_untrusted_round_identifier(&self) -> RoundIdentifier {
+        RoundIdentifier::from_rulesstate(self.untrusted_rules_state.as_ref().unwrap())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+pub struct RoundIdentifier
+{
+    pub game_id : u32,
+    pub round_id : u8,
+}
+
+impl RoundIdentifier {
+    fn from_rulesstate(rules_state : &RulesState) -> Self {
+        Self {
+            game_id : rules_state.game_id,
+            round_id : rules_state.fst.get_round_id(),
+        }
     }
 }
 
@@ -866,96 +903,4 @@ impl TelemetryBuffer
             self.buffer.push(message);
         }
     }
-}
-
-#[derive(Default)]
-pub struct ClientSeenPushManager {
-    pushes : BTreeMap<PushTriple, PushData>,
-    last_round_id : Option<u8>,
-}
-
-impl ClientSeenPushManager {
-    pub fn tick(&mut self, timeline: &Timeline) {
-        let current_round_id = Some(timeline.top_state().get_round_id());
-        let reset = current_round_id != self.last_round_id;
-        self.last_round_id = current_round_id;
-
-        if (reset) {
-            self.pushes.clear();
-        }
-
-        let archive_frame_id = timeline.top_state().frame_id.saturating_sub(512);
-
-        for (k, v) in self.pushes.iter_mut() {
-            v.state = if (k.frame_id < archive_frame_id) {
-                PushDataState::Archived
-            }
-            else {
-                PushDataState::Invalid
-            };
-        }
-
-        for state in timeline.states.iter().rev() {
-            for (id, player_state) in state.player_states.iter() {
-                if let MoveState::Moving(ms) = &player_state.move_state {
-                    if let Some(pushee_id) = &ms.push_info.pushing {
-                        let push_triple = PushTriple::from_info_with_pushing(id, &ms.push_info);
-                        let pusher_pos = &player_state.pos;
-                        let pushee_pos = &state.player_states.get(*pushee_id).unwrap().pos;
-                        let push_data = PushData {
-                            state: PushDataState::Valid,
-                            pusher_pos : timeline.map.realise_pos(state.time_us, pusher_pos),
-                            pushee_pos: timeline.map.realise_pos(state.time_us, pushee_pos),
-                        };
-
-                        _ = self.pushes.insert(push_triple, push_data);
-                        /*
-                        if let Some(mut_info) = self.pushes.get_mut(&push_triple) {
-                            mut_info.invalidated = false;
-                        }
-                        else {
-                            self.pushes.insert(push_triple, PushData { invalidated: false });
-                        }
-                        */
-                    }
-                }
-            }
-        }
-
-        //log!("{:?}", self.pushes);
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PushTriple
-{
-    pusher : PlayerId,
-    pushee : PlayerId,
-    frame_id : u32,
-}
-
-impl PushTriple {
-    pub fn from_info_with_pushing(player_id : PlayerId, push_info : &PushInfo) -> Self {
-        assert!(push_info.pushing.is_some());
-
-        Self {
-            pusher : player_id,
-            pushee : push_info.pushing.unwrap(),
-            frame_id: push_info.push_start_frame_id,
-        }
-    }
-}
-
-#[derive(Debug)]
-enum PushDataState {
-    Valid,
-    Invalid,
-    Archived,
-}
-
-#[derive(Debug)]
-pub struct PushData {
-    pusher_pos : PreciseCoords,
-    pushee_pos : PreciseCoords,
-    state: PushDataState,
 }
