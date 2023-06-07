@@ -7,7 +7,7 @@ import { create_countdown, create_countdown_font, create_game_winner_ui } from "
 import { create_dialogue_controller } from "./dialogue";
 import { create_lillipad } from "./lillipad";
 import { create_prop_controller } from "./props";
-import { create_from_ai_overlay } from "./ai_overlay";
+import { create_from_ai_overlay, create_from_draw_commands } from "./draw_commands";
 import { create_from_lilly_overlay } from "./lilly_move_hints"
 import { create_font_controller } from "./font"
 import { create_intro_ui, create_intro_ui_bg } from "./intro_ui"
@@ -315,11 +315,11 @@ export function create_game(ctx, client, ws, key_event_source) {
                     }
                 }
 
-                const ai_overlay_json = this.client.get_ai_drawstate_json();
-                if (ai_overlay_json && ai_overlay_json.length > 0)
+                const draw_commands_json = this.client.get_draw_commands_json();
+                if (draw_commands_json && draw_commands_json.length > 0)
                 {
-                    const ai_overlay = JSON.parse(ai_overlay_json);
-                    const created = create_from_ai_overlay(ai_overlay);
+                    const draw_commands = JSON.parse(draw_commands_json);
+                    const created = create_from_draw_commands(draw_commands);
                     for (const c of created) {
                         draw_with_depth.push(c);
                     }

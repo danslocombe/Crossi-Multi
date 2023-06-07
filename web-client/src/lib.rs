@@ -11,14 +11,15 @@ mod ai;
 mod realtime_graph;
 mod client_seen_pushes;
 mod round_end_predictor;
+mod draw_commands;
 
 use std::time::Duration;
 use std::cell::RefCell;
 
 use std::collections::{VecDeque, BTreeMap};
-use ai::AIDrawType;
 use crossy_multi_core::map::{RowType, RowWithY};
 use crossy_multi_core::player::{PushInfo, MoveState};
+use draw_commands::DrawCommands;
 use froggy_rand::FroggyRand;
 use realtime_graph::RealtimeGraph;
 use round_end_predictor::RoundEndPredictor;
@@ -31,7 +32,7 @@ use crossy_multi_core::*;
 use crossy_multi_core::game::PlayerId;
 use crossy_multi_core::crossy_ruleset::{AliveState, RulesState};
 
-use crate::ai::{AIDrawObj, AIDrawColour, DrawCoords};
+use crate::draw_commands::{DrawCommand, DrawCoords, DrawColour, DrawType};
 
 struct ConsoleDebugLogger();
 impl crossy_multi_core::DebugLogger for ConsoleDebugLogger {
@@ -694,27 +695,28 @@ impl Client {
         }
     }
 
-    fn get_ai_drawstate(&self) -> Option<ai::AIDrawState> {
-        /*
+    fn get_draw_commands(&self) -> Option<DrawCommands> {
+        let mut draw_state = DrawCommands::default();
         if let Some(x) = self.local_player_info.as_ref() {
             if (self.player_alive_state(x.player_id.0 as u32) != AliveState::Alive) {
                 return None;
             }
+
+            if let Some(commands) = self.ai_agent.as_ref().map(|x| x.borrow().get_drawstate().clone()) {
+                for command in commands.commands {
+                    draw_state.commands.push(command);
+                }
+            }
         }
 
-        self.ai_agent.as_ref().map(|x| x.borrow().get_drawstate().clone())
-        */
-
-        // @nocheckin DAN TEMP HACK IN PUSHES
-        let mut draw_state = ai::AIDrawState::default();
         for (x, y) in &self.client_seen_pushes.pushes {
-            draw_state.draw_objs.push(AIDrawObj {
+            draw_state.commands.push(DrawCommand {
                 pos: DrawCoords::from_precise(y.pusher_pos),
-                draw_type: AIDrawType::Line(DrawCoords::from_precise(y.pushee_pos)),
+                draw_type: DrawType::Line(DrawCoords::from_precise(y.pushee_pos)),
                 colour: match &y.state {
-                    PushDataState::Valid => AIDrawColour::Green,
-                    PushDataState::Invalid => AIDrawColour::Red,
-                    PushDataState::Archived => AIDrawColour::Grey,
+                    PushDataState::Valid => DrawColour::Green,
+                    PushDataState::Invalid => DrawColour::Red,
+                    PushDataState::Archived => DrawColour::Grey,
                 }
             });
         }
@@ -722,8 +724,8 @@ impl Client {
         Some(draw_state)
     }
 
-    pub fn get_ai_drawstate_json(&self) -> String {
-        match self.get_ai_drawstate() {
+    pub fn get_draw_commands_json(&self) -> String {
+        match self.get_draw_commands() {
             Some(x) => {
                 serde_json::to_string(&x).unwrap()
             }

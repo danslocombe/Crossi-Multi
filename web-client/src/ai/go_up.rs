@@ -9,6 +9,7 @@ use crossy_multi_core::player::MoveState;
 use froggy_rand::FroggyRand;
 
 use crate::ai::*;
+use crate::draw_commands::{DrawCommand, DrawCoords, DrawType, DrawColour};
 
 #[derive(Debug)]
 pub struct GoUpAI
@@ -17,7 +18,7 @@ pub struct GoUpAI
     rng : FroggyRand,
     rng_t : u64,
     careful_t : i32,
-    draw_state : AIDrawState,
+    draw_state : DrawCommands,
 }
 
 impl GoUpAI {
@@ -27,7 +28,7 @@ impl GoUpAI {
             rng: FroggyRand::new(1234 + 555*(player_id.0 as u64)),
             rng_t : 0,
             careful_t : 0,
-            draw_state : AIDrawState::default(),
+            draw_state : DrawCommands::default(),
         }
     }
 
@@ -133,7 +134,7 @@ fn should_be_careful(coordpos : &CoordPos, game_state : &GameState, map : &Map) 
     row_type.is_dangerous()
 }
 
-fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw_state : &mut AIDrawState) -> bool {
+fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw_state : &mut DrawCommands) -> bool {
     let current_row = map.get_row(game_state.get_round_id(), coordpos.y);
     match &current_row.row_type {
         RowType::River(_)  => {
@@ -168,18 +169,18 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
 
                 let dist = (frog_x - car_x + dist_from_movement).abs();
                 if (dist < MIN_CAR_DIST) {
-                    draw_state.draw_objs.push(AIDrawObj {
+                    draw_state.commands.push(DrawCommand {
                         pos: DrawCoords::from_precise(car_precise),
-                        draw_type : AIDrawType::Circle,
-                        colour : AIDrawColour::Red,
+                        draw_type : DrawType::Circle,
+                        colour : DrawColour::Red,
                     });
                     result = false;
                 }
                 else {
-                    draw_state.draw_objs.push(AIDrawObj {
+                    draw_state.commands.push(DrawCommand {
                         pos: DrawCoords::from_precise(car_precise),
-                        draw_type : AIDrawType::Circle,
-                        colour : AIDrawColour::Green,
+                        draw_type : DrawType::Circle,
+                        colour : DrawColour::Green,
                     });
                 }
             }
@@ -190,21 +191,21 @@ fn is_safe_inner(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw
     }
 }
 
-fn is_safe(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw_state : &mut AIDrawState) -> bool {
+fn is_safe(coordpos : &CoordPos, game_state : &GameState, map : &Map, draw_state : &mut DrawCommands) -> bool {
     let result = is_safe_inner(coordpos, game_state, map, draw_state);
 
     if (result) {
-        draw_state.draw_objs.push(AIDrawObj {
+        draw_state.commands.push(DrawCommand {
             pos: DrawCoords::from_precise(coordpos.to_precise()),
-            draw_type : AIDrawType::Tick,
-            colour : AIDrawColour::Green,
+            draw_type : DrawType::Tick,
+            colour : DrawColour::Green,
         });
     }
     else {
-        draw_state.draw_objs.push(AIDrawObj {
+        draw_state.commands.push(DrawCommand {
             pos: DrawCoords::from_precise(coordpos.to_precise()),
-            draw_type : AIDrawType::Cross,
-            colour : AIDrawColour::Red,
+            draw_type : DrawType::Cross,
+            colour : DrawColour::Red,
         });
     }
 
@@ -216,7 +217,7 @@ impl AIAgent for GoUpAI
     fn think(&mut self, game_state : &GameState, map : &Map) -> Input
     {
         self.rng_t += 1;
-        self.draw_state.draw_objs.clear();
+        self.draw_state.commands.clear();
 
         match game_state.get_rule_state().fst
         {
@@ -229,7 +230,7 @@ impl AIAgent for GoUpAI
         }
     }
 
-    fn get_drawstate(&self) -> &AIDrawState {
+    fn get_drawstate(&self) -> &DrawCommands {
         &self.draw_state
     }
 }

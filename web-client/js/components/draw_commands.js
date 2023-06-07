@@ -1,6 +1,6 @@
 import { SCALE} from "./constants.js";
 
-function create_ai_overlay(overlay_obj) {
+function create_from_draw_command(overlay_obj) {
     return {
         x : overlay_obj.pos.x,
         y : overlay_obj.pos.y,
@@ -68,11 +68,11 @@ function create_ai_overlay(overlay_obj) {
         }
     }
 }
-export function create_from_ai_overlay(overlay) {
+export function create_from_draw_commands(overlay) {
     let drawables = [];
 
-    for (const overlay_obj of overlay.draw_objs) {
-        drawables.push(create_ai_overlay(overlay_obj));
+    for (const command of overlay.commands) {
+        drawables.push(create_from_draw_command(command));
     }
 
     return drawables;
