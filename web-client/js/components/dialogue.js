@@ -206,8 +206,14 @@ export function create_dialogue_controller(audio_manager, font_controller) {
             }
         },
 
-        tick_game : function(players, rules_state, simple_entities) {
-            if (rules_state && rules_state.fst.type === "RoundCooldown") {
+        tick_game : function(client, players, rules_state, simple_entities) {
+            const round_might_be_cooling_down = client.round_might_be_cooling_down();
+            const round_def_is_cooling_down = client.round_def_is_cooling_down();
+
+            if (round_might_be_cooling_down && !round_def_is_cooling_down) {
+
+            }
+            else if (round_def_is_cooling_down && rules_state && rules_state.fst.type === "RoundCooldown") {
                 let alive_player = false;
                 let alive_player_id = 0;
 

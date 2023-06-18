@@ -105,6 +105,8 @@ pub struct RulesState
 {
     pub game_id : u32,
     pub fst : CrossyRulesetFST,
+
+    // Can we remove this?
     pub config : GameConfig,
 }
 

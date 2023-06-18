@@ -68,6 +68,7 @@ function create_from_draw_command(overlay_obj) {
         }
     }
 }
+
 export function create_from_draw_commands(overlay) {
     let drawables = [];
 

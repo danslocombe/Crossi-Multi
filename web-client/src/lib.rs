@@ -10,7 +10,7 @@ mod wasm_instant;
 mod ai;
 mod realtime_graph;
 mod client_seen_pushes;
-mod round_end_predictor;
+mod predictor;
 mod draw_commands;
 
 use std::time::Duration;
@@ -22,7 +22,7 @@ use crossy_multi_core::player::{PushInfo, MoveState};
 use draw_commands::DrawCommands;
 use froggy_rand::FroggyRand;
 use realtime_graph::RealtimeGraph;
-use round_end_predictor::RoundEndPredictor;
+use predictor::Predictor;
 use wasm_instant::{WasmInstant, WasmDateInstant};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
@@ -76,7 +76,9 @@ pub struct Client {
 
     // This seems like a super hacky solution
     untrusted_rules_state : Option<crossy_ruleset::RulesState>,
-    lkg_rules_state : Option<crossy_ruleset::RulesState>,
+    untrusted_rules_state_time_us : Option<u32>,
+    untrusted_rules_state_frame_id : Option<u32>,
+    lkg_state : Option<GameState>,
 
     queued_time_info : Option<interop::TimeRequestEnd>,
 
@@ -90,7 +92,7 @@ pub struct Client {
     server_message_count_graph : RealtimeGraph,
 
     client_seen_pushes : ClientSeenPushManager,
-    round_end_predictor : RoundEndPredictor,
+    predictor : Option<Predictor>,
 
     tick_id : u32,
 }
@@ -150,12 +152,14 @@ impl Client {
             server_message_count_graph : RealtimeGraph::new(60 * 10),
 
             client_seen_pushes : ClientSeenPushManager::default(),
-            round_end_predictor : RoundEndPredictor::default(),
+            predictor : None,
 
             tick_id : 0,
 
             untrusted_rules_state: None,
-            lkg_rules_state: None,
+            untrusted_rules_state_time_us : None,
+            untrusted_rules_state_frame_id : None,
+            lkg_state: None,
         } 
     }
 
@@ -254,6 +258,9 @@ impl Client {
         self.process_time_info();
 
         self.client_seen_pushes.tick(&self.timeline);
+        if let Some(predictor) = self.predictor.as_mut() { 
+            predictor.tick(&self.timeline, self.untrusted_rules_state.as_ref().unwrap(), self.lkg_state.as_ref().unwrap().get_rule_state());
+        }
     }
 
     pub fn tick_inner(&mut self) {
@@ -426,7 +433,9 @@ impl Client {
         }
 
         self.untrusted_rules_state = Some(linden_server_tick.rules_state.clone());
-        self.lkg_rules_state = Some(linden_server_tick.lkg_state.rules_state.clone());
+        self.untrusted_rules_state_time_us = Some(linden_server_tick.latest.time_us);
+        self.untrusted_rules_state_frame_id = Some(linden_server_tick.latest.frame_id);
+        self.lkg_state  = Some(linden_server_tick.lkg_state.clone());
 
         true
     }
@@ -782,16 +791,23 @@ impl Client {
         }
     }
 
-
     pub fn rand_for_prop_unit(&self, x : i32, y : i32, scenario : &str) -> f32 {
         let rand = FroggyRand::from_hash((self.timeline.map.get_seed(), self.get_lkg_round_identifier()));
         rand.gen_unit((x, y, scenario)) as f32
+    }
+
+    pub fn round_might_be_cooling_down(&self) -> bool {
+        self.predictor.unwrap().round_might_be_cooling_down()
+    }
+
+    pub fn round_def_is_cooling_down(&self) -> bool {
+        self.predictor.unwrap().round_def_is_cooling_down()
     }
 }
 
 impl Client {
     pub fn get_lkg_round_identifier(&self) -> RoundIdentifier {
-        RoundIdentifier::from_rulesstate(self.lkg_rules_state.as_ref().unwrap())
+        RoundIdentifier::from_rulesstate(&self.lkg_state.as_ref().unwrap().rules_state)
     }
 
     pub fn get_untrusted_round_identifier(&self) -> RoundIdentifier {
