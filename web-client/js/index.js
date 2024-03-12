@@ -224,13 +224,28 @@ canvas.style = canvasStyle;
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+let prev_frame_time_ms = window.performance.now();
+const desired_fps = 60;
+const ms_per_frame = 1000 / desired_fps;
+
 function setup_game() {
     let game = create_game(ctx, client, ws, key_event_source);
 
     let tick = () => {
+        window.requestAnimationFrame(tick);
+
+        const now_ms = window.performance.now();
+        const dt_ms = now_ms - prev_frame_time_ms;
+
+        if (dt_ms < ms_per_frame) {
+            return;
+        }
+
+        const excess_ms = dt_ms % ms_per_frame;
+        prev_frame_time_ms = now_ms - excess_ms;
+        
         game.tick();
         game.draw();
-        window.requestAnimationFrame(tick);
     }
 
     tick();
