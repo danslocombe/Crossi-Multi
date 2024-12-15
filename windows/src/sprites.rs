@@ -11,6 +11,12 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_frog.png", None);
         load_frames("../web-client/static/sprites/spr_bird.png", None);
         load_frames("../web-client/static/sprites/spr_shadow.png", None);
+        load_frames("../web-client/static/sprites/spr_duck.png", None);
+        load_frames("../web-client/static/sprites/spr_mouse.png", None);
+        load_frames("../web-client/static/sprites/spr_snake.png", None);
+        //load_frames("../web-client/static/sprites/spr_snake_alt.png", None);
+        load_frames("../web-client/static/sprites/spr_frog_alt.png", None);
+        load_frames("../web-client/static/sprites/spr_frog_3.png", None);
 
         load_frames("../web-client/static/sprites/spr_block.png", None);
         load_frames("../web-client/static/sprites/spr_barrier.png", None);
@@ -71,7 +77,7 @@ unsafe fn load_frames_unsafe(filename: &str, p_frame_count: Option<usize>) -> Ve
 pub fn get_sprite(name: &str) -> &[raylib_sys::Texture2D] {
     unsafe { 
         let frames = SPRITE_FRAMES.assume_init_ref();
-        let frame_vec = frames.get(name).unwrap_or_else(|| frames.get("unknown").unwrap());
+        let frame_vec = frames.get(name).unwrap_or_else(|| frames.get("unknown").expect(&format!("Could not find {}", name)));
         &frame_vec[..]
     }
 }

@@ -421,6 +421,9 @@ fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>
             let y = match &player.pos {
                 Pos::Coord(pos) => pos.y,
                 Pos::Lillipad(lilli) => lilli.y,
+                _ => {
+                    unreachable!()
+                }
             };
 
             screen_y = screen_y.min(y - SCREEN_Y_BUFFER);
@@ -468,6 +471,9 @@ fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerS
                 let precise_pos = map.get_lillipad_screen_x(time_us, lillypad_id);
                 const KILL_OFF_MAP_THRESH : f64 = 2.5;
                 precise_pos < -KILL_OFF_MAP_THRESH || precise_pos > (160.0 / 8.0 + KILL_OFF_MAP_THRESH)
+            },
+            _ => {
+                unreachable!()
             },
         }
     //}

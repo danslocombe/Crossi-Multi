@@ -60,5 +60,6 @@ pub mod crossy_ruleset;
 pub mod map;
 pub mod telemetry;
 pub mod ring_buffer;
+pub mod math;
 
 pub use game::*;

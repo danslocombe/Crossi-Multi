@@ -756,6 +756,9 @@ impl Client {
                                         y : lilly_id.y,
                                     }, true)
                                 },
+                                _ => {
+                                    unreachable!()
+                                }
                             };
 
                             let lilly_moves = get_lilly_moves(&precise_coords, on_lillypad, top_state.get_round_id(), top_state.time_us, &self.timeline.map);

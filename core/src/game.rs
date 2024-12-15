@@ -1,5 +1,6 @@
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
+use crate::math::V2;
 use crate::player_id_map::PlayerIdMap;
 use crate::crossy_ruleset::{RulesState, GameConfig, AliveState};
 use crate::map::Map;
@@ -10,6 +11,7 @@ use crate::player::*;
 pub enum Pos {
     Coord(CoordPos),
     Lillipad(LillipadId),
+    Absolute(V2)
 }
 
 impl Pos {
@@ -21,6 +23,13 @@ impl Pos {
         match self {
             Pos::Coord(p) => p,
             _ => panic!("Tried to get as coordpos"),
+        }
+    }
+
+    pub fn get_abs(self) -> V2 {
+        match self {
+            Pos::Absolute(p) => p,
+            _ => panic!("Tried to get as v2"),
         }
     }
 }

@@ -209,6 +209,9 @@ impl Map {
                 let x = self.get_lillipad_screen_x(time_us, lilli_id);
                 PreciseCoords{x, y: lilli_id.y}
             },
+            _ => {
+                unreachable!()
+            }
         }
     }
 
