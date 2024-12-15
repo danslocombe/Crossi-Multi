@@ -32,10 +32,10 @@ pub struct Row {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RowWithY {
-    y : i32,
+    pub y : i32,
 
     #[serde(flatten)]
-    row : Row,
+    pub row : Row,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

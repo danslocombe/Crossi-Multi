@@ -59,5 +59,6 @@ pub mod timeline;
 pub mod crossy_ruleset;
 pub mod map;
 pub mod telemetry;
+pub mod ring_buffer;
 
 pub use game::*;

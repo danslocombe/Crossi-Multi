@@ -2,10 +2,13 @@
 #![allow(unused_parens)]
 #![allow(non_upper_case_globals)]
 
+mod sprites;
+mod console;
+
 use core::slice;
 use std::{mem::MaybeUninit, ops::Add};
 
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, PlayerId, PlayerInputs};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, Input, PlayerId, PlayerInputs};
 use froggy_rand::FroggyRand;
 use raylib_sys::ClearBackground;
 
@@ -52,12 +55,8 @@ fn main() {
 
         //raylib_sys::SetExitKey(raylib_sys::KeyboardKey::KEY_NULL as i32);
 
-        //console::init_console();
-        //crunda_core::set_debug_logger(Box::new(console::QuakeConsoleLogger{}));
-        //if let Some(l) = level.as_ref() {
-        //    console::big(l);
-        //}
-
+        console::init_console();
+        crossy_multi_core::set_debug_logger(Box::new(console::QuakeConsoleLogger{}));
 
         //draw::init_fonts();
         //draw::init_sprites();
@@ -90,6 +89,8 @@ fn main() {
         //load_font("font_linsenn_m6x11_medium_14");
         //load_font("font_linsenn_m6x11_medium_17");
 
+        sprites::init_sprites();
+
         raylib_sys::GuiLoadStyle(c_str_leaky("style_dark.rgs"));
 
         let framebuffer = raylib_sys::LoadRenderTexture(160, 160);
@@ -102,23 +103,8 @@ fn main() {
             //let image = raylib_sys::LoadImageFromTexture(framebuffer.texture);
 
             let mapping_info = FrameBufferToScreenInfo::compute(&framebuffer.texture);
-            let mut inputs = PlayerInputs::new();
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
-                inputs.set(PlayerId(1), game::Input::Left);
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
-                inputs.set(PlayerId(1), game::Input::Right);
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
-                inputs.set(PlayerId(1), game::Input::Up);
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
-                inputs.set(PlayerId(1), game::Input::Down);
-            }
+            client.tick();
 
-            client.tick(inputs);
-
-            /*
             if key_pressed(raylib_sys::KeyboardKey::KEY_GRAVE) {
                 console::toggle_open();
             };
@@ -128,24 +114,23 @@ fn main() {
                     console::toggle_open();
                 }
                 else {
-                    let mut eaten = false;
-                    if let Some(x) = client.game.editor.as_mut() {
-                        if let EditorMode::Dragging(s) = &x.mode {
-                            if s.selected_entity.is_some() || s.selected_world_id.is_some() {
-                                eaten = true;
-                                x.mode = EditorMode::Dragging(DraggingState::default());
-                            }
-                        }
-                    }
+                    //let mut eaten = false;
+                    //if let Some(x) = client.game.editor.as_mut() {
+                    //    if let EditorMode::Dragging(s) = &x.mode {
+                    //        if s.selected_entity.is_some() || s.selected_world_id.is_some() {
+                    //            eaten = true;
+                    //            x.mode = EditorMode::Dragging(DraggingState::default());
+                    //        }
+                    //    }
+                    //}
 
-                    if (!eaten) {
-                        client.exit = true;
-                    }
+                    //if (!eaten) {
+                    //    client.exit = true;
+                    //}
                 }
             }
 
             console::tick(&mut client);
-            */
 
             {
                 raylib_sys::BeginTextureMode(framebuffer);
@@ -167,7 +152,7 @@ fn main() {
                 }
                 */
 
-                //console::draw(&client);
+                console::draw(&client);
 
                 raylib_sys::EndDrawing();
             }
@@ -245,8 +230,8 @@ impl FrameBufferToScreenInfo {
         let source_width = framebuffer.width as f32;
 
         // This minus is needed to avoid flipping the rendering (for some reason)
-        //let source_height = -(framebuffer.height as f32);
-        let source_height = (framebuffer.height as f32);
+        let source_height = -(framebuffer.height as f32);
+        //let source_height = (framebuffer.height as f32);
 
         let destination = raylib_sys::Rectangle{
             x: (rl_screen_width_f - screen_width_f * screen_scale) * 0.5,
@@ -281,8 +266,10 @@ pub struct Client {
 
 impl Client {
     pub fn new(debug: bool) -> Self {
-        let game_config = GameConfig::default();
-        let mut timeline = Timeline::new(game_config);
+        let mut game_config = GameConfig::default();
+        game_config.bypass_lobby = true;
+        game_config.minimum_players = 1;
+        let mut timeline = Timeline::from_seed(game_config, "aa");
         timeline.add_player(PlayerId(1), game::Pos::new_coord(7, 7));
 
         let mut local_players = Vec::new();
@@ -298,7 +285,29 @@ impl Client {
         }
     }
 
-    pub fn tick(&mut self, inputs: PlayerInputs) {
+    pub fn tick(&mut self) {
+        let mut inputs = PlayerInputs::new();
+
+        for player in self.local_players.iter_mut() {
+            let mut input = Input::None;
+            if (player.player_id.0 == 1) {
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
+                    input = game::Input::Left;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
+                    input = game::Input::Right;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
+                    input = game::Input::Up;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
+                    input = game::Input::Down;
+                }
+            }
+
+            player.update_inputs(&self.timeline, &mut inputs, input);
+        }
+
         self.timeline.tick(Some(inputs), TICK_INTERVAL_US);
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()));
 
@@ -321,10 +330,31 @@ impl Client {
             raylib_sys::ClearBackground(bg_fill_col);
             const grass_col_0: raylib_sys::Color = hex_color("c4e6b5".as_bytes());
             const grass_col_1: raylib_sys::Color = hex_color("d1bfdb".as_bytes());
-            let col_0 = grass_col_0;
-            let col_1 = grass_col_1;
+            const river_col_0: raylib_sys::Color = hex_color("6c6ce2".as_bytes());
+            const river_col_1: raylib_sys::Color = hex_color("5b5be7".as_bytes());
+            const road_col_0: raylib_sys::Color = hex_color("c4e6b5".as_bytes());
+            const road_col_1: raylib_sys::Color = hex_color("d1bfdb".as_bytes());
 
-            for y in 0..160/8 {
+            let screen_y = top.rules_state.fst.get_screen_y();
+            let round_id = top.get_round_id();
+            let rows = self.timeline.map.get_row_view(round_id, screen_y);
+
+            for row_with_y in rows {
+                let row = row_with_y.row;
+                let y = row_with_y.y;
+
+                let (col_0, col_1) = match row.row_type {
+                    RowType::River(_) => {
+                        (river_col_0, river_col_1)
+                    },
+                    RowType::Road(_) => {
+                        (road_col_0, road_col_1)
+                    },
+                    _ => {
+                        (grass_col_0, grass_col_1)
+                    },
+                };
+
                 for x in (0..160 / 8) {
                     let col = if (x + y) % 2 == 0 {
                         col_0
@@ -335,12 +365,58 @@ impl Client {
 
                     raylib_sys::DrawRectangle(x * 8, y * 8, 8, 8, col);
                 }
+
+                if let RowType::Stands = row.row_type {
+                    sprites::draw("block", 0, 6.0 * 8.0, y as f32 * 8.0);
+                    sprites::draw("block", 0, (19.0 - 6.0) * 8.0, y as f32 * 8.0);
+                }
+
+                if let RowType::StartingBarrier = row.row_type {
+                    for i in 0..=6 {
+                        sprites::draw("block", 0, i as f32 * 8.0, y as f32 * 8.0);
+                        sprites::draw("block", 0, (19.0 - i as f32) * 8.0, y as f32 * 8.0);
+                    }
+
+                    if let CrossyRulesetFST::RoundWarmup(_) = &top.rules_state.fst {
+                        for i in 7..(20-7) {
+                            sprites::draw("barrier", 0, i as f32 * 8.0, y as f32 * 8.0);
+                        }
+                    }
+                }
             }
         }
 
         for local_player in &self.local_players {
-            //raylib_sys::DrawRectangle(local_player.x as i32 * 8, local_player.y as i32 * 8, 8, 8, WHITE);
-            raylib_sys::DrawRectangle(local_player.x as i32 * 8, local_player.y as i32 * 8, 8, 8, WHITE);
+            let shadow = sprites::get_sprite("shadow");
+            raylib_sys::DrawTexture(
+                shadow[0],
+                (local_player.x * 8.0) as i32,
+                (local_player.y * 8.0) as i32,
+                WHITE);
+
+            let sprite = sprites::get_sprite("frog");
+
+            let rect = raylib_sys::Rectangle{
+                x: 0.0,
+                y: 0.0,
+                width: sprite[0].width as f32 * local_player.x_flip,
+                height: sprite[0].height as f32,
+            };
+
+            let dest = raylib_sys::Rectangle{
+                x: local_player.x * 8.0,
+                y: local_player.y * 8.0 - 2.0,
+                width: sprite[0].width as f32,
+                height: sprite[0].height as f32,
+            };
+
+            raylib_sys::DrawTexturePro(
+                sprite[local_player.frame_id as usize],
+                rect,
+                dest,
+                raylib_sys::Vector2::zero(),
+                0.0,
+                WHITE);
         }
 
         raylib_sys::EndMode2D();
@@ -377,7 +453,7 @@ impl Camera {
             }
         }
 
-        self.y = dan_lerp(self.y, self.target_y, 3.0);
+        self.y = dan_lerp(self.y, self.target_y * 8.0, 3.0);
         if (self.screen_shake_t > 0.0) {
             self.screen_shake_t -= 1.0;
             let dir = *FroggyRand::new(self.t as u64).choose((), &[-1.0, 1.0]) as f32;
@@ -390,10 +466,8 @@ impl Camera {
 
     pub fn to_raylib(&self) -> raylib_sys::Camera2D {
         raylib_sys::Camera2D {
-            //offset: raylib_sys::Vector2 { x: 80.0, y: 80.0 },
             offset: raylib_sys::Vector2::zero(),
             target: raylib_sys::Vector2 { x: self.x, y: self.y },
-            //target: raylib_sys::Vector2::zero(),
             rotation: 0.0,
             zoom: 1.0,
             
@@ -413,6 +487,7 @@ pub struct PlayerLocal {
     moving: bool,
     x_flip: f32,
     frame_id: i32,
+    buffered_input: Input,
 }
 
 const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
@@ -427,6 +502,28 @@ impl PlayerLocal {
             moving: false,
             x_flip: 1.0,
             frame_id: 0,
+            buffered_input: Input::None,
+        }
+    }
+
+    pub fn update_inputs(&mut self, timeline: &Timeline, player_inputs: &mut PlayerInputs, input: Input) {
+        if (input != Input::None) {
+            self.buffered_input = input;
+
+        }
+
+        if (input == Input::Left) {
+            self.x_flip = -1.0;
+        }
+
+        if (input == Input::Right) {
+            self.x_flip = 1.0;
+        }
+
+        let top = timeline.top_state();
+        if (top.player_states.get(self.player_id).unwrap().can_move()) {
+            player_inputs.set(self.player_id, self.buffered_input);
+            self.buffered_input = Input::None;
         }
     }
 
@@ -442,15 +539,20 @@ impl PlayerLocal {
             let x1 = player_state.t_x as f32;
             let y1 = player_state.t_y as f32;
 
+            self.frame_id = (self.frame_id + 1);
+            if (self.frame_id >= PLAYER_FRAME_COUNT) {
+                self.frame_id = PLAYER_FRAME_COUNT - 1;
+            }
+
             x = x0 + lerp_t * (x1 - x0);
             y = y0 + lerp_t * (y1 - y0);
         }
         else {
-            let new_p = lerp_snap(self.x, self.y, x0, y0);
-            x = new_p.x;
-            y = new_p.y;
+            //let new_p = lerp_snap(self.x, self.y, x0, y0);
+            x = x0;
+            y = y0;
 
-            let delta = 0.1;
+            let delta = 0.01;
             if (diff(x, self.x) > delta || diff(y, self.y) > delta) {
                 self.frame_id = (self.frame_id + 1) % PLAYER_FRAME_COUNT;
             }
@@ -577,4 +679,17 @@ const fn parse_char_hex(c : u8) -> u8 {
     }
 
     panic!("Unexpected char in hex number")
+}
+
+pub fn lerp_color_rgba(c0: raylib_sys::Color, c1: raylib_sys::Color, t: f32) -> raylib_sys::Color {
+    let rr = (1.0 - t) * c0.r as f32 + t * c1.r as f32;
+    let gg = (1.0 - t) * c0.g as f32 + t * c1.g as f32;
+    let bb = (1.0 - t) * c0.b as f32 + t * c1.b as f32;
+    let aa = (1.0 - t) * c0.a as f32 + t * c1.a as f32;
+    raylib_sys::Color {
+        r: rr as u8,
+        g: gg as u8,
+        b: bb as u8,
+        a: aa as u8,
+    }
 }
