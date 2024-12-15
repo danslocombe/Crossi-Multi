@@ -1,8 +1,10 @@
 use core::slice;
 use std::{mem::MaybeUninit, ops::Add};
 
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
+
+use crate::sprites;
 
 pub struct PropController {
     gen_to : i32,
@@ -19,12 +21,15 @@ impl PropController {
         }
     }
 
-    pub fn tick(&mut self, rules_state: &RulesState, entities: &mut EntityManager) {
+    pub fn tick(&mut self, rules_state: &RulesState, map: &Map, entities: &mut EntityManager) {
         let round_id = rules_state.fst.get_round_id() as i32;
         let game_id = rules_state.game_id as i32;
 
         if (self.last_generated_game != game_id || self.last_generated_round != round_id) {
             // Regen.
+
+            // Destroy all props.
+            entities.props.inner.clear();
 
             self.last_generated_game = game_id;
             self.last_generated_round = round_id;
@@ -43,11 +48,43 @@ impl PropController {
             let stand_right_id = entities.create_entity(Entity {
                 id: 0,
                 entity_type: EntityType::Prop,
-                pos: Pos::new_coord(15, 10)
+                pos: Pos::new_coord(14, 10)
             });
             let stand_right = entities.props.get_mut(stand_right_id).unwrap();
             stand_right.depth = Some(100);
             stand_right.sprite = "stand";
+            stand_right.flipped = true;
+        }
+
+        let rand = FroggyRand::from_hash((map.get_seed(), (round_id, game_id)));
+
+        let gen_to_target = rules_state.fst.get_screen_y();
+        while (self.gen_to > gen_to_target - 4) {
+            let row = map.get_row(round_id as u8, self.gen_to);
+            match &row.row_type {
+                RowType::Path{wall_width} => {
+                    for xu in *wall_width..(19-*wall_width) {
+                        let x = xu as i32;
+                        if rand.gen_unit((x, self.gen_to, "prop")) < 0.15 {
+                            let pos = Pos::new_coord(x as i32, self.gen_to);
+                            println!("Pos wallwidth {} {} {:?}", *wall_width, xu, pos);
+                            let prop_id = entities.create_entity(Entity {
+                                id: 0,
+                                entity_type: EntityType::Prop,
+                                pos,
+                            });
+                            let foliage = entities.props.get_mut(prop_id).unwrap();
+                            foliage.sprite = "foliage";
+                            let image_count = sprites::get_sprite("foliage").len();
+                            foliage.image_index = (rand.gen_unit((x, self.gen_to, "ii")) * image_count as f64).floor() as i32;
+                            foliage.dynamic_depth = Some(1.0);
+                        }
+                    }
+                },
+                _ => {},
+            }
+
+            self.gen_to -= 1;
         }
     }
 }
@@ -255,7 +292,6 @@ impl IsEntity for Prop {
     }
 
     fn draw(&self) {
-        // TODO flip
-        crate::sprites::draw(&self.sprite, self.image_index as usize, self.pos.x as f32 * 8.0, self.pos.y as f32 * 8.0);
+        crate::sprites::draw_with_flip(&self.sprite, self.image_index as usize, self.pos.x as f32 * 8.0, self.pos.y as f32 * 8.0, self.flipped);
     }
 }

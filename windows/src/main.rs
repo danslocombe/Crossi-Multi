@@ -11,6 +11,7 @@ use std::{mem::MaybeUninit};
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
 use entities::{Entity, EntityContainer, EntityManager, Prop, PropController};
 use froggy_rand::FroggyRand;
+use sprites::draw_with_flip;
 
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
@@ -236,7 +237,7 @@ impl Client {
         let mut game_config = GameConfig::default();
         game_config.bypass_lobby = true;
         game_config.minimum_players = 1;
-        let mut timeline = Timeline::from_seed(game_config, "aa");
+        let mut timeline = Timeline::from_seed(game_config, "ab");
         timeline.add_player(PlayerId(1), game::Pos::new_coord(7, 7));
 
         let mut local_players = Vec::new();
@@ -293,7 +294,7 @@ impl Client {
             }
         }
 
-        self.prop_controller.tick(&top.rules_state, &mut self.entities);
+        self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities);
     }
 
     pub unsafe fn draw(&mut self) {
@@ -309,8 +310,8 @@ impl Client {
             const grass_col_1: raylib_sys::Color = hex_color("d1bfdb".as_bytes());
             const river_col_0: raylib_sys::Color = hex_color("6c6ce2".as_bytes());
             const river_col_1: raylib_sys::Color = hex_color("5b5be7".as_bytes());
-            const road_col_0: raylib_sys::Color = hex_color("c4e6b5".as_bytes());
-            const road_col_1: raylib_sys::Color = hex_color("d1bfdb".as_bytes());
+            const road_col_0: raylib_sys::Color = hex_color("646469".as_bytes());
+            const road_col_1: raylib_sys::Color = hex_color("59595d".as_bytes());
 
             let screen_y = top.rules_state.fst.get_screen_y();
             let round_id = top.get_round_id();
@@ -383,29 +384,8 @@ impl Client {
                 (local_player.y * 8.0) as i32,
                 WHITE);
 
-            let sprite = sprites::get_sprite("frog");
-
-            let rect = raylib_sys::Rectangle{
-                x: 0.0,
-                y: 0.0,
-                width: sprite[0].width as f32 * local_player.x_flip,
-                height: sprite[0].height as f32,
-            };
-
-            let dest = raylib_sys::Rectangle{
-                x: local_player.x * 8.0,
-                y: local_player.y * 8.0 - 2.0,
-                width: sprite[0].width as f32,
-                height: sprite[0].height as f32,
-            };
-
-            raylib_sys::DrawTexturePro(
-                sprite[local_player.frame_id as usize],
-                rect,
-                dest,
-                raylib_sys::Vector2::zero(),
-                0.0,
-                WHITE);
+            sprites::draw("shadow", 0, local_player.x * 8.0, local_player.y * 8.0);
+            sprites::draw_with_flip("frog", local_player.frame_id as usize, local_player.x * 8.0, local_player.y * 8.0 - 2.0, local_player.x_flip);
         }
 
         raylib_sys::EndMode2D();
@@ -475,7 +455,7 @@ pub struct PlayerLocal {
     x: f32,
     y: f32,
     moving: bool,
-    x_flip: f32,
+    x_flip: bool,
     frame_id: i32,
     buffered_input: Input,
 }
@@ -490,7 +470,7 @@ impl PlayerLocal {
             x: state.x as f32,
             y: state.y as f32,
             moving: false,
-            x_flip: 1.0,
+            x_flip: false,
             frame_id: 0,
             buffered_input: Input::None,
         }
@@ -503,11 +483,11 @@ impl PlayerLocal {
         }
 
         if (input == Input::Left) {
-            self.x_flip = -1.0;
+            self.x_flip = true;
         }
 
         if (input == Input::Right) {
-            self.x_flip = 1.0;
+            self.x_flip = false;
         }
 
         let top = timeline.top_state();

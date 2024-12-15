@@ -86,3 +86,31 @@ pub fn draw(name: &str, image_index: usize, x: f32, y: f32) {
             crate::WHITE);
     }
 }
+
+pub fn draw_with_flip(name: &str, image_index: usize, x: f32, y: f32, x_flip: bool) {
+    let sprite = get_sprite(name)[image_index];
+    let x_flip_f = if x_flip {-1.0} else {1.0};
+    let rect = raylib_sys::Rectangle{
+        x: 0.0,
+        y: 0.0,
+        width: sprite.width as f32 * x_flip_f,
+        height: sprite.height as f32,
+    };
+
+    let dest = raylib_sys::Rectangle{
+        x,
+        y,
+        width: sprite.width as f32,
+        height: sprite.height as f32,
+    };
+
+    unsafe {
+        raylib_sys::DrawTexturePro(
+            sprite,
+            rect,
+            dest,
+            raylib_sys::Vector2::zero(),
+            0.0,
+            crate::WHITE);
+    }
+}
