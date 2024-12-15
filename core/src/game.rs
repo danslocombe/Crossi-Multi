@@ -16,6 +16,13 @@ impl Pos {
     pub fn new_coord(x: i32, y: i32) -> Self {
         Pos::Coord(CoordPos { x, y })
     }
+
+    pub fn get_coord(self) -> CoordPos {
+        match self {
+            Pos::Coord(p) => p,
+            _ => panic!("Tried to get as coordpos"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]

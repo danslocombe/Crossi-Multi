@@ -4,13 +4,13 @@
 
 mod sprites;
 mod console;
+mod entities;
 
-use core::slice;
-use std::{mem::MaybeUninit, ops::Add};
+use std::{mem::MaybeUninit};
 
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, Input, PlayerId, PlayerInputs};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
+use entities::{Entity, EntityContainer, EntityManager, Prop, PropController};
 use froggy_rand::FroggyRand;
-use raylib_sys::ClearBackground;
 
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
@@ -58,37 +58,6 @@ fn main() {
         console::init_console();
         crossy_multi_core::set_debug_logger(Box::new(console::QuakeConsoleLogger{}));
 
-        //draw::init_fonts();
-        //draw::init_sprites();
-        //crunda_core::dialogue::init_dialogue();
-        //crunda_core::progress::init_progress("");
-        //crunda_core::outfit::init_outfit("");
-
-        //// @Fragile @TODO sync this between web client and here
-        //load_sprite("impact_particle", None);
-        //load_sprite("impact_particle_blue", None);
-        //load_sprite("impact_particle_yellow", None);
-        //load_sprite("mine", None);
-        //load_sprite("flag", Some(2));
-
-        //load_sprite("font_small", Some(26));
-        //load_sprite("font_small_2", Some(26));
-        //load_sprite("font_small_black", Some(26));
-        //load_sprite("font_small_black_2", Some(26));
-        //load_sprite("font_blob", Some(26));
-        //load_sprite("font_blob_2", Some(26));
-
-        //load_sprite("pause_icon", None);
-        //load_sprite("trophy", None);
-        //load_sprite("padlock", None);
-        //load_sprite("finger", Some(1));
-        //load_sprite("cursor", Some(1));
-        //load_sprite("hats", None);
-
-        //load_font("font_linsenn_m5x7_medium_12");
-        //load_font("font_linsenn_m6x11_medium_14");
-        //load_font("font_linsenn_m6x11_medium_17");
-
         sprites::init_sprites();
 
         raylib_sys::GuiLoadStyle(c_str_leaky("style_dark.rgs"));
@@ -98,10 +67,6 @@ fn main() {
         let mut client = Client::new(debug_param);
 
         while !raylib_sys::WindowShouldClose() && !client.exit {
-            //crunda_core::t += 1;
-
-            //let image = raylib_sys::LoadImageFromTexture(framebuffer.texture);
-
             let mapping_info = FrameBufferToScreenInfo::compute(&framebuffer.texture);
             client.tick();
 
@@ -262,6 +227,8 @@ pub struct Client {
     camera: Camera,
 
     local_players: Vec<PlayerLocal>,
+    prop_controller: PropController,
+    entities: EntityManager,
 }
 
 impl Client {
@@ -282,6 +249,14 @@ impl Client {
             timeline,
             camera: Camera::new(),
             local_players,
+            entities: EntityManager {
+                next_id: 1,
+                props: EntityContainer::<Prop> {
+                    entity_type: entities::EntityType::Prop,
+                    inner: Default::default(),
+                },
+            },
+            prop_controller: PropController::new(),
         }
     }
 
@@ -317,6 +292,8 @@ impl Client {
                 local_player.tick(&state.to_public(top.get_round_id(), top.time_us, &self.timeline.map));
             }
         }
+
+        self.prop_controller.tick(&top.rules_state, &mut self.entities);
     }
 
     pub unsafe fn draw(&mut self) {
@@ -386,6 +363,18 @@ impl Client {
             }
         }
 
+        {
+            // @Perf keep some list and insertion sort
+            let mut all_entities = Vec::new();
+            self.entities.extend_all_depth(&mut all_entities);
+
+            all_entities.sort_by_key(|(_, depth)| *depth);
+
+            for (e, _) in all_entities {
+                self.entities.draw_entity(e);
+            }
+        }
+
         for local_player in &self.local_players {
             let shadow = sprites::get_sprite("shadow");
             raylib_sys::DrawTexture(
@@ -441,6 +430,7 @@ impl Camera {
             t: 0,
         }
     }
+
     pub fn tick(&mut self, m_rules_state: Option<&RulesState>) {
         self.t += 1;
 

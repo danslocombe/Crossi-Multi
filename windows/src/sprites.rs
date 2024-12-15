@@ -9,9 +9,15 @@ pub fn init_sprites() {
         let map = BTreeMap::new();
         SPRITE_FRAMES = MaybeUninit::new(map);
         load_frames("../web-client/static/sprites/spr_frog.png", None);
+        load_frames("../web-client/static/sprites/spr_bird.png", None);
         load_frames("../web-client/static/sprites/spr_shadow.png", None);
+
         load_frames("../web-client/static/sprites/spr_block.png", None);
         load_frames("../web-client/static/sprites/spr_barrier.png", None);
+
+        load_frames("../web-client/static/sprites/spr_foliage.png", Some(6));
+        load_frames("../web-client/static/sprites/spr_stand.png", Some(1));
+        load_frames("../web-client/static/sprites/tree_top.png", Some(1));
     }
 }
 
