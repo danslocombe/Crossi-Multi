@@ -289,7 +289,8 @@ impl Client {
         let top = self.timeline.top_state();
         for local_player in self.entities.players.inner.iter_mut() {
             if let Some(state) = top.player_states.get(local_player.player_id) {
-                local_player.tick(&state.to_public(top.get_round_id(), top.time_us, &self.timeline.map));
+                let player_state = state.to_public(top.get_round_id(), top.time_us, &self.timeline.map);
+                local_player.tick(&player_state, &mut self.entities.dust);
             }
         }
 
@@ -320,6 +321,11 @@ impl Client {
             });
             let lilly = self.entities.lillipads.get_mut(lilly_id).unwrap();
         }
+
+        let camera_y_max = top.rules_state.fst.get_screen_y() as f32 + 200.0;
+        self.entities.bubbles.prune_dead(camera_y_max);
+        self.entities.props.prune_dead(camera_y_max);
+        self.entities.dust.prune_dead(camera_y_max);
     }
 
     pub unsafe fn draw(&mut self) {

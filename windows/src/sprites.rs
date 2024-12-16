@@ -27,6 +27,8 @@ pub fn init_sprites() {
 
         load_frames("../web-client/static/sprites/spr_car_flipped.png", Some(4));
         load_frames("../web-client/static/sprites/spr_log.png", None);
+
+        load_frames("../web-client/static/sprites/spr_dust.png", Some(4));
     }
 }
 
@@ -111,6 +113,33 @@ pub fn draw_with_flip(name: &str, image_index: usize, x: f32, y: f32, x_flip: bo
         y,
         width: sprite.width as f32,
         height: sprite.height as f32,
+    };
+
+    unsafe {
+        raylib_sys::DrawTexturePro(
+            sprite,
+            rect,
+            dest,
+            raylib_sys::Vector2::zero(),
+            0.0,
+            crate::WHITE);
+    }
+}
+
+pub fn draw_scaled(name: &str, image_index: usize, x: f32, y: f32, scale: f32) {
+    let sprite = get_sprite(name)[image_index];
+    let rect = raylib_sys::Rectangle{
+        x: 0.0,
+        y: 0.0,
+        width: sprite.width as f32,
+        height: sprite.height as f32,
+    };
+
+    let dest = raylib_sys::Rectangle{
+        x,
+        y,
+        width: sprite.width as f32 * scale,
+        height: sprite.height as f32 * scale,
     };
 
     unsafe {

@@ -156,6 +156,9 @@ pub enum EntityType {
     Car,
     Lillipad,
     Player,
+    Corpse,
+    Bubble,
+    Dust,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -177,6 +180,10 @@ pub trait IsEntity {
     fn set_pos(&mut self, p: Pos);
     fn get_depth(&self) -> i32;
     fn draw(&mut self);
+
+    fn alive(&self, _camera_y_max: f32) -> bool {
+        true
+    }
 }
 
 pub struct EntityContainer<T : IsEntity> {
@@ -199,9 +206,14 @@ impl<T: IsEntity> EntityContainer<T> {
         }
     }
 
-    pub fn create_entity(&mut self, e: Entity) {
+    pub fn create_entity(&mut self, mut e: Entity) -> i32 {
         assert!(self.entity_type == e.entity_type);
+        unsafe {
+            e.id = g_next_id;
+            g_next_id += 1;
+        }
         self.inner.push(T::create(e));
+        e.id
     }
 
     pub fn get(&self, id: i32) -> Option<&T> {
@@ -234,6 +246,18 @@ impl<T: IsEntity> EntityContainer<T> {
         }
     }
 
+    pub fn prune_dead(&mut self, camera_y_max: f32) {
+        let mut new = Vec::with_capacity(self.inner.len());
+
+        let existing = std::mem::take(&mut self.inner);
+        for e in existing {
+            if e.alive(camera_y_max) {
+                new.push(e);
+            }
+        }
+
+        self.inner = new
+    }
 
     pub fn extend_all_entities_depth(&self, all_entities: &mut Vec<(Entity, i32)>) {
         for x in &self.inner {
@@ -252,23 +276,31 @@ impl<'a, T: IsEntity> IntoIterator for &'a EntityContainer<T> {
     }
 }
 
+// This may come back to bite me.
+static mut g_next_id : i32 = 1;
+
 pub struct EntityManager {
-    pub next_id: i32,
     pub props: EntityContainer<Prop>,
     pub spectators: EntityContainer<Spectator>,
     pub cars: EntityContainer<Car>,
     pub lillipads: EntityContainer<Lillipad>,
     pub players: EntityContainer<PlayerLocal>,
+    pub bubbles: EntityContainer<Bubble>,
+    pub corpses: EntityContainer<Corpse>,
+    pub dust: EntityContainer<Dust>,
 }
 
 macro_rules! map_over_entity {
-    ($self:expr, $e:expr, $f:ident) => {
-        match $e.entity_type {
+    ($self:expr, $e:expr, $entity_type:expr, $f:ident) => {
+        match $entity_type {
             EntityType::Prop => $self.props.$f($e),
             EntityType::Spectator => $self.spectators.$f($e),
             EntityType::Car => $self.cars.$f($e),
             EntityType::Lillipad => $self.lillipads.$f($e),
             EntityType::Player => $self.players.$f($e),
+            EntityType::Bubble => $self.bubbles.$f($e),
+            EntityType::Corpse => $self.corpses.$f($e),
+            EntityType::Dust => $self.dust.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -279,58 +311,43 @@ macro_rules! map_over_entity {
 impl EntityManager {
     pub fn new() -> Self {
         Self {
-            next_id: 1,
             props: EntityContainer::<Prop>::new(EntityType::Prop),
             spectators: EntityContainer::<Spectator>::new(EntityType::Spectator),
             cars: EntityContainer::<Car>::new(EntityType::Car),
             lillipads: EntityContainer::<Lillipad>::new(EntityType::Lillipad),
             players: EntityContainer::<PlayerLocal>::new(EntityType::Player),
+            corpses: EntityContainer::<Corpse>::new(EntityType::Corpse),
+            bubbles: EntityContainer::<Bubble>::new(EntityType::Bubble),
+            dust: EntityContainer::<Dust>::new(EntityType::Dust),
         }
     }
 
     pub fn update_entity(&mut self, e: Entity) {
-        map_over_entity!(self, e, update_from_entity);
+        map_over_entity!(self, e, e.entity_type, update_from_entity);
     }
 
-    pub fn create_entity(&mut self, mut e: Entity) -> i32 {
-        let eid = self.next_id;
-        e.id = eid;
-        self.next_id += 1;
-        map_over_entity!(self, e, create_entity);
-        eid
+    pub fn create_entity(&mut self, e: Entity) -> i32 {
+        map_over_entity!(self, e, e.entity_type, create_entity)
     }
 
     pub fn delete_entity(&mut self, e: Entity) -> bool {
-        map_over_entity!(self, e, delete_entity)
+        map_over_entity!(self, e, e.entity_type, delete_entity)
     }
 
     pub fn extend_all_depth(&self, all_entities: &mut Vec<(Entity, i32)>) {
         // Done like this to make sure we dont forget to add.
         for entity_type in EntityType::iter()
         {
-            match entity_type {
-                EntityType::Prop => {
-                    self.props.extend_all_entities_depth(all_entities);
-                },
-                EntityType::Spectator => {
-                    self.spectators.extend_all_entities_depth(all_entities);
-                },
-                EntityType::Car => {
-                    self.cars.extend_all_entities_depth(all_entities);
-                },
-                EntityType::Lillipad => {
-                    self.lillipads.extend_all_entities_depth(all_entities);
-                },
-                EntityType::Player => {
-                    self.players.extend_all_entities_depth(all_entities);
-                },
-                EntityType::Unknown => {},
+            if entity_type == EntityType::Unknown {
+                continue;
             }
+
+            map_over_entity!(self, all_entities, entity_type, extend_all_entities_depth);
         }
     }
 
     pub fn draw_entity(&mut self, e: Entity) {
-        map_over_entity!(self, e, draw)
+        map_over_entity!(self, e, e.entity_type, draw)
     }
 }
 
@@ -357,12 +374,6 @@ impl Prop {
             depth: None,
             dynamic_depth: None,
         }
-    }
-
-    pub fn alive(&self, camera_y_max: f32) -> bool {
-        // @Perf
-        let h = crate::sprites::get_sprite(self.sprite)[0].height;
-        self.pos.y as f32 * 8.0 < h as f32 + camera_y_max
     }
 }
 
@@ -423,10 +434,6 @@ impl Spectator {
             spectator.sprite = x;
         }
     }
-
-    pub fn alive(&self, camera_y_max: f32) -> bool {
-        true
-    }
 }
 
 pub struct Car {
@@ -444,10 +451,6 @@ impl Car {
             image_index: 0,
             flipped: false,
         }
-    }
-
-    pub fn alive(&self, camera_y_max: f32) -> bool {
-        true
     }
 }
 
@@ -467,10 +470,6 @@ impl Lillipad {
             flipped: false,
         }
     }
-
-    pub fn alive(&self, camera_y_max: f32) -> bool {
-        true
-    }
 }
 
 #[derive(Debug)]
@@ -482,10 +481,17 @@ pub struct PlayerLocal {
     pub x_flip: bool,
     pub image_index: i32,
     pub buffered_input: Input,
+    pub created_corpse: bool,
+    pub t : i32,
 }
 
 const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
 const PLAYER_FRAME_COUNT: i32 = 5;
+
+pub struct Skin {
+    sprite: &'static str,
+    dead_sprite: &'static str,
+}
 
 impl PlayerLocal {
     pub fn new(entity_id: i32, pos: V2,) -> Self {
@@ -497,6 +503,8 @@ impl PlayerLocal {
             x_flip: false,
             image_index: 0,
             buffered_input: Input::None,
+            created_corpse: false,
+            t: 0,
         }
     }
 
@@ -526,7 +534,9 @@ impl PlayerLocal {
         }
     }
 
-    pub fn tick(&mut self, player_state: &PlayerStatePublic) {
+    pub fn tick(&mut self, player_state: &PlayerStatePublic, dust: &mut EntityContainer<Dust>) {
+        self.t += 1;
+
         let x0 = player_state.x as f32;
         let y0 = player_state.y as f32;
 
@@ -560,9 +570,85 @@ impl PlayerLocal {
             }
         }
 
+        if (player_state.moving && !self.moving) {
+            // Started moving, do effects.
+            let rand = FroggyRand::from_hash((self.player_id.0, self.t));
+            for i in 0..2 {
+                let rand = rand.subrand(i);
+                let dust_off = rand.gen_unit("off") * 3.0;
+                let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
+                let pos = self.pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+                //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+                let eid = dust.create_entity(Entity {
+                    id: 0,
+                    entity_type: EntityType::Dust,
+                    pos: Pos::Absolute(pos),
+                });
+                let dust_part = dust.get_mut(eid).unwrap();
+                dust_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
+                dust_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
+            }
+        }
+
         self.pos.x = x;
         self.pos.y = y;
         self.moving = player_state.moving;
+    }
+}
+
+pub struct Bubble {
+    pub id : i32,
+    pub pos: V2,
+    pub image_index: i32,
+    pub flipped: bool,
+}
+
+impl Bubble {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            image_index: 0,
+            flipped: false,
+        }
+    }
+}
+
+pub struct Corpse {
+    pub id : i32,
+    pub pos: V2,
+    pub image_index: i32,
+    pub flipped: bool,
+}
+
+impl Corpse {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            image_index: 0,
+            flipped: false,
+        }
+    }
+}
+
+pub struct Dust {
+    pub id : i32,
+    pub pos: V2,
+    pub image_index: i32,
+    pub flipped: bool,
+    pub scale: f32,
+}
+
+impl Dust {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            image_index: 0,
+            flipped: false,
+            scale: 1.0,
+        }
     }
 }
 
@@ -589,13 +675,19 @@ impl IsEntity for Prop {
         }
     }
 
+    fn alive(&self, camera_y_max: f32) -> bool {
+        // @Perf
+        let h = crate::sprites::get_sprite(self.sprite)[0].height;
+        self.pos.y as f32 * 8.0 < h as f32 + camera_y_max
+    }
+
     fn get_depth(&self) -> i32 {
         if let Some(d) = self.depth {
             return d;
         }
 
         if let Some(dynamic_depth) = self.dynamic_depth {
-            return (dynamic_depth * self.pos.y as f32) as i32;
+            return (self.pos.y as f32) as i32 + dynamic_depth as i32;
         }
 
         0
@@ -755,11 +847,105 @@ impl IsEntity for PlayerLocal {
     }
 
     fn get_depth(&self) -> i32 {
-        self.pos.y as i32
+        self.pos.y as i32 * 8
     }
 
     fn draw(&mut self) {
         sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
         sprites::draw_with_flip("frog", self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
+    }
+}
+
+impl IsEntity for Bubble {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::Bubble,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32
+    }
+
+    fn draw(&mut self) {
+        //sprites::draw("log", 0, self.pos.x, self.pos.y);
+    }
+}
+
+impl IsEntity for Corpse {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::Corpse,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32
+    }
+
+    fn draw(&mut self) {
+        //sprites::draw("log", 0, self.pos.x, self.pos.y);
+    }
+}
+
+impl IsEntity for Dust {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::Dust,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32 - 20
+    }
+
+    fn draw(&mut self) {
+        self.scale -= 0.025;
+        if (self.scale > 0.0) {
+            let size = 8.0 * self.scale;
+            let x = self.pos.x - 0.5 * size;
+            let y = self.pos.y + 2.0 - 0.5 * size;
+            sprites::draw_scaled("dust", self.image_index as usize, x, y, self.scale);
+        }
+    }
+
+    fn alive(&self, _camera_y_max: f32) -> bool {
+        self.scale > 0.0
     }
 }
