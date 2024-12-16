@@ -541,11 +541,23 @@ impl IsEntity for Car {
     }
 
     fn draw(&mut self) {
-        let mut xx = self.pos.x + spr_car_width as f32 * 0.5;
+        let mut xx = self.pos.x - spr_car_width as f32 * 0.5;
         if self.flipped {
-            xx -= 24.0;
+            xx = self.pos.x - spr_car_width as f32 * 0.5;
+            //xx -= 24.0;
         }
         self.image_index = (((100.0 + self.pos.x) / 8.0).floor().abs()) as i32 % car_sprite_count;
         sprites::draw_with_flip("car_flipped", self.image_index as usize, xx, self.pos.y - spr_car_height as f32 * 0.5, self.flipped);
+
+        /*
+        unsafe {
+            if self.flipped {
+                raylib_sys::DrawCircle(self.pos.x as i32, self.pos.y as i32, 6.0, crate::PINK);
+            }
+            else {
+                raylib_sys::DrawCircle(self.pos.x as i32, self.pos.y as i32, 6.0, crate::BEIGE);
+            }
+        }
+        */
     }
 }
