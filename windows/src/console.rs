@@ -1,6 +1,6 @@
 use std::{mem::MaybeUninit};
 
-use crossy_multi_core::{ring_buffer::RingBuffer, DebugLogger};
+use crossy_multi_core::{ring_buffer::RingBuffer, timeline::Timeline, DebugLogger, PlayerId, Pos};
 
 use crate::Client;
 
@@ -17,7 +17,11 @@ impl DebugLogger for QuakeConsoleLogger {
 
 pub fn init_console() {
     unsafe {
-        let command_set = CommandSet::create();
+        let mut command_set = CommandSet::create();
+        command_set.commands.push(Command {
+            name: "new".to_owned(),
+            lambda: Box::new(do_new),
+        });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
 }
@@ -400,4 +404,26 @@ impl CommandSet {
 struct Command {
     name: String,
     lambda: Box<dyn Fn(&[&str], &mut Client)>,
+}
+
+fn do_new(args: &[&str], client: &mut Client) {
+    if (args.len() > 1) {
+        err(&format!("Expected 0 or 1 argument to new, got {}", args.len()));
+        info("Usage: new");
+        info("Usage: new some_seed");
+        return;
+    }
+
+    let mut seed = String::default();
+    if args.len() == 1 {
+        seed = args[0].to_owned();
+    }
+    else {
+        seed = format!("seed_{}", 10);
+    }
+
+    big(&format!("New Level Seed '{}'", seed));
+    let config = client.timeline.top_state().rules_state.config.clone();
+    client.timeline = Timeline::from_seed(config, &seed);
+    client.timeline.add_player(PlayerId(1), Pos::new_coord(7, 7));
 }
