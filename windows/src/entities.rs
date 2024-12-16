@@ -154,6 +154,7 @@ pub enum EntityType {
     Prop,
     Spectator,
     Car,
+    Lillipad
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -183,6 +184,13 @@ pub struct EntityContainer<T : IsEntity> {
 }
 
 impl<T: IsEntity> EntityContainer<T> {
+    pub fn new(entity_type: EntityType) -> Self {
+        Self {
+            entity_type,
+            inner: Default::default(),
+        }
+    }
+
     pub fn update_from_entity(&mut self, e : Entity) {
         assert!(self.entity_type == e.entity_type);
         if let Some(x) = self.get_mut(e.id) {
@@ -248,6 +256,7 @@ pub struct EntityManager {
     pub props: EntityContainer<Prop>,
     pub spectators: EntityContainer<Spectator>,
     pub cars: EntityContainer<Car>,
+    pub lillipads: EntityContainer<Lillipad>,
 }
 
 macro_rules! map_over_entity {
@@ -256,6 +265,7 @@ macro_rules! map_over_entity {
             EntityType::Prop => $self.props.$f($e),
             EntityType::Spectator => $self.spectators.$f($e),
             EntityType::Car => $self.cars.$f($e),
+            EntityType::Lillipad => $self.lillipads.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -264,6 +274,16 @@ macro_rules! map_over_entity {
 }
 
 impl EntityManager {
+    pub fn new() -> Self {
+        Self {
+            next_id: 1,
+            props: EntityContainer::<Prop>::new(EntityType::Prop),
+            spectators: EntityContainer::<Spectator>::new(EntityType::Spectator),
+            cars: EntityContainer::<Car>::new(EntityType::Car),
+            lillipads: EntityContainer::<Lillipad>::new(EntityType::Lillipad),
+        }
+    }
+
     pub fn update_entity(&mut self, e: Entity) {
         map_over_entity!(self, e, update_from_entity);
     }
@@ -293,6 +313,9 @@ impl EntityManager {
                 },
                 EntityType::Car => {
                     self.cars.extend_all_entities_depth(all_entities);
+                },
+                EntityType::Lillipad => {
+                    self.lillipads.extend_all_entities_depth(all_entities);
                 },
                 EntityType::Unknown => {},
             }
@@ -407,6 +430,28 @@ pub struct Car {
 }
 
 impl Car {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            image_index: 0,
+            flipped: false,
+        }
+    }
+
+    pub fn alive(&self, camera_y_max: f32) -> bool {
+        true
+    }
+}
+
+pub struct Lillipad {
+    pub id : i32,
+    pub pos: V2,
+    pub image_index: i32,
+    pub flipped: bool,
+}
+
+impl Lillipad {
     pub fn new(id: i32, pos: V2) -> Self {
         Self {
             id,
@@ -559,5 +604,33 @@ impl IsEntity for Car {
             }
         }
         */
+    }
+}
+
+impl IsEntity for Lillipad {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::Lillipad,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32 - 1000
+    }
+
+    fn draw(&mut self) {
+        sprites::draw("log", 0, self.pos.x, self.pos.y);
     }
 }

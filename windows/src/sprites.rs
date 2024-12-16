@@ -26,6 +26,7 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_tree_top.png", Some(1));
 
         load_frames("../web-client/static/sprites/spr_car_flipped.png", Some(4));
+        load_frames("../web-client/static/sprites/spr_log.png", None);
     }
 }
 

@@ -250,21 +250,7 @@ impl Client {
             timeline,
             camera: Camera::new(),
             local_players,
-            entities: EntityManager {
-                next_id: 1,
-                props: EntityContainer::<Prop> {
-                    entity_type: entities::EntityType::Prop,
-                    inner: Default::default(),
-                },
-                spectators: EntityContainer::<Spectator> {
-                    entity_type: entities::EntityType::Spectator,
-                    inner: Default::default(),
-                },
-                cars: EntityContainer::<Car> {
-                    entity_type: entities::EntityType::Car,
-                    inner: Default::default(),
-                }
-            },
+            entities: EntityManager::new(),
             prop_controller: PropController::new(),
         }
     }
@@ -307,6 +293,7 @@ impl Client {
         // @TODO how do we model this?
         // Should cars be ephemeral actors?
         self.entities.cars.inner.clear();
+        self.entities.lillipads.inner.clear();
         //let rows = self.timeline.map.get_row_view(top.get_round_id(), top.rules_state.fst.get_screen_y());
         let pub_cars = self.timeline.map.get_cars(top.get_round_id(), top.time_us);
         for pub_car in pub_cars {
@@ -317,6 +304,16 @@ impl Client {
             });
             let car = self.entities.cars.get_mut(car_id).unwrap();
             car.flipped = pub_car.2;
+        }
+
+        let pub_lillies = self.timeline.map.get_lillipads(top.get_round_id(), top.time_us);
+        for pub_lilly in pub_lillies {
+            let lilly_id = self.entities.create_entity(Entity {
+                id: 0,
+                entity_type: entities::EntityType::Lillipad,
+                pos: Pos::Absolute(V2::new(pub_lilly.0 as f32 * 8.0, pub_lilly.1 as f32 * 8.0)),
+            });
+            let lilly = self.entities.lillipads.get_mut(lilly_id).unwrap();
         }
     }
 
