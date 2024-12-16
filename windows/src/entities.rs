@@ -170,7 +170,7 @@ pub trait IsEntity {
     fn get(&self) -> Entity;
     fn set_pos(&mut self, p: Pos);
     fn get_depth(&self) -> i32;
-    fn draw(&self);
+    fn draw(&mut self);
 }
 
 pub struct EntityContainer<T : IsEntity> {
@@ -195,8 +195,8 @@ impl<T: IsEntity> EntityContainer<T> {
         self.inner.iter().find(|x| x.get().id == id)
     }
 
-    pub fn draw(&self, e: Entity) {
-        if let Some(entity) = self.get(e.id) {
+    pub fn draw(&mut self, e: Entity) {
+        if let Some(entity) = self.get_mut(e.id) {
             entity.draw();
         }
     }
@@ -279,7 +279,7 @@ impl EntityManager {
         self.spectators.extend_all_entities_depth(all_entities);
     }
 
-    pub fn draw_entity(&self, e: Entity) {
+    pub fn draw_entity(&mut self, e: Entity) {
         map_over_entity!(self, e, draw)
     }
 }
@@ -325,6 +325,8 @@ pub struct Spectator {
     image_index: i32,
     flipped: bool,
 
+    t: i32,
+
     jump_t: i32,
     jump_t_max: i32,
 }
@@ -340,8 +342,10 @@ impl Spectator {
             image_index: 0,
             flipped: false,
 
+            t: 0,
+
             jump_t: 0,
-            jump_t_max: 10,
+            jump_t_max: 16,
         }
     }
 
@@ -410,7 +414,7 @@ impl IsEntity for Prop {
         0
     }
 
-    fn draw(&self) {
+    fn draw(&mut self) {
         crate::sprites::draw_with_flip(
             &self.sprite,
             self.image_index as usize,
@@ -443,8 +447,26 @@ impl IsEntity for Spectator {
         return (self.dynamic_depth as f32 * self.pos.y as f32) as i32;
     }
 
-    fn draw(&self) {
-        crate::sprites::draw("shadow", 0, self.pos.x, self.pos.y);
+    fn draw(&mut self) {
+        self.t += 1;
+        let rand = FroggyRand::from_hash((self.t, self.pos.x as i32, self.pos.y as i32));
+        //if (self.jump_t <= 0 && rand.gen_unit("jump") < 0.016) {
+        if (self.jump_t <= 0 && rand.gen_unit("jump") < 0.010) {
+            self.jump_t = self.jump_t_max;
+        }
+
+        if (self.jump_t > 0) {
+            self.jump_t -= 1;
+            //self.pos.y = self.pos_0.y - (self.jump_t as f32 / self.jump_t_max as f32).sin() * 4.0;
+            self.pos.y = self.pos_0.y;// - (self.jump_t as f32 / self.jump_t_max as f32).sin() * 4.0;
+            self.image_index = (5.0 * (self.jump_t as f32 / self.jump_t_max as f32)).floor() as i32;
+        }
+        else {
+            self.pos = self.pos_0;
+            self.image_index = 0;
+        }
+
+        crate::sprites::draw("shadow", 0, self.pos_0.x, self.pos_0.y);
         crate::sprites::draw_with_flip(self.sprite, self.image_index as usize, self.pos.x, self.pos.y - 2.0, self.flipped);
     }
 }
