@@ -538,11 +538,11 @@ impl PlayerLocal {
             y = y0 + lerp_t * (y1 - y0);
         }
         else {
-            //let new_p = lerp_snap(self.x, self.y, x0, y0);
-            x = x0;
-            y = y0;
+            let new_p = lerp_snap(self.x, self.y, x0, y0);
+            x = new_p.x;
+            y = new_p.y;
 
-            let delta = 0.01;
+            let delta = 8.0 * 0.01;
             if (diff(x, self.x) > delta || diff(y, self.y) > delta) {
                 self.frame_id = (self.frame_id + 1) % PLAYER_FRAME_COUNT;
             }
@@ -576,8 +576,8 @@ fn lerp_snap(x0 : f32, y0 : f32, x1 : f32, y1 : f32) -> raylib_sys::Vector2
 
     let dist = ((x - x1) * (x - x1) + (y - y1) * (y - y1)).sqrt();
 
-    let snap_dir_small = 0.15;
-    let snap_dir_large = 3.0;
+    let snap_dir_small = 8.0 * 0.15;
+    let snap_dir_large = 8.0 * 3.0;
 
     if (dist < snap_dir_small || dist > snap_dir_large) {
         x = x1;
