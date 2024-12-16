@@ -69,7 +69,7 @@ pub struct RiverDescr {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PathDescr {
-    wall_width : u32,
+    pub wall_width : u32,
 }
 
 #[derive(Debug)]

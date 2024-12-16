@@ -6,7 +6,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::sprites;
+use crate::{diff, lerp_snap, sprites};
 
 pub struct PropController {
     gen_to : i32,
@@ -154,7 +154,8 @@ pub enum EntityType {
     Prop,
     Spectator,
     Car,
-    Lillipad
+    Lillipad,
+    Player,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -257,6 +258,7 @@ pub struct EntityManager {
     pub spectators: EntityContainer<Spectator>,
     pub cars: EntityContainer<Car>,
     pub lillipads: EntityContainer<Lillipad>,
+    pub players: EntityContainer<PlayerLocal>,
 }
 
 macro_rules! map_over_entity {
@@ -266,6 +268,7 @@ macro_rules! map_over_entity {
             EntityType::Spectator => $self.spectators.$f($e),
             EntityType::Car => $self.cars.$f($e),
             EntityType::Lillipad => $self.lillipads.$f($e),
+            EntityType::Player => $self.players.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -281,6 +284,7 @@ impl EntityManager {
             spectators: EntityContainer::<Spectator>::new(EntityType::Spectator),
             cars: EntityContainer::<Car>::new(EntityType::Car),
             lillipads: EntityContainer::<Lillipad>::new(EntityType::Lillipad),
+            players: EntityContainer::<PlayerLocal>::new(EntityType::Player),
         }
     }
 
@@ -316,6 +320,9 @@ impl EntityManager {
                 },
                 EntityType::Lillipad => {
                     self.lillipads.extend_all_entities_depth(all_entities);
+                },
+                EntityType::Player => {
+                    self.players.extend_all_entities_depth(all_entities);
                 },
                 EntityType::Unknown => {},
             }
@@ -463,6 +470,99 @@ impl Lillipad {
 
     pub fn alive(&self, camera_y_max: f32) -> bool {
         true
+    }
+}
+
+#[derive(Debug)]
+pub struct PlayerLocal {
+    pub entity_id: i32,
+    pub player_id: PlayerId,
+    pub pos: V2,
+    pub moving: bool,
+    pub x_flip: bool,
+    pub image_index: i32,
+    pub buffered_input: Input,
+}
+
+const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
+const PLAYER_FRAME_COUNT: i32 = 5;
+
+impl PlayerLocal {
+    pub fn new(entity_id: i32, pos: V2,) -> Self {
+        Self {
+            entity_id,
+            player_id: PlayerId(0),
+            pos,
+            moving: false,
+            x_flip: false,
+            image_index: 0,
+            buffered_input: Input::None,
+        }
+    }
+
+    pub fn set_from(&mut self, state: &PlayerStatePublic) {
+        self.player_id = PlayerId(state.id);
+        self.pos = V2::new(state.x as f32, state.y as f32);
+    }
+
+    pub fn update_inputs(&mut self, timeline: &Timeline, player_inputs: &mut PlayerInputs, input: Input) {
+        if (input != Input::None) {
+            self.buffered_input = input;
+
+        }
+
+        if (input == Input::Left) {
+            self.x_flip = true;
+        }
+
+        if (input == Input::Right) {
+            self.x_flip = false;
+        }
+
+        let top = timeline.top_state();
+        if (top.player_states.get(self.player_id).unwrap().can_move()) {
+            player_inputs.set(self.player_id, self.buffered_input);
+            self.buffered_input = Input::None;
+        }
+    }
+
+    pub fn tick(&mut self, player_state: &PlayerStatePublic) {
+        let x0 = player_state.x as f32;
+        let y0 = player_state.y as f32;
+
+        let mut x: f32 = 0.0;
+        let mut y: f32 = 0.0;
+        if (player_state.moving) {
+            let lerp_t = 1.0 - (player_state.remaining_move_dur as f32 / MOVE_T as f32);
+
+            let x1 = player_state.t_x as f32;
+            let y1 = player_state.t_y as f32;
+
+            self.image_index = (self.image_index + 1);
+            if (self.image_index >= PLAYER_FRAME_COUNT) {
+                self.image_index = PLAYER_FRAME_COUNT - 1;
+            }
+
+            x = x0 + lerp_t * (x1 - x0);
+            y = y0 + lerp_t * (y1 - y0);
+        }
+        else {
+            let new_p = lerp_snap(self.pos.x, self.pos.y, x0, y0);
+            x = new_p.x;
+            y = new_p.y;
+
+            let delta = 8.0 * 0.01;
+            if (diff(x, self.pos.x) > delta || diff(y, self.pos.y) > delta) {
+                self.image_index = (self.image_index + 1) % PLAYER_FRAME_COUNT;
+            }
+            else {
+                self.image_index = 0;
+            }
+        }
+
+        self.pos.x = x;
+        self.pos.y = y;
+        self.moving = player_state.moving;
     }
 }
 
@@ -632,5 +732,34 @@ impl IsEntity for Lillipad {
 
     fn draw(&mut self) {
         sprites::draw("log", 0, self.pos.x, self.pos.y);
+    }
+}
+
+impl IsEntity for PlayerLocal {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.entity_id,
+            entity_type: EntityType::Player,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32
+    }
+
+    fn draw(&mut self) {
+        sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
+        sprites::draw_with_flip("frog", self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
     }
 }

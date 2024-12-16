@@ -227,7 +227,6 @@ pub struct Client {
     timeline: Timeline,
     camera: Camera,
 
-    local_players: Vec<PlayerLocal>,
     prop_controller: PropController,
     entities: EntityManager,
 }
@@ -240,17 +239,23 @@ impl Client {
         let mut timeline = Timeline::from_seed(game_config, "ac");
         timeline.add_player(PlayerId(1), game::Pos::new_coord(7, 7));
 
-        let mut local_players = Vec::new();
         let top = timeline.top_state();
-        let local_player_0 = PlayerLocal::new(&top.player_states.get(PlayerId(1)).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map));
-        local_players.push(local_player_0);
+
+        let player_state = top.player_states.get(PlayerId(1)).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
+        let mut entities = EntityManager::new();
+        let eid = entities.create_entity(Entity {
+            id: 0,
+            entity_type: entities::EntityType::Player,
+            pos: Pos::Absolute(V2::default())
+        });
+        let player_local = entities.players.get_mut(eid).unwrap();
+        player_local.set_from(&player_state);
 
         Self {
             exit: false,
             timeline,
             camera: Camera::new(),
-            local_players,
-            entities: EntityManager::new(),
+            entities,
             prop_controller: PropController::new(),
         }
     }
@@ -258,7 +263,7 @@ impl Client {
     pub fn tick(&mut self) {
         let mut inputs = PlayerInputs::new();
 
-        for player in self.local_players.iter_mut() {
+        for player in self.entities.players.inner.iter_mut() {
             let mut input = Input::None;
             if (player.player_id.0 == 1) {
                 if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
@@ -282,7 +287,7 @@ impl Client {
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()));
 
         let top = self.timeline.top_state();
-        for local_player in self.local_players.iter_mut() {
+        for local_player in self.entities.players.inner.iter_mut() {
             if let Some(state) = top.player_states.get(local_player.player_id) {
                 local_player.tick(&state.to_public(top.get_round_id(), top.time_us, &self.timeline.map));
             }
@@ -364,6 +369,21 @@ impl Client {
                     raylib_sys::DrawRectangle(x * 8, y * 8, 8, 8, col);
                 }
 
+                if let RowType::Bushes(bush_descr) = &row.row_type {
+                    for i in 0..=bush_descr.path_descr.wall_width {
+                        sprites::draw("tree_top", 1, i as f32 * 8.0, y as f32 * 8.0);
+                        sprites::draw("tree_top", 1, (19 - i) as f32 * 8.0, y as f32 * 8.0);
+                    }
+                    let hydrated = bush_descr.hydrate();
+                }
+
+                if let RowType::Path { wall_width } = row.row_type {
+                    for i in 0..=wall_width {
+                        sprites::draw("tree_top", 1, i as f32 * 8.0, y as f32 * 8.0);
+                        sprites::draw("tree_top", 1, (19 - i) as f32 * 8.0, y as f32 * 8.0);
+                    }
+                }
+
                 if let RowType::Stands = row.row_type {
                     sprites::draw("block", 0, 6.0 * 8.0, y as f32 * 8.0);
                     sprites::draw("block", 0, (19.0 - 6.0) * 8.0, y as f32 * 8.0);
@@ -394,18 +414,6 @@ impl Client {
             for (e, _) in all_entities {
                 self.entities.draw_entity(e);
             }
-        }
-
-        for local_player in &self.local_players {
-            let shadow = sprites::get_sprite("shadow");
-            raylib_sys::DrawTexture(
-                shadow[0],
-                (local_player.x * 8.0) as i32,
-                (local_player.y * 8.0) as i32,
-                WHITE);
-
-            sprites::draw("shadow", 0, local_player.x * 8.0, local_player.y * 8.0);
-            sprites::draw_with_flip("frog", local_player.frame_id as usize, local_player.x * 8.0, local_player.y * 8.0 - 2.0, local_player.x_flip);
         }
 
         raylib_sys::EndMode2D();
@@ -467,94 +475,6 @@ impl Camera {
 
 pub struct PlayerLocalSource {
 
-}
-
-#[derive(Debug)]
-pub struct PlayerLocal {
-    player_id: PlayerId,
-    x: f32,
-    y: f32,
-    moving: bool,
-    x_flip: bool,
-    frame_id: i32,
-    buffered_input: Input,
-}
-
-const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
-const PLAYER_FRAME_COUNT: i32 = 5;
-
-impl PlayerLocal {
-    pub fn new(state: &PlayerStatePublic) -> Self {
-        Self {
-            player_id: PlayerId(state.id),
-            x: state.x as f32,
-            y: state.y as f32,
-            moving: false,
-            x_flip: false,
-            frame_id: 0,
-            buffered_input: Input::None,
-        }
-    }
-
-    pub fn update_inputs(&mut self, timeline: &Timeline, player_inputs: &mut PlayerInputs, input: Input) {
-        if (input != Input::None) {
-            self.buffered_input = input;
-
-        }
-
-        if (input == Input::Left) {
-            self.x_flip = true;
-        }
-
-        if (input == Input::Right) {
-            self.x_flip = false;
-        }
-
-        let top = timeline.top_state();
-        if (top.player_states.get(self.player_id).unwrap().can_move()) {
-            player_inputs.set(self.player_id, self.buffered_input);
-            self.buffered_input = Input::None;
-        }
-    }
-
-    pub fn tick(&mut self, player_state: &PlayerStatePublic) {
-        let x0 = player_state.x as f32;
-        let y0 = player_state.y as f32;
-
-        let mut x: f32 = 0.0;
-        let mut y: f32 = 0.0;
-        if (player_state.moving) {
-            let lerp_t = 1.0 - (player_state.remaining_move_dur as f32 / MOVE_T as f32);
-
-            let x1 = player_state.t_x as f32;
-            let y1 = player_state.t_y as f32;
-
-            self.frame_id = (self.frame_id + 1);
-            if (self.frame_id >= PLAYER_FRAME_COUNT) {
-                self.frame_id = PLAYER_FRAME_COUNT - 1;
-            }
-
-            x = x0 + lerp_t * (x1 - x0);
-            y = y0 + lerp_t * (y1 - y0);
-        }
-        else {
-            let new_p = lerp_snap(self.x, self.y, x0, y0);
-            x = new_p.x;
-            y = new_p.y;
-
-            let delta = 8.0 * 0.01;
-            if (diff(x, self.x) > delta || diff(y, self.y) > delta) {
-                self.frame_id = (self.frame_id + 1) % PLAYER_FRAME_COUNT;
-            }
-            else {
-                self.frame_id = 0;
-            }
-        }
-
-        self.x = x;
-        self.y = y;
-        self.moving = player_state.moving;
-    }
 }
 
 pub struct PlayerSkin {
