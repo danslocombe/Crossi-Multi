@@ -1,5 +1,7 @@
 use core::slice;
 use std::{mem::MaybeUninit, ops::Add};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
@@ -32,6 +34,7 @@ impl PropController {
 
             // Destroy all props.
             entities.props.inner.clear();
+            entities.spectators.inner.clear();
 
             self.last_generated_game = game_id;
             self.last_generated_round = round_id;
@@ -89,11 +92,11 @@ impl PropController {
                 // In front of left stand
                 let yy = 13.0 * 8.0 + iy as f32 * 8.0;
                 let xx = stand_left_pos.x as f32 * 8.0 + 4.0 * 8.0 + 8.0;
-                Spectator::rand(rand, V2::new(xx, yy), false, prob_stands, entities);
+                Spectator::rand(rand, V2::new(xx, yy), false, prob_front, entities);
 
                 // In front of right stand
                 let xx = 14.0 * 8.0;
-                Spectator::rand(rand, V2::new(xx, yy), true, prob_stands, entities);
+                Spectator::rand(rand, V2::new(xx, yy), true, prob_front, entities);
             }
 
             let prob_below = 0.2;
@@ -144,12 +147,13 @@ impl PropController {
 }
 
 #[repr(u8)]
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum EntityType {
     #[default]
     Unknown,
     Prop,
     Spectator,
+    Car,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -243,6 +247,7 @@ pub struct EntityManager {
     pub next_id: i32,
     pub props: EntityContainer<Prop>,
     pub spectators: EntityContainer<Spectator>,
+    pub cars: EntityContainer<Car>,
 }
 
 macro_rules! map_over_entity {
@@ -250,6 +255,7 @@ macro_rules! map_over_entity {
         match $e.entity_type {
             EntityType::Prop => $self.props.$f($e),
             EntityType::Spectator => $self.spectators.$f($e),
+            EntityType::Car => $self.cars.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -275,8 +281,22 @@ impl EntityManager {
     }
 
     pub fn extend_all_depth(&self, all_entities: &mut Vec<(Entity, i32)>) {
-        self.props.extend_all_entities_depth(all_entities);
-        self.spectators.extend_all_entities_depth(all_entities);
+        // Done like this to make sure we dont forget to add.
+        for entity_type in EntityType::iter()
+        {
+            match entity_type {
+                EntityType::Prop => {
+                    self.props.extend_all_entities_depth(all_entities);
+                },
+                EntityType::Spectator => {
+                    self.spectators.extend_all_entities_depth(all_entities);
+                },
+                EntityType::Car => {
+                    self.cars.extend_all_entities_depth(all_entities);
+                },
+                EntityType::Unknown => {},
+            }
+        }
     }
 
     pub fn draw_entity(&mut self, e: Entity) {
@@ -379,6 +399,28 @@ impl Spectator {
     }
 }
 
+pub struct Car {
+    pub id : i32,
+    pub pos: V2,
+    pub image_index: i32,
+    pub flipped: bool,
+}
+
+impl Car {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            image_index: 0,
+            flipped: false,
+        }
+    }
+
+    pub fn alive(&self, camera_y_max: f32) -> bool {
+        true
+    }
+}
+
 /////////////////////////////////////////////////////////////
 
 // Ugh
@@ -468,5 +510,42 @@ impl IsEntity for Spectator {
 
         crate::sprites::draw("shadow", 0, self.pos_0.x, self.pos_0.y);
         crate::sprites::draw_with_flip(self.sprite, self.image_index as usize, self.pos.x, self.pos.y - 2.0, self.flipped);
+    }
+}
+
+const spr_car_width : i32 = 24;
+const spr_car_height : i32 = 16;
+const car_sprite_count : i32 = 4;
+
+impl IsEntity for Car {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::Car,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        return self.pos.y as i32 + spr_car_height / 2
+    }
+
+    fn draw(&mut self) {
+        let mut xx = self.pos.x + spr_car_width as f32 * 0.5;
+        if self.flipped {
+            xx -= 24.0;
+        }
+        self.image_index = (((100.0 + self.pos.x) / 8.0).floor().abs()) as i32 % car_sprite_count;
+        sprites::draw_with_flip("car_flipped", self.image_index as usize, xx, self.pos.y - spr_car_height as f32 * 0.5, self.flipped);
     }
 }

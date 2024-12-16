@@ -8,8 +8,8 @@ mod entities;
 
 use std::{mem::MaybeUninit};
 
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use entities::{Entity, EntityContainer, EntityManager, Prop, PropController, Spectator};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
+use entities::{Car, Entity, EntityContainer, EntityManager, Prop, PropController, Spectator};
 use froggy_rand::FroggyRand;
 use sprites::draw_with_flip;
 
@@ -260,6 +260,10 @@ impl Client {
                     entity_type: entities::EntityType::Spectator,
                     inner: Default::default(),
                 },
+                cars: EntityContainer::<Car> {
+                    entity_type: entities::EntityType::Car,
+                    inner: Default::default(),
+                }
             },
             prop_controller: PropController::new(),
         }
@@ -299,6 +303,21 @@ impl Client {
         }
 
         self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities);
+
+        // @TODO how do we model this?
+        // Should cars be ephemeral actors?
+        self.entities.cars.inner.clear();
+        //let rows = self.timeline.map.get_row_view(top.get_round_id(), top.rules_state.fst.get_screen_y());
+        let pub_cars = self.timeline.map.get_cars(top.get_round_id(), top.time_us);
+        for pub_car in pub_cars {
+            let car_id = self.entities.create_entity(Entity {
+                id: 0,
+                entity_type: entities::EntityType::Car,
+                pos: Pos::Absolute(V2::new(pub_car.0 as f32 * 8.0, pub_car.1 as f32 * 8.0)),
+            });
+            let car = self.entities.cars.get_mut(car_id).unwrap();
+            car.flipped = pub_car.2;
+        }
     }
 
     pub unsafe fn draw(&mut self) {
