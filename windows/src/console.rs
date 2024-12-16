@@ -423,7 +423,9 @@ fn do_new(args: &[&str], client: &mut Client) {
     }
 
     big(&format!("New Level Seed '{}'", seed));
+    let new_game_id = client.timeline.top_state().rules_state.game_id;
     let config = client.timeline.top_state().rules_state.config.clone();
     client.timeline = Timeline::from_seed(config, &seed);
+    client.timeline.set_game_id(new_game_id);
     client.timeline.add_player(PlayerId(1), Pos::new_coord(7, 7));
 }

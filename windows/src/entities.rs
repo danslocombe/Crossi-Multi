@@ -3,7 +3,7 @@ use std::{mem::MaybeUninit, ops::Add};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
+use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
 use crate::{diff, lerp_snap, sprites};
@@ -33,8 +33,15 @@ impl PropController {
             // Regen.
 
             // Destroy all props.
+            crate::console::info(&format!("PropController Resetting, gameid {} roundid {}", game_id, round_id));
             entities.props.inner.clear();
             entities.spectators.inner.clear();
+            entities.bubbles.inner.clear();
+            entities.corpses.inner.clear();
+            entities.dust.inner.clear();
+            for player in entities.players.inner.iter_mut() {
+                player.reset();
+            }
 
             self.last_generated_game = game_id;
             self.last_generated_round = round_id;
@@ -508,6 +515,10 @@ impl PlayerLocal {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.created_corpse = false;
+    }
+
     pub fn set_from(&mut self, state: &PlayerStatePublic) {
         self.player_id = PlayerId(state.id);
         self.pos = V2::new(state.x as f32, state.y as f32);
@@ -534,7 +545,7 @@ impl PlayerLocal {
         }
     }
 
-    pub fn tick(&mut self, player_state: &PlayerStatePublic, dust: &mut EntityContainer<Dust>) {
+    pub fn tick(&mut self, player_state: &PlayerStatePublic, alive_state: AliveState, dust: &mut EntityContainer<Dust>, corpses: &mut EntityContainer<Corpse>) {
         self.t += 1;
 
         let x0 = player_state.x as f32;
@@ -588,6 +599,15 @@ impl PlayerLocal {
                 dust_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
                 dust_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
             }
+        }
+
+        if (alive_state == AliveState::Dead && !self.created_corpse) {
+            self.created_corpse = true;
+            let eid = corpses.create_entity(Entity {
+                id: 0,
+                entity_type: EntityType::Corpse,
+                pos: Pos::Absolute(self.pos * 8.0),
+            });
         }
 
         self.pos.x = x;
@@ -851,8 +871,10 @@ impl IsEntity for PlayerLocal {
     }
 
     fn draw(&mut self) {
-        sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
-        sprites::draw_with_flip("frog", self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
+        if (!self.created_corpse) {
+            sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
+            sprites::draw_with_flip("frog", self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
+        }
     }
 }
 
@@ -908,6 +930,7 @@ impl IsEntity for Corpse {
     }
 
     fn draw(&mut self) {
+        sprites::draw("frog_dead", 0, self.pos.x, self.pos.y);
         //sprites::draw("log", 0, self.pos.x, self.pos.y);
     }
 }

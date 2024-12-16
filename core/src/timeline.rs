@@ -60,6 +60,11 @@ impl Timeline {
         }
     }
 
+    pub fn set_game_id(&mut self, game_id: u32) {
+        // @Hack
+        self.states.front_mut().unwrap().rules_state.game_id = game_id;
+    }
+
     pub fn from_server_parts(
         seed: &str,
         frame_id : u32,
