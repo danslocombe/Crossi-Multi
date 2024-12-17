@@ -385,3 +385,7 @@ pub fn lerp_color_rgba(c0: raylib_sys::Color, c1: raylib_sys::Color, t: f32) -> 
         a: aa as u8,
     }
 }
+
+pub fn ease_in_quad(x: f32) -> f32 {
+    return 1.0 - (1.0 - x) * (1.0 - x);
+}

@@ -1,6 +1,8 @@
 use core::str;
 use std::{collections::BTreeMap, mem::MaybeUninit};
 
+use crossy_multi_core::math::V2;
+
 
 static mut SPRITE_FRAMES: MaybeUninit<BTreeMap<String, Vec<raylib_sys::Texture2D>>> = MaybeUninit::uninit();
 
@@ -34,6 +36,9 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_bubble.png", Some(5));
 
         load_frames("../web-client/static/sprites/spr_countdown.png", Some(4));
+
+        load_frames("../web-client/static/sprites/spr_frog_dialogue.png", Some(2));
+        load_frames("../web-client/static/sprites/spr_mouse_dialogue_cute.png", Some(2));
     }
 }
 
@@ -99,6 +104,33 @@ pub fn draw(name: &str, image_index: usize, x: f32, y: f32) {
             *spr,
             x as i32,
             y as i32,
+            crate::WHITE);
+    }
+}
+
+pub fn draw_ex(name: &str, image_index: usize, pos: V2, rotation: f32, scale: f32) {
+    let sprite = &get_sprite(name)[image_index];
+    unsafe {
+        let rect = raylib_sys::Rectangle{
+            x: 0.0,
+            y: 0.0,
+            width: sprite.width as f32,
+            height: sprite.height as f32,
+        };
+
+        let dest = raylib_sys::Rectangle{
+            x: pos.x,
+            y: pos.y,
+            width: sprite.width as f32 * scale,
+            height: sprite.height as f32 * scale,
+        };
+
+        raylib_sys::DrawTexturePro(
+            *sprite,
+            rect,
+            dest,
+            raylib_sys::Vector2::new(sprite.width as f32 * 0.5, sprite.height as f32 * 0.5),
+            rotation,
             crate::WHITE);
     }
 }
