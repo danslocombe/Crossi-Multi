@@ -6,7 +6,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{diff, lerp_snap, sprites, VisualEffects};
+use crate::{diff, lerp_snap, sprites, client::VisualEffects};
 
 pub struct PropController {
     gen_to : i32,
