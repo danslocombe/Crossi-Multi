@@ -745,7 +745,7 @@ impl IsEntity for Prop {
         }
 
         if let Some(dynamic_depth) = self.dynamic_depth {
-            return (self.pos.y as f32) as i32 + dynamic_depth as i32;
+            return (self.pos.y as f32 * 8.0) as i32 + dynamic_depth as i32;
         }
 
         0

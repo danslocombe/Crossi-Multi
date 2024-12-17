@@ -11,7 +11,6 @@ use std::{mem::MaybeUninit};
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
 use entities::{Car, Entity, EntityContainer, EntityManager, Prop, PropController, Spectator};
 use froggy_rand::FroggyRand;
-use sprites::draw_with_flip;
 
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
@@ -108,8 +107,24 @@ fn main() {
             {
                 raylib_sys::BeginDrawing();
                 raylib_sys::ClearBackground(BLACK);
+
+
+                if (client.screen_shader.enabled) {
+                    client.screen_shader.iTime += 1;
+
+                    let iTime_ptr: *const i32 = std::ptr::from_ref(&client.screen_shader.iTime);
+                    raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_iTime_loc, iTime_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_INT as i32);
+                    let amp = client.visual_effects.screenshake * 2.0;// / 16.0;
+                    let amp_ptr: *const f32 = std::ptr::from_ref(&amp);
+                    raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_amp_loc, amp_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_FLOAT as i32);
+                    raylib_sys::BeginShaderMode(client.screen_shader.shader);
+                }
+
                 raylib_sys::DrawTexturePro(framebuffer.texture, mapping_info.source, mapping_info.destination, raylib_sys::Vector2{ x: 0.0, y: 0.0 }, 0.0, WHITE);
 
+                if (client.screen_shader.enabled) {
+                    raylib_sys::EndShaderMode();
+                }
                 /*
                 if let Some(editor) = client.game.editor.as_mut() {
                     gui_editor::draw_gui(&mut client.game.local_simulation.simulation, editor);
@@ -230,6 +245,8 @@ pub struct Client {
     prop_controller: PropController,
     entities: EntityManager,
     visual_effects: VisualEffects,
+
+    screen_shader: ScreenShader,
 }
 
 impl Client {
@@ -259,6 +276,7 @@ impl Client {
             entities,
             prop_controller: PropController::new(),
             visual_effects: VisualEffects::default(),
+            screen_shader: ScreenShader::new(),
         }
     }
 
@@ -506,11 +524,29 @@ impl Camera {
     }
 }
 
-pub struct PlayerLocalSource {
-
+struct ScreenShader {
+    enabled: bool,
+    shader: raylib_sys::Shader,
+    iTime: i32,
+    shader_iTime_loc: i32,
+    shader_amp_loc: i32,
 }
 
-pub struct PlayerSkin {
+impl ScreenShader {
+    pub fn new() -> Self {
+        unsafe {
+            let shader = raylib_sys::LoadShader(std::ptr::null(), c_str_leaky("shaders/pause.fs"));
+            let shader_iTime_loc = raylib_sys::GetShaderLocation(shader, c_str_leaky("iTime"));
+            let shader_amp_loc = raylib_sys::GetShaderLocation(shader, c_str_leaky("amp"));
+            Self {
+                enabled: true,
+                shader,
+                iTime: 0,
+                shader_iTime_loc,
+                shader_amp_loc,
+            }
+        }
+    }
 }
 
 fn dan_lerp(x0 : f32, x : f32, k : f32) -> f32 {

@@ -22,6 +22,10 @@ pub fn init_console() {
             name: "new".to_owned(),
             lambda: Box::new(do_new),
         });
+        command_set.commands.push(Command {
+            name: "shader".to_owned(),
+            lambda: Box::new(do_toggle_shader),
+        });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
 }
@@ -428,4 +432,13 @@ fn do_new(args: &[&str], client: &mut Client) {
     client.timeline = Timeline::from_seed(config, &seed);
     client.timeline.set_game_id(new_game_id);
     client.timeline.add_player(PlayerId(1), Pos::new_coord(7, 7));
+}
+
+fn do_toggle_shader(args: &[&str], client: &mut Client) {
+    if (args.len() > 0) {
+        err(&format!("Expected no arguments to 'shader' got {}", args.len()));
+        return;
+    }
+
+    client.screen_shader.enabled = !client.screen_shader.enabled;
 }
