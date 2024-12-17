@@ -291,7 +291,13 @@ impl Client {
             if let Some(state) = top.player_states.get(local_player.player_id) {
                 let player_state = state.to_public(top.get_round_id(), top.time_us, &self.timeline.map);
                 let alive_state = top.rules_state.fst.get_player_alive(local_player.player_id);
-                local_player.tick(&player_state, alive_state, &mut self.entities.dust, &mut self.entities.corpses);
+                local_player.tick(
+                    &player_state,
+                    alive_state,
+                    &self.timeline,
+                    &mut self.entities.dust,
+                    &mut self.entities.bubbles,
+                    &mut self.entities.corpses);
             }
         }
 

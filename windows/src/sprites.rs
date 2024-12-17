@@ -30,6 +30,7 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_log.png", None);
 
         load_frames("../web-client/static/sprites/spr_dust.png", Some(4));
+        load_frames("../web-client/static/sprites/spr_bubble.png", Some(5));
     }
 }
 

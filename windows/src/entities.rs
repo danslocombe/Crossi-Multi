@@ -3,7 +3,7 @@ use std::{mem::MaybeUninit, ops::Add};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
+use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
 use crate::{diff, lerp_snap, sprites};
@@ -545,7 +545,14 @@ impl PlayerLocal {
         }
     }
 
-    pub fn tick(&mut self, player_state: &PlayerStatePublic, alive_state: AliveState, dust: &mut EntityContainer<Dust>, corpses: &mut EntityContainer<Corpse>) {
+    pub fn tick(
+        &mut self,
+        player_state: &PlayerStatePublic,
+        alive_state: AliveState,
+        timeline: &Timeline,
+        dust: &mut EntityContainer<Dust>,
+        bubbles: &mut EntityContainer<Bubble>,
+        corpses: &mut EntityContainer<Corpse>) {
         self.t += 1;
 
         let x0 = player_state.x as f32;
@@ -603,11 +610,36 @@ impl PlayerLocal {
 
         if (alive_state == AliveState::Dead && !self.created_corpse) {
             self.created_corpse = true;
-            let eid = corpses.create_entity(Entity {
-                id: 0,
-                entity_type: EntityType::Corpse,
-                pos: Pos::Absolute(self.pos * 8.0),
-            });
+
+            let top_state = timeline.top_state();
+            let row = timeline.map.get_row(top_state.rules_state.fst.get_round_id(), player_state.y);
+            if let RowType::River(_) = row.row_type {
+                // Drowning.
+                let rand = FroggyRand::from_hash((self.player_id.0, self.t));
+                for i in 0..2 {
+                    let rand = rand.subrand(i);
+                    let dust_off = rand.gen_unit("off") * 3.0;
+                    let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
+                    let pos = self.pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+                    //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+                    let eid = bubbles.create_entity(Entity {
+                        id: 0,
+                        entity_type: EntityType::Bubble,
+                        pos: Pos::Absolute(pos),
+                    });
+                    let bubble_part = bubbles.get_mut(eid).unwrap();
+                    bubble_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
+                    bubble_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
+                }
+            }
+            else {
+                /// Hit by car.
+                let eid = corpses.create_entity(Entity {
+                    id: 0,
+                    entity_type: EntityType::Corpse,
+                    pos: Pos::Absolute(self.pos * 8.0),
+                });
+            }
         }
 
         self.pos.x = x;
@@ -621,6 +653,7 @@ pub struct Bubble {
     pub pos: V2,
     pub image_index: i32,
     pub flipped: bool,
+    pub scale: f32,
 }
 
 impl Bubble {
@@ -630,6 +663,7 @@ impl Bubble {
             pos,
             image_index: 0,
             flipped: false,
+            scale: 1.0,
         }
     }
 }
@@ -878,34 +912,6 @@ impl IsEntity for PlayerLocal {
     }
 }
 
-impl IsEntity for Bubble {
-    fn create(e: Entity) -> Self {
-        Self::new(e.id, e.pos.get_abs())
-    }
-
-    fn get(&self) -> Entity {
-        Entity {
-            id: self.id,
-            entity_type: EntityType::Bubble,
-            pos: Pos::Absolute(self.pos),
-        }
-    }
-
-    fn set_pos(&mut self, pos : Pos) {
-        if let Pos::Absolute(p) = pos {
-            self.pos = p;
-        }
-    }
-
-    fn get_depth(&self) -> i32 {
-        self.pos.y as i32
-    }
-
-    fn draw(&mut self) {
-        //sprites::draw("log", 0, self.pos.x, self.pos.y);
-    }
-}
-
 impl IsEntity for Corpse {
     fn create(e: Entity) -> Self {
         Self::new(e.id, e.pos.get_abs())
@@ -932,6 +938,45 @@ impl IsEntity for Corpse {
     fn draw(&mut self) {
         sprites::draw("frog_dead", 0, self.pos.x, self.pos.y);
         //sprites::draw("log", 0, self.pos.x, self.pos.y);
+    }
+}
+
+impl IsEntity for Bubble {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::Bubble,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32
+    }
+
+    fn draw(&mut self) {
+        self.scale -= 0.025;
+        self.pos.y -= 0.2;
+        if (self.scale > 0.0) {
+            let size = 8.0 * self.scale;
+            let x = self.pos.x - 0.5 * size;
+            let y = self.pos.y - 0.5 * size;
+            sprites::draw_scaled("bubble", self.image_index as usize, x, y, self.scale);
+        }
+    }
+
+    fn alive(&self, _camera_y_max: f32) -> bool {
+        self.scale > 0.0
     }
 }
 
