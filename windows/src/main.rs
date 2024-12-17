@@ -6,13 +6,11 @@ mod sprites;
 mod console;
 mod entities;
 mod client;
+mod bigtext;
 
 use std::{mem::MaybeUninit};
 
 use client::Client;
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use entities::{Car, Entity, EntityContainer, EntityManager, Prop, PropController, Spectator};
-use froggy_rand::FroggyRand;
 
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();

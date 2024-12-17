@@ -141,7 +141,7 @@ impl PropController {
                             foliage.sprite = "foliage";
                             let image_count = sprites::get_sprite("foliage").len();
                             foliage.image_index = (rand.gen_unit((x, self.gen_to, "ii")) * image_count as f64).floor() as i32;
-                            foliage.dynamic_depth = Some(1.0);
+                            foliage.dynamic_depth = Some(-100.0);
                         }
                     }
                 },
@@ -490,6 +490,7 @@ pub struct PlayerLocal {
     pub buffered_input: Input,
     pub created_corpse: bool,
     pub t : i32,
+    pub sprite: &'static str,
 }
 
 const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
@@ -512,6 +513,7 @@ impl PlayerLocal {
             buffered_input: Input::None,
             created_corpse: false,
             t: 0,
+            sprite: "frog",
         }
     }
 
@@ -911,7 +913,7 @@ impl IsEntity for PlayerLocal {
     fn draw(&mut self) {
         if (!self.created_corpse) {
             sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
-            sprites::draw_with_flip("frog", self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
+            sprites::draw_with_flip(&self.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
         }
     }
 }

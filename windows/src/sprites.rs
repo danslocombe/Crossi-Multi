@@ -6,6 +6,7 @@ static mut SPRITE_FRAMES: MaybeUninit<BTreeMap<String, Vec<raylib_sys::Texture2D
 
 pub fn init_sprites() {
     unsafe {
+        // @Perf should be enum instead of hashmap
         let map = BTreeMap::new();
         SPRITE_FRAMES = MaybeUninit::new(map);
         load_frames("../web-client/static/sprites/spr_frog.png", None);
@@ -31,6 +32,8 @@ pub fn init_sprites() {
 
         load_frames("../web-client/static/sprites/spr_dust.png", Some(4));
         load_frames("../web-client/static/sprites/spr_bubble.png", Some(5));
+
+        load_frames("../web-client/static/sprites/spr_countdown.png", Some(4));
     }
 }
 

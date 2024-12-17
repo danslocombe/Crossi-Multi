@@ -12,27 +12,44 @@ pub struct Client {
     pub visual_effects: VisualEffects,
 
     pub screen_shader: crate::ScreenShader,
+
+    pub big_text_controller: crate::bigtext::BigTextController,
 }
 
 impl Client {
     pub fn new(debug: bool) -> Self {
         let mut game_config = GameConfig::default();
         game_config.bypass_lobby = true;
-        game_config.minimum_players = 1;
+        //game_config.minimum_players = 1;
         let mut timeline = Timeline::from_seed(game_config, "ac");
         timeline.add_player(PlayerId(1), game::Pos::new_coord(7, 7));
+        timeline.add_player(PlayerId(2), game::Pos::new_coord(8, 7));
 
         let top = timeline.top_state();
 
-        let player_state = top.player_states.get(PlayerId(1)).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
         let mut entities = EntityManager::new();
-        let eid = entities.create_entity(Entity {
-            id: 0,
-            entity_type: entities::EntityType::Player,
-            pos: Pos::Absolute(V2::default())
-        });
-        let player_local = entities.players.get_mut(eid).unwrap();
-        player_local.set_from(&player_state);
+        {
+            let player_state = top.player_states.get(PlayerId(1)).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
+            let eid = entities.create_entity(Entity {
+                id: 0,
+                entity_type: entities::EntityType::Player,
+                pos: Pos::Absolute(V2::default())
+            });
+            let player_local = entities.players.get_mut(eid).unwrap();
+            player_local.set_from(&player_state);
+            player_local.sprite = "frog";
+        }
+        {
+            let player_state = top.player_states.get(PlayerId(2)).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
+            let eid = entities.create_entity(Entity {
+                id: 0,
+                entity_type: entities::EntityType::Player,
+                pos: Pos::Absolute(V2::default())
+            });
+            let player_local = entities.players.get_mut(eid).unwrap();
+            player_local.set_from(&player_state);
+            player_local.sprite = "snake";
+        }
 
         Self {
             exit: false,
@@ -42,6 +59,7 @@ impl Client {
             prop_controller: PropController::new(),
             visual_effects: VisualEffects::default(),
             screen_shader: crate::ScreenShader::new(),
+            big_text_controller: Default::default(),
         }
     }
 
@@ -61,6 +79,20 @@ impl Client {
                     input = game::Input::Up;
                 }
                 if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
+                    input = game::Input::Down;
+                }
+            }
+            if (player.player_id.0 == 2) {
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_A)) {
+                    input = game::Input::Left;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_D)) {
+                    input = game::Input::Right;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_W)) {
+                    input = game::Input::Up;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_S)) {
                     input = game::Input::Down;
                 }
             }
@@ -115,6 +147,8 @@ impl Client {
             });
             let lilly = self.entities.lillipads.get_mut(lilly_id).unwrap();
         }
+
+        self.big_text_controller.tick(&self.timeline);
 
         let camera_y_max = top.rules_state.fst.get_screen_y() as f32 + 200.0;
         self.entities.bubbles.prune_dead(camera_y_max);
@@ -217,6 +251,8 @@ impl Client {
         }
 
         raylib_sys::EndMode2D();
+
+        self.big_text_controller.draw();
 
         {
             if (self.visual_effects.whiteout > 0) {
