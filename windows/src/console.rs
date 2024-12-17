@@ -432,6 +432,7 @@ fn do_new(args: &[&str], client: &mut Client) {
     client.timeline = Timeline::from_seed(config, &seed);
     client.timeline.set_game_id(new_game_id);
     client.timeline.add_player(PlayerId(1), Pos::new_coord(7, 7));
+    client.timeline.add_player(PlayerId(2), Pos::new_coord(8, 7));
 }
 
 fn do_toggle_shader(args: &[&str], client: &mut Client) {

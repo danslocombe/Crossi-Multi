@@ -50,7 +50,7 @@ fn main() {
         raylib_sys::SetTraceLogLevel(raylib_sys::TraceLogLevel::LOG_WARNING as i32);
         raylib_sys::SetConfigFlags(raylib_sys::ConfigFlags::FLAG_WINDOW_RESIZABLE as u32);
 
-        raylib_sys::InitWindow(1000, 800, c_str_leaky("Road Taods"));
+        raylib_sys::InitWindow(1000, 800, c_str_leaky("Road Toads"));
         raylib_sys::SetTargetFPS(60);
 
         //raylib_sys::SetExitKey(raylib_sys::KeyboardKey::KEY_NULL as i32);
