@@ -6,7 +6,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{diff, lerp_snap, sprites};
+use crate::{diff, lerp_snap, sprites, VisualEffects};
 
 pub struct PropController {
     gen_to : i32,
@@ -550,6 +550,7 @@ impl PlayerLocal {
         player_state: &PlayerStatePublic,
         alive_state: AliveState,
         timeline: &Timeline,
+        visual_effects: &mut VisualEffects,
         dust: &mut EntityContainer<Dust>,
         bubbles: &mut EntityContainer<Bubble>,
         corpses: &mut EntityContainer<Corpse>) {
@@ -640,6 +641,9 @@ impl PlayerLocal {
                     pos: Pos::Absolute(self.pos * 8.0),
                 });
             }
+
+            visual_effects.screenshake();
+            visual_effects.whiteout();
         }
 
         self.pos.x = x;

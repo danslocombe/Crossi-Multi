@@ -229,6 +229,7 @@ pub struct Client {
 
     prop_controller: PropController,
     entities: EntityManager,
+    visual_effects: VisualEffects,
 }
 
 impl Client {
@@ -257,6 +258,7 @@ impl Client {
             camera: Camera::new(),
             entities,
             prop_controller: PropController::new(),
+            visual_effects: VisualEffects::default(),
         }
     }
 
@@ -284,7 +286,8 @@ impl Client {
         }
 
         self.timeline.tick(Some(inputs), TICK_INTERVAL_US);
-        self.camera.tick(Some(self.timeline.top_state().get_rule_state()));
+        self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects);
+        self.visual_effects.tick();
 
         let top = self.timeline.top_state();
         for local_player in self.entities.players.inner.iter_mut() {
@@ -295,6 +298,7 @@ impl Client {
                     &player_state,
                     alive_state,
                     &self.timeline,
+                    &mut self.visual_effects,
                     &mut self.entities.dust,
                     &mut self.entities.bubbles,
                     &mut self.entities.corpses);
@@ -430,14 +434,21 @@ impl Client {
         }
 
         raylib_sys::EndMode2D();
+
+        {
+            if (self.visual_effects.whiteout > 0) {
+                raylib_sys::DrawRectangle(0, 0, 160, 160, WHITE);
+            }
+        }
     }
 }
 
 pub struct Camera {
     x: f32,
     y: f32,
+    x_mod: f32,
+    y_mod: f32,
     target_y: f32,
-    screen_shake_t: f32,
     t: i32,
 }
 
@@ -446,13 +457,14 @@ impl Camera {
         Self {
             x: 0.0,
             y: 0.0,
+            x_mod: 0.0,
+            y_mod: 0.0,
             target_y: 0.0,
-            screen_shake_t: 0.0,
             t: 0,
         }
     }
 
-    pub fn tick(&mut self, m_rules_state: Option<&RulesState>) {
+    pub fn tick(&mut self, m_rules_state: Option<&RulesState>, visual_effects: &VisualEffects) {
         self.t += 1;
 
         if let Some(rules_state) = m_rules_state {
@@ -464,21 +476,29 @@ impl Camera {
             }
         }
 
+        self.x = 0.0;
         self.y = dan_lerp(self.y, self.target_y * 8.0, 3.0);
-        if (self.screen_shake_t > 0.0) {
-            self.screen_shake_t -= 1.0;
-            let dir = *FroggyRand::new(self.t as u64).choose((), &[-1.0, 1.0]) as f32;
-            self.x = 1.0 / (self.screen_shake_t + 1.0) * dir;
-        }
-        else {
-            self.x = 0.0;
+
+        self.x_mod = self.x;
+        self.y_mod = self.y;
+
+        if (visual_effects.screenshake > 0.01) {
+            //self.screen_shake_t -= 1.0;
+            //let dir = *FroggyRand::new(self.t as u64).choose((), &[-1.0, 1.0]) as f32;
+            //self.x = 1.0 / (visual_effects.screenshake + 1.0) * dir;
+
+            let dir = (FroggyRand::new(self.t as u64).gen_unit(0) * 3.141 * 2.0) as f32;
+            let mag = visual_effects.screenshake * 0.4;
+            let offset = V2::norm_from_angle(dir) * mag;
+            self.x_mod = offset.x;
+            self.y_mod = offset.y;
         }
     }
 
     pub fn to_raylib(&self) -> raylib_sys::Camera2D {
         raylib_sys::Camera2D {
             offset: raylib_sys::Vector2::zero(),
-            target: raylib_sys::Vector2 { x: self.x, y: self.y },
+            target: raylib_sys::Vector2 { x: self.x_mod, y: self.y_mod },
             rotation: 0.0,
             zoom: 1.0,
             
@@ -544,6 +564,27 @@ fn mouse_button_down(mb: raylib_sys::MouseButton) -> bool {
 fn mouse_button_pressed(mb: raylib_sys::MouseButton) -> bool {
     unsafe {
         raylib_sys::IsMouseButtonPressed(mb as i32)
+    }
+}
+
+#[derive(Default)]
+pub struct VisualEffects {
+    whiteout: i32,
+    screenshake: f32,
+}
+
+impl VisualEffects {
+    pub fn whiteout(&mut self) {
+        self.whiteout = self.whiteout.max(6);
+    }
+
+    pub fn screenshake(&mut self) {
+        self.screenshake = self.screenshake.max(15.0);
+    }
+
+    pub fn tick(&mut self) {
+        self.whiteout = (self.whiteout - 1).max(0);
+        self.screenshake *= 0.85;
     }
 }
 
