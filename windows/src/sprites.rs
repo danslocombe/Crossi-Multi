@@ -36,6 +36,8 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_bubble.png", Some(5));
 
         load_frames("../web-client/static/sprites/spr_countdown.png", Some(4));
+        load_frames("../web-client/static/sprites/spr_winner.png", Some(1));
+        load_frames("../web-client/static/sprites/spr_no_winner.png", Some(1));
 
         load_frames("../web-client/static/sprites/spr_frog_dialogue.png", Some(2));
         load_frames("../web-client/static/sprites/spr_mouse_dialogue_cute.png", Some(2));

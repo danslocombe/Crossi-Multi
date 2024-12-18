@@ -10,7 +10,8 @@ struct Face {
     scale_factor: f32,
     face_x_off: f32,
     image_index: i32,
-    t_end: i32
+    t_end: i32,
+    close_triggered: bool,
 }
 
 const fade_in_time: i32 = 16;
@@ -53,6 +54,15 @@ impl Face {
         }
 
         self.letterbox = self.scale_factor * target_letterbox;
+    }
+
+    pub fn trigger_close(&mut self) {
+        if (self.close_triggered) {
+            return;
+        }
+
+        self.close_triggered = true;
+        self.t_end = self.t_end.min(self.t + fade_out_time);
     }
 
     pub fn draw(&self) {
@@ -108,15 +118,16 @@ impl BigTextController {
         }
 
         if let CrossyRulesetFST::RoundCooldown(state) = rules {
+            let mut winner = None;
+            for (player_id, alive_state) in state.round_state.alive_states.iter() {
+                if let AliveState::Alive = alive_state {
+                    winner = Some(player_id);
+                    break;
+                }
+            }
+
             if let Some(CrossyRulesetFST::Round(_)) = &self.last_rule_state_fst {
                 // Moving into round end
-                let mut winner = None;
-                for (player_id, alive_state) in state.round_state.alive_states.iter() {
-                    if let AliveState::Alive = alive_state {
-                        winner = Some(player_id);
-                        break;
-                    }
-                }
 
                 if let Some(winner_id) = winner {
                     // @Hack
@@ -136,7 +147,35 @@ impl BigTextController {
                         face_x_off: 0.0,
                         image_index: 0,
                         t_end: 120,
+                        close_triggered: false,
                     });
+
+                    self.text = Some(BigText {
+                        sprite: "winner",
+                        image_index: 0,
+                        lifetime: 120,
+                    })
+                }
+                else {
+                    self.text = Some(BigText {
+                        sprite: "no_winner",
+                        image_index: 0,
+                        lifetime: 120,
+                    })
+                }
+            }
+            else {
+                // Check for death to trigger no winner.
+                if (winner.is_none()) {
+                    if let Some(face) = self.face.as_mut() {
+                        face.trigger_close();
+                    }
+
+                    self.text = Some(BigText {
+                        sprite: "no_winner",
+                        image_index: 0,
+                        lifetime: 120,
+                    })
                 }
             }
         }
