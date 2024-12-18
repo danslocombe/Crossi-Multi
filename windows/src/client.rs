@@ -15,6 +15,8 @@ pub struct Client {
 
     pub big_text_controller: crate::bigtext::BigTextController,
     pub player_input_controller: PlayerInputController,
+
+    prev_rules: Option<CrossyRulesetFST>,
 }
 
 impl Client {
@@ -35,6 +37,7 @@ impl Client {
             screen_shader: crate::ScreenShader::new(),
             big_text_controller: Default::default(),
             player_input_controller: PlayerInputController::default(),
+            prev_rules: Default::default(),
         }
     }
 
@@ -45,6 +48,8 @@ impl Client {
         self.visual_effects.tick();
 
         let top = self.timeline.top_state();
+        let transitions = StateTransition::new(&top.rules_state.fst, &self.prev_rules);
+
         for local_player in self.entities.players.inner.iter_mut() {
             if let Some(state) = top.player_states.get(local_player.player_id) {
                 let player_state = state.to_public(top.get_round_id(), top.time_us, &self.timeline.map);
@@ -61,7 +66,7 @@ impl Client {
             }
         }
 
-        self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities);
+        self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities, &transitions);
 
         // @TODO how do we model this?
         // Should cars be ephemeral actors?
@@ -96,6 +101,8 @@ impl Client {
         self.entities.props.prune_dead(camera_y_max);
         self.entities.dust.prune_dead(camera_y_max);
         self.entities.crowns.prune_dead(camera_y_max);
+
+        self.prev_rules = Some(top.rules_state.clone().fst);
     }
 
     pub unsafe fn draw(&mut self) {
@@ -311,5 +318,37 @@ impl VisualEffects {
     pub fn tick(&mut self) {
         self.whiteout = (self.whiteout - 1).max(0);
         self.screenshake *= 0.85;
+    }
+}
+
+#[derive(Default)]
+pub struct StateTransition {
+    pub into_lobby: bool,
+    pub into_round_warmup: bool,
+    pub into_round: bool,
+    pub into_round_cooldown: bool,
+    pub into_end: bool,
+}
+
+impl StateTransition {
+    pub fn new(current: &CrossyRulesetFST, prev: &Option<CrossyRulesetFST>) -> Self {
+        let mut transitions = Self::default();
+        transitions.into_lobby = 
+            matches!(current, CrossyRulesetFST::Lobby { .. })
+            && !matches!(prev, Some(CrossyRulesetFST::Lobby { .. }));
+        transitions.into_round_warmup = 
+            matches!(current, CrossyRulesetFST::RoundWarmup { .. })
+            && !matches!(prev, Some(CrossyRulesetFST::RoundWarmup { .. }));
+        transitions.into_round = 
+            matches!(current, CrossyRulesetFST::Round { .. })
+            && !matches!(prev, Some(CrossyRulesetFST::Round { .. }));
+        transitions.into_round_cooldown = 
+            matches!(current, CrossyRulesetFST::RoundCooldown { .. })
+            && !matches!(prev, Some(CrossyRulesetFST::RoundCooldown { .. }));
+        transitions.into_end = 
+            matches!(current, CrossyRulesetFST::EndWinner { .. })
+            && !matches!(prev, Some(CrossyRulesetFST::EndWinner { .. }));
+
+        transitions
     }
 }

@@ -1,4 +1,4 @@
-use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState}, game, map::RowType, math::V2, player::PlayerStatePublic, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
+use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState, CrossyRulesetFST}, game, map::RowType, math::V2, player::PlayerStatePublic, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
 use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity}, key_pressed, lerp_snap, sprites};
@@ -16,6 +16,7 @@ pub struct PlayerLocal {
     pub created_crowns: bool,
     pub t : i32,
     pub skin: Skin,
+    pub visible: bool,
 }
 
 const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
@@ -215,12 +216,14 @@ impl PlayerLocal {
             created_crowns: false,
             t: 0,
             skin: Skin::default(),
+            visible: true,
         }
     }
 
     pub fn reset(&mut self) {
         self.created_corpse = false;
         self.created_crowns = false;
+        self.visible = true;
     }
 
     pub fn set_from(&mut self, state: &PlayerStatePublic) {
@@ -260,6 +263,13 @@ impl PlayerLocal {
         corpses: &mut EntityContainer<Corpse>,
         crowns: &mut EntityContainer<Crown>) {
         self.t += 1;
+
+        if let CrossyRulesetFST::EndWinner(state) = &timeline.top_state().rules_state.fst {
+            if (state.winner_id != self.player_id) {
+                self.visible = false;
+                return;
+            }
+        }
 
         let x0 = player_state.x as f32;
         let y0 = player_state.y as f32;
@@ -410,9 +420,15 @@ impl IsEntity for PlayerLocal {
     }
 
     fn draw(&mut self) {
-        if (!self.created_corpse) {
-            sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
-            sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
+        if (!self.visible) {
+            return;
         }
+
+        if (self.created_corpse) {
+            return;
+        }
+
+        sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
+        sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
     }
 }

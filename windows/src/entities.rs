@@ -4,7 +4,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{player_local::{PlayerLocal, Skin}, sprites};
+use crate::{client::StateTransition, player_local::{PlayerLocal, Skin}, sprites};
 
 pub struct PropController {
     gen_to : i32,
@@ -21,22 +21,79 @@ impl PropController {
         }
     }
 
-    pub fn tick(&mut self, rules_state: &RulesState, map: &Map, entities: &mut EntityManager) {
+    pub fn clear_round_entities(entities: &mut EntityManager) {
+        entities.props.inner.clear();
+        entities.spectators.inner.clear();
+        entities.bubbles.inner.clear();
+        entities.corpses.inner.clear();
+        entities.dust.inner.clear();
+    }
+
+    pub fn create_stands(entities: &mut EntityManager) -> (CoordPos, CoordPos) {
+        let stand_left_id = entities.create_entity(Entity {
+            id: 0,
+            entity_type: EntityType::Prop,
+            pos: Pos::new_coord(0, 10)
+        });
+        let stand_left_pos = {
+            let stand_left = entities.props.get_mut(stand_left_id).unwrap();
+            stand_left.depth = Some(100);
+            stand_left.sprite = "stand";
+            stand_left.draw_offset = V2::new(4.0, 0.0);
+            stand_left.pos
+        };
+
+        let stand_right_id = entities.create_entity(Entity {
+            id: 0,
+            entity_type: EntityType::Prop,
+            pos: Pos::new_coord(15, 10)
+        });
+
+        let stand_right_pos = {
+            let stand_right = entities.props.get_mut(stand_right_id).unwrap();
+            stand_right.depth = Some(100);
+            stand_right.sprite = "stand";
+            stand_right.flipped = true;
+            stand_right.draw_offset = V2::new(-4.0, 0.0);
+            stand_right.pos
+        };
+
+        (stand_left_pos, stand_right_pos)
+    }
+
+    pub fn tick(&mut self, rules_state: &RulesState, map: &Map, entities: &mut EntityManager, transitions: &StateTransition) {
         let round_id = rules_state.fst.get_round_id() as i32;
         let game_id = rules_state.game_id as i32;
 
         let rand = FroggyRand::from_hash((map.get_seed(), (round_id, game_id)));
 
-        if (self.last_generated_game != game_id || self.last_generated_round != round_id) {
+        for player in entities.players.inner.iter_mut() {
+            if let CrossyRulesetFST::Lobby { .. } = &rules_state.fst {
+                player.visible = true;
+            }
+        }
+
+        if (transitions.into_lobby) {
+            Self::clear_round_entities(entities);
+            _ = Self::create_stands(entities);
+        }
+        if (transitions.into_end) {
+            Self::clear_round_entities(entities);
+        }
+
+        if (transitions.into_round_warmup) {
+            Self::clear_round_entities(entities);
+        //}
+        //if (self.last_generated_game != game_id || self.last_generated_round != round_id) {
             // Regen.
 
             // Destroy all props.
             crate::console::info(&format!("PropController Resetting, gameid {} roundid {}", game_id, round_id));
-            entities.props.inner.clear();
-            entities.spectators.inner.clear();
-            entities.bubbles.inner.clear();
-            entities.corpses.inner.clear();
-            entities.dust.inner.clear();
+            //entities.props.inner.clear();
+            //entities.spectators.inner.clear();
+            //entities.bubbles.inner.clear();
+            //entities.corpses.inner.clear();
+            //entities.dust.inner.clear();
             for player in entities.players.inner.iter_mut() {
                 player.reset();
             }
@@ -46,92 +103,50 @@ impl PropController {
 
             self.gen_to = 20;
 
-            let in_lobby = if let CrossyRulesetFST::Lobby { .. } = &rules_state.fst {
-                true
+            let (stand_left_pos, stand_right_pos) = Self::create_stands(entities);
+
+            let prob_stands = 0.7;
+            let ymin = stand_left_pos.y as f32 * 8.0 + 8.0;
+            for ix in 0..4 {
+                for iy in 0..4 {
+                    let x = stand_left_pos.x as f32 * 8.0 + ix as f32 * 8.0 + 4.0;
+                    let y = ymin + x / 2.0 + 4.0 + 8.0 * iy as f32;// + 2.0;
+                    Spectator::rand(rand, V2::new(x + 4.0, y), false, prob_stands, entities);
+                }
             }
-            else {
-                false
-            };
 
-            //if let CrossyRulesetFST::Lobby { .. } = &rules_state.fst {
-            if (false) {
-                // ...
+            for ix in 0..4 {
+                for iy in 0..4 {
+                    let x = stand_right_pos.x as f32 * 8.0 + ix as f32 * 8.0 - 4.0;
+                    let y = ymin - 4.0 * ix as f32 + 16.0 + 8.0 * iy as f32;// + 2.0;
+                    Spectator::rand(rand, V2::new(x + 4.0, y), true, prob_stands, entities);
+                }
             }
-            else {
-                let stand_left_id = entities.create_entity(Entity {
-                    id: 0,
-                    entity_type: EntityType::Prop,
-                    pos: Pos::new_coord(0, 10)
-                });
-                let stand_left_pos = {
-                    let stand_left = entities.props.get_mut(stand_left_id).unwrap();
-                    stand_left.depth = Some(100);
-                    stand_left.sprite = "stand";
-                    stand_left.draw_offset = V2::new(4.0, 0.0);
-                    stand_left.pos
-                };
 
-                let stand_right_id = entities.create_entity(Entity {
-                    id: 0,
-                    entity_type: EntityType::Prop,
-                    pos: Pos::new_coord(15, 10)
-                });
+            let prob_front = 0.35;
+            for iy in 0..7 {
+                // In front of left stand
+                let yy = 13.0 * 8.0 + iy as f32 * 8.0;
+                let xx = stand_left_pos.x as f32 * 8.0 + 4.0 * 8.0 + 8.0;
+                Spectator::rand(rand, V2::new(xx, yy), false, prob_front, entities);
 
-                let stand_right_pos = {
-                    let stand_right = entities.props.get_mut(stand_right_id).unwrap();
-                    stand_right.depth = Some(100);
-                    stand_right.sprite = "stand";
-                    stand_right.flipped = true;
-                    stand_right.draw_offset = V2::new(-4.0, 0.0);
-                    stand_right.pos
-                };
+                // In front of right stand
+                let xx = 14.0 * 8.0;
+                Spectator::rand(rand, V2::new(xx, yy), true, prob_front, entities);
+            }
 
-                if (!in_lobby) {
+            let prob_below = 0.2;
+            for ix in 0..5 {
+                for iy in 0..2 {
+                    let yy = 18.0 * 8.0 + iy as f32 * 8.0;
 
-                    let prob_stands = 0.7;
-                    let ymin = stand_left_pos.y as f32 * 8.0 + 8.0;
-                    for ix in 0..4 {
-                        for iy in 0..4 {
-                            let x = stand_left_pos.x as f32 * 8.0 + ix as f32 * 8.0 + 4.0;
-                            let y = ymin + x / 2.0 + 4.0 + 8.0 * iy as f32;// + 2.0;
-                            Spectator::rand(rand, V2::new(x + 4.0, y), false, prob_stands, entities);
-                        }
-                    }
+                    // Below left stand
+                    let xx = stand_left_pos.x as f32 + ix as f32 * 8.0 - 8.0 + 4.0;
+                    Spectator::rand(rand, V2::new(xx, yy), false, prob_below, entities);
 
-                    for ix in 0..4 {
-                        for iy in 0..4 {
-                            let x = stand_right_pos.x as f32 * 8.0 + ix as f32 * 8.0 - 4.0;
-                            let y = ymin - 4.0 * ix as f32 + 16.0 + 8.0 * iy as f32;// + 2.0;
-                            Spectator::rand(rand, V2::new(x + 4.0, y), true, prob_stands, entities);
-                        }
-                    }
-
-                    let prob_front = 0.35;
-                    for iy in 0..7 {
-                        // In front of left stand
-                        let yy = 13.0 * 8.0 + iy as f32 * 8.0;
-                        let xx = stand_left_pos.x as f32 * 8.0 + 4.0 * 8.0 + 8.0;
-                        Spectator::rand(rand, V2::new(xx, yy), false, prob_front, entities);
-
-                        // In front of right stand
-                        let xx = 14.0 * 8.0;
-                        Spectator::rand(rand, V2::new(xx, yy), true, prob_front, entities);
-                    }
-
-                    let prob_below = 0.2;
-                    for ix in 0..5 {
-                        for iy in 0..2 {
-                            let yy = 18.0 * 8.0 + iy as f32 * 8.0;
-
-                            // Below left stand
-                            let xx = stand_left_pos.x as f32 + ix as f32 * 8.0 - 8.0 + 4.0;
-                            Spectator::rand(rand, V2::new(xx, yy), false, prob_below, entities);
-
-                            // Below right stand
-                            let xx = 15.0 * 8.0 + ix as f32 * 8.0;
-                            Spectator::rand(rand, V2::new(xx, yy), true, prob_below, entities);
-                        }
-                    }
+                    // Below right stand
+                    let xx = 15.0 * 8.0 + ix as f32 * 8.0;
+                    Spectator::rand(rand, V2::new(xx, yy), true, prob_below, entities);
                 }
             }
         }
