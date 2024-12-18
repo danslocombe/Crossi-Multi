@@ -1,12 +1,10 @@
-use core::slice;
-use std::{mem::MaybeUninit, ops::Add};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{diff, lerp_snap, sprites, client::VisualEffects};
+use crate::{player_local::PlayerLocal, sprites};
 
 pub struct PropController {
     gen_to : i32,
@@ -48,6 +46,13 @@ impl PropController {
 
             self.gen_to = 20;
 
+            let in_lobby = if let CrossyRulesetFST::Lobby { .. } = &rules_state.fst {
+                true
+            }
+            else {
+                false
+            };
+
             //if let CrossyRulesetFST::Lobby { .. } = &rules_state.fst {
             if (false) {
                 // ...
@@ -81,48 +86,51 @@ impl PropController {
                     stand_right.pos
                 };
 
-                let prob_stands = 0.7;
-                let ymin = stand_left_pos.y as f32 * 8.0 + 8.0;
-                for ix in 0..4 {
-                    for iy in 0..4 {
-                        let x = stand_left_pos.x as f32 * 8.0 + ix as f32 * 8.0 + 4.0;
-                        let y = ymin + x / 2.0 + 4.0 + 8.0 * iy as f32;// + 2.0;
-                        Spectator::rand(rand, V2::new(x + 4.0, y), false, prob_stands, entities);
+                if (!in_lobby) {
+
+                    let prob_stands = 0.7;
+                    let ymin = stand_left_pos.y as f32 * 8.0 + 8.0;
+                    for ix in 0..4 {
+                        for iy in 0..4 {
+                            let x = stand_left_pos.x as f32 * 8.0 + ix as f32 * 8.0 + 4.0;
+                            let y = ymin + x / 2.0 + 4.0 + 8.0 * iy as f32;// + 2.0;
+                            Spectator::rand(rand, V2::new(x + 4.0, y), false, prob_stands, entities);
+                        }
                     }
-                }
 
-                for ix in 0..4 {
-                    for iy in 0..4 {
-                        let x = stand_right_pos.x as f32 * 8.0 + ix as f32 * 8.0 - 4.0;
-                        let y = ymin - 4.0 * ix as f32 + 16.0 + 8.0 * iy as f32;// + 2.0;
-                        Spectator::rand(rand, V2::new(x + 4.0, y), true, prob_stands, entities);
+                    for ix in 0..4 {
+                        for iy in 0..4 {
+                            let x = stand_right_pos.x as f32 * 8.0 + ix as f32 * 8.0 - 4.0;
+                            let y = ymin - 4.0 * ix as f32 + 16.0 + 8.0 * iy as f32;// + 2.0;
+                            Spectator::rand(rand, V2::new(x + 4.0, y), true, prob_stands, entities);
+                        }
                     }
-                }
 
-                let prob_front = 0.35;
-                for iy in 0..7 {
-                    // In front of left stand
-                    let yy = 13.0 * 8.0 + iy as f32 * 8.0;
-                    let xx = stand_left_pos.x as f32 * 8.0 + 4.0 * 8.0 + 8.0;
-                    Spectator::rand(rand, V2::new(xx, yy), false, prob_front, entities);
+                    let prob_front = 0.35;
+                    for iy in 0..7 {
+                        // In front of left stand
+                        let yy = 13.0 * 8.0 + iy as f32 * 8.0;
+                        let xx = stand_left_pos.x as f32 * 8.0 + 4.0 * 8.0 + 8.0;
+                        Spectator::rand(rand, V2::new(xx, yy), false, prob_front, entities);
 
-                    // In front of right stand
-                    let xx = 14.0 * 8.0;
-                    Spectator::rand(rand, V2::new(xx, yy), true, prob_front, entities);
-                }
+                        // In front of right stand
+                        let xx = 14.0 * 8.0;
+                        Spectator::rand(rand, V2::new(xx, yy), true, prob_front, entities);
+                    }
 
-                let prob_below = 0.2;
-                for ix in 0..5 {
-                    for iy in 0..2 {
-                        let yy = 18.0 * 8.0 + iy as f32 * 8.0;
+                    let prob_below = 0.2;
+                    for ix in 0..5 {
+                        for iy in 0..2 {
+                            let yy = 18.0 * 8.0 + iy as f32 * 8.0;
 
-                        // Below left stand
-                        let xx = stand_left_pos.x as f32 + ix as f32 * 8.0 - 8.0 + 4.0;
-                        Spectator::rand(rand, V2::new(xx, yy), false, prob_below, entities);
+                            // Below left stand
+                            let xx = stand_left_pos.x as f32 + ix as f32 * 8.0 - 8.0 + 4.0;
+                            Spectator::rand(rand, V2::new(xx, yy), false, prob_below, entities);
 
-                        // Below right stand
-                        let xx = 15.0 * 8.0 + ix as f32 * 8.0;
-                        Spectator::rand(rand, V2::new(xx, yy), true, prob_below, entities);
+                            // Below right stand
+                            let xx = 15.0 * 8.0 + ix as f32 * 8.0;
+                            Spectator::rand(rand, V2::new(xx, yy), true, prob_below, entities);
+                        }
                     }
                 }
             }
@@ -485,181 +493,6 @@ impl Lillipad {
     }
 }
 
-#[derive(Debug)]
-pub struct PlayerLocal {
-    pub entity_id: i32,
-    pub player_id: PlayerId,
-    pub pos: V2,
-    pub moving: bool,
-    pub x_flip: bool,
-    pub image_index: i32,
-    pub buffered_input: Input,
-    pub created_corpse: bool,
-    pub t : i32,
-    pub sprite: &'static str,
-}
-
-const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
-const PLAYER_FRAME_COUNT: i32 = 5;
-
-pub struct Skin {
-    sprite: &'static str,
-    dead_sprite: &'static str,
-}
-
-impl PlayerLocal {
-    pub fn new(entity_id: i32, pos: V2,) -> Self {
-        Self {
-            entity_id,
-            player_id: PlayerId(0),
-            pos,
-            moving: false,
-            x_flip: false,
-            image_index: 0,
-            buffered_input: Input::None,
-            created_corpse: false,
-            t: 0,
-            sprite: "frog",
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.created_corpse = false;
-    }
-
-    pub fn set_from(&mut self, state: &PlayerStatePublic) {
-        self.player_id = PlayerId(state.id);
-        self.pos = V2::new(state.x as f32, state.y as f32);
-    }
-
-    pub fn update_inputs(&mut self, timeline: &Timeline, player_inputs: &mut PlayerInputs, input: Input) {
-        if (input != Input::None) {
-            self.buffered_input = input;
-
-        }
-
-        if (input == Input::Left) {
-            self.x_flip = true;
-        }
-
-        if (input == Input::Right) {
-            self.x_flip = false;
-        }
-
-        let top = timeline.top_state();
-        if (top.player_states.get(self.player_id).unwrap().can_move()) {
-            player_inputs.set(self.player_id, self.buffered_input);
-            self.buffered_input = Input::None;
-        }
-    }
-
-    pub fn tick(
-        &mut self,
-        player_state: &PlayerStatePublic,
-        alive_state: AliveState,
-        timeline: &Timeline,
-        visual_effects: &mut VisualEffects,
-        dust: &mut EntityContainer<Dust>,
-        bubbles: &mut EntityContainer<Bubble>,
-        corpses: &mut EntityContainer<Corpse>) {
-        self.t += 1;
-
-        let x0 = player_state.x as f32;
-        let y0 = player_state.y as f32;
-
-        let mut x: f32 = 0.0;
-        let mut y: f32 = 0.0;
-        if (player_state.moving) {
-            let lerp_t = 1.0 - (player_state.remaining_move_dur as f32 / MOVE_T as f32);
-
-            let x1 = player_state.t_x as f32;
-            let y1 = player_state.t_y as f32;
-
-            self.image_index = (self.image_index + 1);
-            if (self.image_index >= PLAYER_FRAME_COUNT) {
-                self.image_index = PLAYER_FRAME_COUNT - 1;
-            }
-
-            x = x0 + lerp_t * (x1 - x0);
-            y = y0 + lerp_t * (y1 - y0);
-        }
-        else {
-            let new_p = lerp_snap(self.pos.x, self.pos.y, x0, y0);
-            x = new_p.x;
-            y = new_p.y;
-
-            let delta = 8.0 * 0.01;
-            if (diff(x, self.pos.x) > delta || diff(y, self.pos.y) > delta) {
-                self.image_index = (self.image_index + 1) % PLAYER_FRAME_COUNT;
-            }
-            else {
-                self.image_index = 0;
-            }
-        }
-
-        if (player_state.moving && !self.moving) {
-            // Started moving, do effects.
-            let rand = FroggyRand::from_hash((self.player_id.0, self.t));
-            for i in 0..2 {
-                let rand = rand.subrand(i);
-                let dust_off = rand.gen_unit("off") * 3.0;
-                let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
-                let pos = self.pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                let eid = dust.create_entity(Entity {
-                    id: 0,
-                    entity_type: EntityType::Dust,
-                    pos: Pos::Absolute(pos),
-                });
-                let dust_part = dust.get_mut(eid).unwrap();
-                dust_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
-                dust_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
-            }
-        }
-
-        if (alive_state == AliveState::Dead && !self.created_corpse) {
-            self.created_corpse = true;
-
-            let top_state = timeline.top_state();
-            let row = timeline.map.get_row(top_state.rules_state.fst.get_round_id(), player_state.y);
-            if let RowType::River(_) = row.row_type {
-                // Drowning.
-                let rand = FroggyRand::from_hash((self.player_id.0, self.t));
-                for i in 0..2 {
-                    let rand = rand.subrand(i);
-                    let dust_off = rand.gen_unit("off") * 3.0;
-                    let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
-                    let pos = self.pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                    //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                    let eid = bubbles.create_entity(Entity {
-                        id: 0,
-                        entity_type: EntityType::Bubble,
-                        pos: Pos::Absolute(pos),
-                    });
-                    let bubble_part = bubbles.get_mut(eid).unwrap();
-                    bubble_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
-                    bubble_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
-                }
-            }
-            else {
-                /// Hit by car.
-                let eid = corpses.create_entity(Entity {
-                    id: 0,
-                    entity_type: EntityType::Corpse,
-                    pos: Pos::Absolute(self.pos * 8.0),
-                });
-            }
-
-            visual_effects.screenshake();
-            visual_effects.whiteout();
-        }
-
-        self.pos.x = x;
-        self.pos.y = y;
-        self.moving = player_state.moving;
-    }
-}
-
 pub struct Bubble {
     pub id : i32,
     pub pos: V2,
@@ -890,37 +723,6 @@ impl IsEntity for Lillipad {
 
     fn draw(&mut self) {
         sprites::draw("log", 0, self.pos.x, self.pos.y);
-    }
-}
-
-impl IsEntity for PlayerLocal {
-    fn create(e: Entity) -> Self {
-        Self::new(e.id, e.pos.get_abs())
-    }
-
-    fn get(&self) -> Entity {
-        Entity {
-            id: self.entity_id,
-            entity_type: EntityType::Player,
-            pos: Pos::Absolute(self.pos),
-        }
-    }
-
-    fn set_pos(&mut self, pos : Pos) {
-        if let Pos::Absolute(p) = pos {
-            self.pos = p;
-        }
-    }
-
-    fn get_depth(&self) -> i32 {
-        self.pos.y as i32 * 8
-    }
-
-    fn draw(&mut self) {
-        if (!self.created_corpse) {
-            sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
-            sprites::draw_with_flip(&self.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
-        }
     }
 }
 

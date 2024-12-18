@@ -7,6 +7,7 @@ mod console;
 mod entities;
 mod client;
 mod bigtext;
+mod player_local;
 
 use std::{mem::MaybeUninit};
 
