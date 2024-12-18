@@ -360,6 +360,23 @@ impl CrossyRulesetFST
             EndAllLeft(_) => AliveState::Alive,
         }
     }
+
+    pub fn winner_counts(&self) -> PlayerIdMap<u8> {
+        match self {
+            CrossyRulesetFST::Round(state) => {
+                state.win_counts.clone()
+            },
+            CrossyRulesetFST::RoundCooldown(state) => {
+                state.round_state.win_counts.clone()
+            },
+            CrossyRulesetFST::RoundWarmup(state) => {
+                state.win_counts.clone()
+            },
+            _ => {
+                Default::default()
+            }
+        }
+    }
      
     pub fn get_screen_y(&self) -> i32 {
         match self {

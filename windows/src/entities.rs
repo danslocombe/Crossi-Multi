@@ -180,6 +180,7 @@ pub enum EntityType {
     Corpse,
     Bubble,
     Dust,
+    Crown,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -320,6 +321,7 @@ pub struct EntityManager {
     pub bubbles: EntityContainer<Bubble>,
     pub corpses: EntityContainer<Corpse>,
     pub dust: EntityContainer<Dust>,
+    pub crowns: EntityContainer<Crown>,
 }
 
 macro_rules! map_over_entity {
@@ -333,6 +335,7 @@ macro_rules! map_over_entity {
             EntityType::Bubble => $self.bubbles.$f($e),
             EntityType::Corpse => $self.corpses.$f($e),
             EntityType::Dust => $self.dust.$f($e),
+            EntityType::Crown => $self.crowns.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -351,6 +354,7 @@ impl EntityManager {
             corpses: EntityContainer::<Corpse>::new(EntityType::Corpse),
             bubbles: EntityContainer::<Bubble>::new(EntityType::Bubble),
             dust: EntityContainer::<Dust>::new(EntityType::Dust),
+            crowns: EntityContainer::<Crown>::new(EntityType::Crown),
         }
     }
 
@@ -560,6 +564,32 @@ impl Dust {
             image_index: 0,
             flipped: false,
             scale: 1.0,
+        }
+    }
+}
+
+pub struct Crown {
+    pub id : i32,
+    pub pos: V2,
+    pub image_index: i32,
+    pub t: i32,
+    pub t_visible: i32,
+    pub t_max: i32,
+    pub owner: PlayerId,
+    pub offset_i : usize,
+}
+
+impl Crown {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            image_index: 0,
+            t: 0,
+            t_visible: 10,
+            t_max: 120,
+            owner: PlayerId(0),
+            offset_i: 0,
         }
     }
 }
@@ -841,5 +871,40 @@ impl IsEntity for Dust {
 
     fn alive(&self, _camera_y_max: f32) -> bool {
         self.scale > 0.0
+    }
+}
+
+impl IsEntity for Crown {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::Crown,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32 + 20
+    }
+
+    fn draw(&mut self) {
+        self.t += 1;
+        if self.t >= self.t_visible {
+            sprites::draw("crown", self.image_index as usize, self.pos.x, self.pos.y);
+        }
+    }
+
+    fn alive(&self, _camera_y_max: f32) -> bool {
+        self.t < self.t_max
     }
 }

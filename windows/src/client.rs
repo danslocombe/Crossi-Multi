@@ -56,7 +56,8 @@ impl Client {
                     &mut self.visual_effects,
                     &mut self.entities.dust,
                     &mut self.entities.bubbles,
-                    &mut self.entities.corpses);
+                    &mut self.entities.corpses,
+                    &mut self.entities.crowns);
             }
         }
 
@@ -94,6 +95,7 @@ impl Client {
         self.entities.bubbles.prune_dead(camera_y_max);
         self.entities.props.prune_dead(camera_y_max);
         self.entities.dust.prune_dead(camera_y_max);
+        self.entities.crowns.prune_dead(camera_y_max);
     }
 
     pub unsafe fn draw(&mut self) {

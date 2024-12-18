@@ -44,6 +44,7 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_frog_3.png", None);
 
         load_frames("../web-client/static/sprites/spr_shadow.png", None);
+        load_frames("../web-client/static/sprites/spr_crown.png", None);
 
         load_frames("../web-client/static/sprites/spr_block.png", None);
         load_frames("../web-client/static/sprites/spr_barrier.png", None);

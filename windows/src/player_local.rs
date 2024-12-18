@@ -1,7 +1,7 @@
 use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState}, game, map::RowType, math::V2, player::PlayerStatePublic, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Dust, Entity, EntityContainer, EntityType, IsEntity}, key_pressed, lerp_snap, sprites};
+use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity}, key_pressed, lerp_snap, sprites};
 
 #[derive(Debug)]
 pub struct PlayerLocal {
@@ -13,6 +13,7 @@ pub struct PlayerLocal {
     pub image_index: i32,
     pub buffered_input: Input,
     pub created_corpse: bool,
+    pub created_crowns: bool,
     pub t : i32,
     pub skin: Skin,
 }
@@ -94,6 +95,7 @@ impl PlayerInputController {
                 player_local.set_from(&player_state);
                 let rand = FroggyRand::new(timeline.len() as u64);
                 player_local.skin = Skin::from_enum(*rand.choose((), &crate::player_local::g_all_skins));
+                player_local.update_inputs(&*timeline, player_inputs, input);
             }
             else {
                 console::info("Unable to create another player");
@@ -210,6 +212,7 @@ impl PlayerLocal {
             image_index: 0,
             buffered_input: Input::None,
             created_corpse: false,
+            created_crowns: false,
             t: 0,
             skin: Skin::default(),
         }
@@ -217,6 +220,7 @@ impl PlayerLocal {
 
     pub fn reset(&mut self) {
         self.created_corpse = false;
+        self.created_crowns = false;
     }
 
     pub fn set_from(&mut self, state: &PlayerStatePublic) {
@@ -253,7 +257,8 @@ impl PlayerLocal {
         visual_effects: &mut VisualEffects,
         dust: &mut EntityContainer<Dust>,
         bubbles: &mut EntityContainer<Bubble>,
-        corpses: &mut EntityContainer<Corpse>) {
+        corpses: &mut EntityContainer<Corpse>,
+        crowns: &mut EntityContainer<Crown>) {
         self.t += 1;
 
         let x0 = player_state.x as f32;
@@ -344,6 +349,35 @@ impl PlayerLocal {
 
             visual_effects.screenshake();
             visual_effects.whiteout();
+        }
+
+        if (!self.created_crowns) {
+            self.created_crowns = true;
+            let winner_counts = timeline.top_state().rules_state.fst.winner_counts();
+            let count = winner_counts.get(self.player_id).map(|x| *x).unwrap_or(0) as usize;
+            for i in 0..count {
+                let crown = crowns.create(Pos::Absolute(self.pos));
+                crown.owner = self.player_id;
+                crown.offset_i =  i;
+                crown.t_visible = 10 * i as i32;
+                crown.t_max = 120 - 10 * i as i32;
+            }
+        }
+
+        for crown in crowns.inner.iter_mut() {
+            if (crown.owner != self.player_id) {
+                continue;
+            }
+
+            let x_off = if self.x_flip {
+                //-1.0
+                0.0
+            }
+            else {
+                1.0
+            };
+
+            crown.pos = self.pos * 8.0 + V2::new(x_off, -8.0 * crown.offset_i as f32 - 7.0);
         }
 
         self.pos.x = x;
