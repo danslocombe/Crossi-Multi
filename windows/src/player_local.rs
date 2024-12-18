@@ -1,7 +1,7 @@
-use crossy_multi_core::{crossy_ruleset::{AliveState}, map::{RowType}, math::V2, player::{PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
+use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState}, map::RowType, math::V2, player::PlayerStatePublic, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::VisualEffects, diff, entities::{Bubble, Corpse, Dust, Entity, EntityContainer, EntityType, IsEntity}, lerp_snap, sprites};
+use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Dust, Entity, EntityContainer, EntityType, IsEntity}, lerp_snap, sprites};
 
 #[derive(Debug)]
 pub struct PlayerLocal {
@@ -14,15 +14,25 @@ pub struct PlayerLocal {
     pub buffered_input: Input,
     pub created_corpse: bool,
     pub t : i32,
-    pub sprite: &'static str,
+    pub skin: Skin,
 }
 
 const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
 const PLAYER_FRAME_COUNT: i32 = 5;
 
+#[derive(Debug, Clone)]
 pub struct Skin {
-    sprite: &'static str,
-    dead_sprite: &'static str,
+    pub sprite: &'static str,
+    pub dead_sprite: &'static str,
+}
+
+impl Default for Skin {
+    fn default() -> Self {
+        Self {
+            sprite: "frog",
+            dead_sprite: "frog_dead",
+        }
+    }
 }
 
 impl PlayerLocal {
@@ -37,7 +47,7 @@ impl PlayerLocal {
             buffered_input: Input::None,
             created_corpse: false,
             t: 0,
-            sprite: "frog",
+            skin: Skin::default(),
         }
     }
 
@@ -138,6 +148,14 @@ impl PlayerLocal {
         if (alive_state == AliveState::Dead && !self.created_corpse) {
             self.created_corpse = true;
 
+            //let target_pos = V2::new((player_state.t_x * 8.0) as f32, player_state.t_y as f32 * 8.0);
+            let corpse_pos = if player_state.moving {
+                V2::new(player_state.t_x as f32, player_state.t_y as f32)
+            }
+            else {
+                V2::new(player_state.x as f32, player_state.y as f32)
+            } * 8.0;
+
             let top_state = timeline.top_state();
             let row = timeline.map.get_row(top_state.rules_state.fst.get_round_id(), player_state.y);
             if let RowType::River(_) = row.row_type {
@@ -147,25 +165,17 @@ impl PlayerLocal {
                     let rand = rand.subrand(i);
                     let dust_off = rand.gen_unit("off") * 3.0;
                     let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
-                    let pos = self.pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+                    let pos = corpse_pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
                     //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                    let eid = bubbles.create_entity(Entity {
-                        id: 0,
-                        entity_type: EntityType::Bubble,
-                        pos: Pos::Absolute(pos),
-                    });
-                    let bubble_part = bubbles.get_mut(eid).unwrap();
+                    let bubble_part = bubbles.create(Pos::Absolute(pos));
                     bubble_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
                     bubble_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
                 }
             }
             else {
-                /// Hit by car.
-                let eid = corpses.create_entity(Entity {
-                    id: 0,
-                    entity_type: EntityType::Corpse,
-                    pos: Pos::Absolute(self.pos * 8.0),
-                });
+                // Hit by car.
+                let corpse = corpses.create(Pos::Absolute(corpse_pos));
+                corpse.skin = self.skin.clone();
             }
 
             visual_effects.screenshake();
@@ -204,7 +214,7 @@ impl IsEntity for PlayerLocal {
     fn draw(&mut self) {
         if (!self.created_corpse) {
             sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
-            sprites::draw_with_flip(&self.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
+            sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
         }
     }
 }

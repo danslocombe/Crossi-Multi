@@ -37,7 +37,6 @@ impl Client {
             });
             let player_local = entities.players.get_mut(eid).unwrap();
             player_local.set_from(&player_state);
-            player_local.sprite = "frog";
         }
         {
             let player_state = top.player_states.get(PlayerId(2)).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
@@ -48,7 +47,8 @@ impl Client {
             });
             let player_local = entities.players.get_mut(eid).unwrap();
             player_local.set_from(&player_state);
-            player_local.sprite = "snake";
+            player_local.skin.sprite = "snake";
+            player_local.skin.dead_sprite = "snake_dead";
         }
 
         Self {

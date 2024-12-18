@@ -18,6 +18,7 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_duck.png", None);
         load_frames("../web-client/static/sprites/spr_mouse.png", None);
         load_frames("../web-client/static/sprites/spr_snake.png", None);
+        load_frames("../web-client/static/sprites/spr_snake_dead.png", None);
         //load_frames("../web-client/static/sprites/spr_snake_alt.png", None);
         load_frames("../web-client/static/sprites/spr_frog_alt.png", None);
         load_frames("../web-client/static/sprites/spr_frog_3.png", None);

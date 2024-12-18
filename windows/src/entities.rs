@@ -4,7 +4,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{player_local::PlayerLocal, sprites};
+use crate::{player_local::{PlayerLocal, Skin}, sprites};
 
 pub struct PropController {
     gen_to : i32,
@@ -235,6 +235,17 @@ impl<T: IsEntity> EntityContainer<T> {
         }
         self.inner.push(T::create(e));
         e.id
+    }
+
+    pub fn create(&mut self, pos: Pos) -> &mut T {
+        self.create_entity(Entity {
+            id: 0,
+            entity_type: self.entity_type,
+            pos,
+        });
+
+        // Assumes we push to the end of the inner vector
+        self.inner.last_mut().unwrap()
     }
 
     pub fn get(&self, id: i32) -> Option<&T> {
@@ -518,6 +529,7 @@ pub struct Corpse {
     pub pos: V2,
     pub image_index: i32,
     pub flipped: bool,
+    pub skin: Skin,
 }
 
 impl Corpse {
@@ -527,6 +539,7 @@ impl Corpse {
             pos,
             image_index: 0,
             flipped: false,
+            skin: Skin::default(),
         }
     }
 }
@@ -750,8 +763,7 @@ impl IsEntity for Corpse {
     }
 
     fn draw(&mut self) {
-        sprites::draw("frog_dead", 0, self.pos.x, self.pos.y);
-        //sprites::draw("log", 0, self.pos.x, self.pos.y);
+        sprites::draw(self.skin.dead_sprite, self.image_index as usize, self.pos.x, self.pos.y);
     }
 }
 
