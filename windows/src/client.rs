@@ -1,5 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{dan_lerp, entities::{self, Entity, EntityContainer, EntityManager, Prop, PropController, Spectator}, hex_color, key_pressed, sprites, BLACK, WHITE};
+use crate::{dan_lerp, entities::{self, Entity, EntityContainer, EntityManager, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, Skin}, sprites, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -14,6 +14,7 @@ pub struct Client {
     pub screen_shader: crate::ScreenShader,
 
     pub big_text_controller: crate::bigtext::BigTextController,
+    pub player_input_controller: PlayerInputController,
 }
 
 impl Client {
@@ -28,28 +29,6 @@ impl Client {
         let top = timeline.top_state();
 
         let mut entities = EntityManager::new();
-        {
-            let player_state = top.player_states.get(PlayerId(1)).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
-            let eid = entities.create_entity(Entity {
-                id: 0,
-                entity_type: entities::EntityType::Player,
-                pos: Pos::Absolute(V2::default())
-            });
-            let player_local = entities.players.get_mut(eid).unwrap();
-            player_local.set_from(&player_state);
-        }
-        {
-            let player_state = top.player_states.get(PlayerId(2)).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
-            let eid = entities.create_entity(Entity {
-                id: 0,
-                entity_type: entities::EntityType::Player,
-                pos: Pos::Absolute(V2::default())
-            });
-            let player_local = entities.players.get_mut(eid).unwrap();
-            player_local.set_from(&player_state);
-            player_local.skin.sprite = "snake";
-            player_local.skin.dead_sprite = "snake_dead";
-        }
 
         Self {
             exit: false,
@@ -60,46 +39,12 @@ impl Client {
             visual_effects: VisualEffects::default(),
             screen_shader: crate::ScreenShader::new(),
             big_text_controller: Default::default(),
+            player_input_controller: PlayerInputController::default(),
         }
     }
 
     pub fn tick(&mut self) {
-        let mut inputs = PlayerInputs::new();
-
-        for player in self.entities.players.inner.iter_mut() {
-            let mut input = Input::None;
-            if (player.player_id.0 == 1) {
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
-                    input = game::Input::Left;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
-                    input = game::Input::Right;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
-                    input = game::Input::Up;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
-                    input = game::Input::Down;
-                }
-            }
-            if (player.player_id.0 == 2) {
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_A)) {
-                    input = game::Input::Left;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_D)) {
-                    input = game::Input::Right;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_W)) {
-                    input = game::Input::Up;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_S)) {
-                    input = game::Input::Down;
-                }
-            }
-
-            player.update_inputs(&self.timeline, &mut inputs, input);
-        }
-
+        let inputs = self.player_input_controller.tick(&mut self.timeline, &mut self.entities.players);
         self.timeline.tick(Some(inputs), TICK_INTERVAL_US);
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects);
         self.visual_effects.tick();
@@ -148,7 +93,7 @@ impl Client {
             let lilly = self.entities.lillipads.get_mut(lilly_id).unwrap();
         }
 
-        self.big_text_controller.tick(&self.timeline);
+        self.big_text_controller.tick(&self.timeline, &self.entities.players);
 
         let camera_y_max = top.rules_state.fst.get_screen_y() as f32 + 200.0;
         self.entities.bubbles.prune_dead(camera_y_max);

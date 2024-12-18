@@ -101,6 +101,21 @@ impl<T> PlayerIdMap<T> {
     pub fn iter(&self) -> PlayerIdMapIterator<'_, T> {
         self.into_iter()
     }
+
+    pub fn next_free(&self) -> Option<PlayerId> {
+        for i in 1..8 {
+            if i < self.inner.len() {
+                if self.inner[i].is_none() {
+                    return Some(PlayerId(i as u8));
+                }
+            }
+            else {
+                return Some(PlayerId(i as u8));
+            }
+        }
+
+        None
+    }
 }
 
 impl<T> PlayerIdMap<T> where T : Clone {

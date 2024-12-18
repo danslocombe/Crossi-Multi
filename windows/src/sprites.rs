@@ -13,15 +13,37 @@ pub fn init_sprites() {
         SPRITE_FRAMES = MaybeUninit::new(map);
         load_frames("../web-client/static/sprites/spr_frog.png", None);
         load_frames("../web-client/static/sprites/spr_frog_dead.png", None);
-        load_frames("../web-client/static/sprites/spr_bird.png", None);
-        load_frames("../web-client/static/sprites/spr_shadow.png", None);
-        load_frames("../web-client/static/sprites/spr_duck.png", None);
+        load_frames("../web-client/static/sprites/spr_frog_dialogue.png", Some(2));
+
         load_frames("../web-client/static/sprites/spr_mouse.png", None);
+        load_frames("../web-client/static/sprites/spr_mouse_dead.png", None);
+        load_frames("../web-client/static/sprites/spr_mouse_dialogue_cute.png", Some(2));
+
+        load_frames("../web-client/static/sprites/spr_bird.png", None);
+        load_frames("../web-client/static/sprites/spr_bird_dead.png", None);
+        load_frames("../web-client/static/sprites/spr_bird_dialogue_cute.png", Some(2));
+
         load_frames("../web-client/static/sprites/spr_snake.png", None);
         load_frames("../web-client/static/sprites/spr_snake_dead.png", None);
-        //load_frames("../web-client/static/sprites/spr_snake_alt.png", None);
+        load_frames("../web-client/static/sprites/spr_snake_dialogue.png", Some(2));
+
+        load_frames("../web-client/static/sprites/spr_duck.png", None);
+        load_frames("../web-client/static/sprites/spr_duck_dead.png", None);
+        load_frames("../web-client/static/sprites/spr_duck_dialogue.png", Some(2));
+
+        load_frames("../web-client/static/sprites/spr_mouse.png", None);
+        load_frames("../web-client/static/sprites/spr_mouse_dead.png", None);
+        load_frames("../web-client/static/sprites/spr_mouse_dialogue_cute.png", Some(2));
+
+        load_frames("../web-client/static/sprites/spr_woshette.png", None);
+        //load_frames("../web-client/static/sprites/spr_wosh_dead.png", None);
+        //load_frames("../web-client/static/sprites/spr_wosh_dialogue.png", Some(2));
+
         load_frames("../web-client/static/sprites/spr_frog_alt.png", None);
+
         load_frames("../web-client/static/sprites/spr_frog_3.png", None);
+
+        load_frames("../web-client/static/sprites/spr_shadow.png", None);
 
         load_frames("../web-client/static/sprites/spr_block.png", None);
         load_frames("../web-client/static/sprites/spr_barrier.png", None);
@@ -39,9 +61,6 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_countdown.png", Some(4));
         load_frames("../web-client/static/sprites/spr_winner.png", Some(1));
         load_frames("../web-client/static/sprites/spr_no_winner.png", Some(1));
-
-        load_frames("../web-client/static/sprites/spr_frog_dialogue.png", Some(2));
-        load_frames("../web-client/static/sprites/spr_mouse_dialogue_cute.png", Some(2));
     }
 }
 

@@ -1,7 +1,7 @@
-use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState}, map::RowType, math::V2, player::PlayerStatePublic, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
+use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState}, game, map::RowType, math::V2, player::PlayerStatePublic, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Dust, Entity, EntityContainer, EntityType, IsEntity}, lerp_snap, sprites};
+use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Dust, Entity, EntityContainer, EntityType, IsEntity}, key_pressed, lerp_snap, sprites};
 
 #[derive(Debug)]
 pub struct PlayerLocal {
@@ -20,17 +20,181 @@ pub struct PlayerLocal {
 const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
 const PLAYER_FRAME_COUNT: i32 = 5;
 
+#[derive(Default)]
+pub struct PlayerInputController {
+    arrow_key_player: Option<PlayerId>,
+    wasd_player: Option<PlayerId>,
+    controller_a_player: Option<PlayerId>,
+    controller_b_player: Option<PlayerId>,
+    controller_c_player: Option<PlayerId>,
+    controller_d_player: Option<PlayerId>,
+}
+
+impl PlayerInputController {
+    pub fn tick(&mut self, timeline: &mut Timeline, players_local: &mut EntityContainer<PlayerLocal>) -> PlayerInputs {
+        let mut player_inputs = PlayerInputs::default();
+
+        {
+            // Arrows
+            let mut input = Input::None;
+            if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
+                input = game::Input::Left;
+            }
+            if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
+                input = game::Input::Right;
+            }
+            if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
+                input = game::Input::Up;
+            }
+            if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
+                input = game::Input::Down;
+            }
+
+            Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local);
+        }
+
+        {
+            // WASD
+            let mut input = Input::None;
+            if (key_pressed(raylib_sys::KeyboardKey::KEY_A)) {
+                input = game::Input::Left;
+            }
+            if (key_pressed(raylib_sys::KeyboardKey::KEY_D)) {
+                input = game::Input::Right;
+            }
+            if (key_pressed(raylib_sys::KeyboardKey::KEY_W)) {
+                input = game::Input::Up;
+            }
+            if (key_pressed(raylib_sys::KeyboardKey::KEY_S)) {
+                input = game::Input::Down;
+            }
+
+            Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local);
+        }
+
+        player_inputs
+    }
+
+    pub fn process_input(id_registration: &mut Option<PlayerId>, input: Input, player_inputs: &mut PlayerInputs, timeline: &mut Timeline, players_local: &mut EntityContainer<PlayerLocal>) {
+        if let Some(pid) = *id_registration {
+            let player = players_local.inner.iter_mut().find(|x| x.player_id == pid).unwrap();
+            player.update_inputs(&*timeline, player_inputs, input);
+        }
+        else if input != Input::None{
+            // Create player.
+            let top = timeline.top_state();
+            if let Some(new_id) = top.player_states.next_free() {
+                *id_registration = Some(new_id);
+                drop(top);
+                timeline.add_player(new_id, Pos::new_coord(7, 7));
+
+                let top = timeline.top_state();
+                let player_state = top.player_states.get(new_id).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
+                let player_local = players_local.create(Pos::Absolute(V2::default()));
+                player_local.set_from(&player_state);
+                let rand = FroggyRand::new(timeline.len() as u64);
+                player_local.skin = Skin::from_enum(*rand.choose((), &crate::player_local::g_all_skins));
+            }
+            else {
+                console::info("Unable to create another player");
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Skin {
+    pub player_skin: PlayerSkin,
     pub sprite: &'static str,
     pub dead_sprite: &'static str,
+    pub dialogue_sprite: &'static str,
 }
+
+#[derive(Debug, Clone, Copy)]
+pub enum PlayerSkin {
+    Frog,
+    Bird,
+    Snake,
+    Duck,
+    Mouse,
+    Wosh,
+    FrogAlt,
+    Frog3,
+}
+
+pub const g_all_skins: [PlayerSkin; 8] = [
+    PlayerSkin::Frog,
+    PlayerSkin::Bird,
+    PlayerSkin::Snake,
+    PlayerSkin::Duck,
+    PlayerSkin::Mouse,
+    PlayerSkin::Wosh,
+    PlayerSkin::FrogAlt,
+    PlayerSkin::Frog3,
+];
 
 impl Default for Skin {
     fn default() -> Self {
         Self {
+            player_skin: PlayerSkin::Frog,
             sprite: "frog",
             dead_sprite: "frog_dead",
+            dialogue_sprite: "frog_dialogue",
+        }
+    }
+}
+
+impl Skin {
+    pub fn from_enum(player_skin: PlayerSkin) -> Self {
+        match player_skin {
+            PlayerSkin::Frog => Self {
+                player_skin,
+                sprite: "frog",
+                dead_sprite: "frog_dead",
+                dialogue_sprite: "frog_dialogue",
+            },
+            PlayerSkin::Bird => Self {
+                player_skin,
+                sprite: "bird",
+                dead_sprite: "bird_dead",
+                dialogue_sprite: "bird_dialogue_cute",
+            },
+            PlayerSkin::Snake => Self {
+                player_skin,
+                sprite: "snake",
+                dead_sprite: "snake_dead",
+                dialogue_sprite: "snake_dialogue",
+            },
+            PlayerSkin::Duck => Self {
+                player_skin,
+                sprite: "duck",
+                dead_sprite: "duck_dead",
+                dialogue_sprite: "duck_dialogue",
+            },
+            PlayerSkin::Mouse => Self {
+                player_skin,
+                sprite: "mouse",
+                dead_sprite: "mouse_dead",
+                dialogue_sprite: "mouse_dialogue_cute",
+            },
+            PlayerSkin::Wosh => Self {
+                player_skin,
+                sprite: "woshette",
+                dead_sprite: "frog_dead",
+                dialogue_sprite: "frog_dialogue",
+            },
+            PlayerSkin::FrogAlt => Self {
+                player_skin,
+                sprite: "frog_alt",
+                dead_sprite: "frog_dead",
+                dialogue_sprite: "frog_dialogue",
+            },
+            PlayerSkin::Frog3 => Self {
+                player_skin,
+                sprite: "frog_3",
+                dead_sprite: "frog_dead",
+                dialogue_sprite: "frog_dialogue",
+            },
         }
     }
 }

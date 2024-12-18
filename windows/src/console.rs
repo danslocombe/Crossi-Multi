@@ -2,7 +2,7 @@ use std::{mem::MaybeUninit};
 
 use crossy_multi_core::{ring_buffer::RingBuffer, timeline::Timeline, DebugLogger, PlayerId, Pos};
 
-use crate::Client;
+use crate::{player_local::PlayerInputController, Client};
 
 pub struct QuakeConsoleLogger {
 }
@@ -432,8 +432,11 @@ fn do_new(args: &[&str], client: &mut Client) {
     config.bypass_lobby = true;
     client.timeline = Timeline::from_seed(config, &seed);
     client.timeline.set_game_id(new_game_id);
-    client.timeline.add_player(PlayerId(1), Pos::new_coord(7, 7));
-    client.timeline.add_player(PlayerId(2), Pos::new_coord(8, 7));
+    //client.timeline.add_player(PlayerId(1), Pos::new_coord(7, 7));
+    //client.timeline.add_player(PlayerId(2), Pos::new_coord(8, 7));
+
+    client.player_input_controller = PlayerInputController::default();
+    client.entities.players.inner.clear();
 }
 
 fn do_toggle_shader(args: &[&str], client: &mut Client) {

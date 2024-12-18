@@ -1,6 +1,6 @@
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, RulesState}, math::V2, timeline::{self, Timeline}};
 
-use crate::client::VisualEffects;
+use crate::{client::VisualEffects, entities::EntityContainer, player_local::PlayerLocal};
 
 struct Face {
     sprite: &'static str,
@@ -96,7 +96,7 @@ pub struct BigTextController {
 }
 
 impl BigTextController {
-    pub fn tick(&mut self, timeline: &Timeline) {
+    pub fn tick(&mut self, timeline: &Timeline, players: &EntityContainer<PlayerLocal>) {
         let rules = &timeline.top_state().rules_state.fst;
 
         if let CrossyRulesetFST::RoundWarmup(state) = rules {
@@ -131,12 +131,7 @@ impl BigTextController {
 
                 if let Some(winner_id) = winner {
                     // @Hack
-                    let sprite = if (winner_id.0 == 1) {
-                        "frog_dialogue"
-                    }
-                    else {
-                        "mouse_dialogue_cute"
-                    };
+                    let sprite = players.inner.iter().find(|x| x.player_id == winner_id).unwrap().skin.dialogue_sprite;
 
                     self.face = Some(Face {
                         sprite,
