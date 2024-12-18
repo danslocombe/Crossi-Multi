@@ -66,6 +66,13 @@ impl Client {
             }
         }
 
+        if (transitions.into_round_warmup)
+        {
+            for player in self.entities.players.inner.iter_mut() {
+                player.reset();
+            }
+        }
+
         self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities, &transitions);
 
         // @TODO how do we model this?
@@ -94,7 +101,7 @@ impl Client {
             let lilly = self.entities.lillipads.get_mut(lilly_id).unwrap();
         }
 
-        self.big_text_controller.tick(&self.timeline, &self.entities.players);
+        self.big_text_controller.tick(&self.timeline, &self.entities.players, &transitions);
 
         let camera_y_max = top.rules_state.fst.get_screen_y() as f32 + 200.0;
         self.entities.bubbles.prune_dead(camera_y_max);

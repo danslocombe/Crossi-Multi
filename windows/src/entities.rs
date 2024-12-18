@@ -83,20 +83,7 @@ impl PropController {
 
         if (transitions.into_round_warmup) {
             Self::clear_round_entities(entities);
-        //}
-        //if (self.last_generated_game != game_id || self.last_generated_round != round_id) {
-            // Regen.
-
-            // Destroy all props.
             crate::console::info(&format!("PropController Resetting, gameid {} roundid {}", game_id, round_id));
-            //entities.props.inner.clear();
-            //entities.spectators.inner.clear();
-            //entities.bubbles.inner.clear();
-            //entities.corpses.inner.clear();
-            //entities.dust.inner.clear();
-            for player in entities.players.inner.iter_mut() {
-                player.reset();
-            }
 
             self.last_generated_game = game_id;
             self.last_generated_round = round_id;
