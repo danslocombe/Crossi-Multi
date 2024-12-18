@@ -1,5 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{dan_lerp, entities::{self, Entity, EntityContainer, EntityManager, Prop, PropController, Spectator}, hex_color, key_pressed, sprites, WHITE};
+use crate::{dan_lerp, entities::{self, Entity, EntityContainer, EntityManager, Prop, PropController, Spectator}, hex_color, key_pressed, sprites, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -19,7 +19,7 @@ pub struct Client {
 impl Client {
     pub fn new(debug: bool) -> Self {
         let mut game_config = GameConfig::default();
-        game_config.bypass_lobby = true;
+        //game_config.bypass_lobby = true;
         //game_config.minimum_players = 1;
         let mut timeline = Timeline::from_seed(game_config, "ac");
         timeline.add_player(PlayerId(1), game::Pos::new_coord(7, 7));
@@ -235,6 +235,29 @@ impl Client {
                         }
                     }
                 }
+            }
+        }
+
+        if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone } = &top.rules_state.fst {
+            let x0 = 7.0 * 8.0;
+            let y0 = 14.0 * 8.0;
+            let w_base = 6.0 * 8.0;
+            let h = 4.0 * 8.0;
+
+            unsafe {
+                let proportion = *time_with_all_players_in_ready_zone as f32 / 120.0;
+                raylib_sys::DrawRectangleRec(raylib_sys::Rectangle {
+                    x: x0,
+                    y: y0,
+                    width: w_base * proportion,
+                    height: h,
+                }, WHITE);
+                raylib_sys::DrawRectangleLinesEx(raylib_sys::Rectangle {
+                    x: x0,
+                    y: y0,
+                    width: w_base,
+                    height: h,
+                }, 1.0, BLACK);
             }
         }
 

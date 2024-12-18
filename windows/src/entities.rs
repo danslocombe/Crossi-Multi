@@ -48,76 +48,82 @@ impl PropController {
 
             self.gen_to = 20;
 
-            let stand_left_id = entities.create_entity(Entity {
-                id: 0,
-                entity_type: EntityType::Prop,
-                pos: Pos::new_coord(0, 10)
-            });
-            let stand_left_pos = {
-                let stand_left = entities.props.get_mut(stand_left_id).unwrap();
-                stand_left.depth = Some(100);
-                stand_left.sprite = "stand";
-                stand_left.draw_offset = V2::new(4.0, 0.0);
-                stand_left.pos
-            };
+            //if let CrossyRulesetFST::Lobby { .. } = &rules_state.fst {
+            if (false) {
+                // ...
+            }
+            else {
+                let stand_left_id = entities.create_entity(Entity {
+                    id: 0,
+                    entity_type: EntityType::Prop,
+                    pos: Pos::new_coord(0, 10)
+                });
+                let stand_left_pos = {
+                    let stand_left = entities.props.get_mut(stand_left_id).unwrap();
+                    stand_left.depth = Some(100);
+                    stand_left.sprite = "stand";
+                    stand_left.draw_offset = V2::new(4.0, 0.0);
+                    stand_left.pos
+                };
 
-            let stand_right_id = entities.create_entity(Entity {
-                id: 0,
-                entity_type: EntityType::Prop,
-                pos: Pos::new_coord(15, 10)
-            });
+                let stand_right_id = entities.create_entity(Entity {
+                    id: 0,
+                    entity_type: EntityType::Prop,
+                    pos: Pos::new_coord(15, 10)
+                });
 
-            let stand_right_pos = {
-                let stand_right = entities.props.get_mut(stand_right_id).unwrap();
-                stand_right.depth = Some(100);
-                stand_right.sprite = "stand";
-                stand_right.flipped = true;
-                stand_right.draw_offset = V2::new(-4.0, 0.0);
-                stand_right.pos
-            };
+                let stand_right_pos = {
+                    let stand_right = entities.props.get_mut(stand_right_id).unwrap();
+                    stand_right.depth = Some(100);
+                    stand_right.sprite = "stand";
+                    stand_right.flipped = true;
+                    stand_right.draw_offset = V2::new(-4.0, 0.0);
+                    stand_right.pos
+                };
 
-            let prob_stands = 0.7;
-            let ymin = stand_left_pos.y as f32 * 8.0 + 8.0;
-            for ix in 0..4 {
-                for iy in 0..4 {
-                    let x = stand_left_pos.x as f32 * 8.0 + ix as f32 * 8.0 + 4.0;
-                    let y = ymin + x / 2.0 + 4.0 + 8.0 * iy as f32;// + 2.0;
-                    Spectator::rand(rand, V2::new(x + 4.0, y), false, prob_stands, entities);
+                let prob_stands = 0.7;
+                let ymin = stand_left_pos.y as f32 * 8.0 + 8.0;
+                for ix in 0..4 {
+                    for iy in 0..4 {
+                        let x = stand_left_pos.x as f32 * 8.0 + ix as f32 * 8.0 + 4.0;
+                        let y = ymin + x / 2.0 + 4.0 + 8.0 * iy as f32;// + 2.0;
+                        Spectator::rand(rand, V2::new(x + 4.0, y), false, prob_stands, entities);
+                    }
                 }
-            }
 
-            for ix in 0..4 {
-                for iy in 0..4 {
-                    let x = stand_right_pos.x as f32 * 8.0 + ix as f32 * 8.0 - 4.0;
-                    let y = ymin - 4.0 * ix as f32 + 16.0 + 8.0 * iy as f32;// + 2.0;
-                    Spectator::rand(rand, V2::new(x + 4.0, y), true, prob_stands, entities);
+                for ix in 0..4 {
+                    for iy in 0..4 {
+                        let x = stand_right_pos.x as f32 * 8.0 + ix as f32 * 8.0 - 4.0;
+                        let y = ymin - 4.0 * ix as f32 + 16.0 + 8.0 * iy as f32;// + 2.0;
+                        Spectator::rand(rand, V2::new(x + 4.0, y), true, prob_stands, entities);
+                    }
                 }
-            }
 
-            let prob_front = 0.35;
-            for iy in 0..7 {
-                // In front of left stand
-                let yy = 13.0 * 8.0 + iy as f32 * 8.0;
-                let xx = stand_left_pos.x as f32 * 8.0 + 4.0 * 8.0 + 8.0;
-                Spectator::rand(rand, V2::new(xx, yy), false, prob_front, entities);
+                let prob_front = 0.35;
+                for iy in 0..7 {
+                    // In front of left stand
+                    let yy = 13.0 * 8.0 + iy as f32 * 8.0;
+                    let xx = stand_left_pos.x as f32 * 8.0 + 4.0 * 8.0 + 8.0;
+                    Spectator::rand(rand, V2::new(xx, yy), false, prob_front, entities);
 
-                // In front of right stand
-                let xx = 14.0 * 8.0;
-                Spectator::rand(rand, V2::new(xx, yy), true, prob_front, entities);
-            }
+                    // In front of right stand
+                    let xx = 14.0 * 8.0;
+                    Spectator::rand(rand, V2::new(xx, yy), true, prob_front, entities);
+                }
 
-            let prob_below = 0.2;
-            for ix in 0..5 {
-                for iy in 0..2 {
-                    let yy = 18.0 * 8.0 + iy as f32 * 8.0;
+                let prob_below = 0.2;
+                for ix in 0..5 {
+                    for iy in 0..2 {
+                        let yy = 18.0 * 8.0 + iy as f32 * 8.0;
 
-                    // Below left stand
-                    let xx = stand_left_pos.x as f32 + ix as f32 * 8.0 - 8.0 + 4.0;
-                    Spectator::rand(rand, V2::new(xx, yy), false, prob_below, entities);
+                        // Below left stand
+                        let xx = stand_left_pos.x as f32 + ix as f32 * 8.0 - 8.0 + 4.0;
+                        Spectator::rand(rand, V2::new(xx, yy), false, prob_below, entities);
 
-                    // Below right stand
-                    let xx = 15.0 * 8.0 + ix as f32 * 8.0;
-                    Spectator::rand(rand, V2::new(xx, yy), true, prob_below, entities);
+                        // Below right stand
+                        let xx = 15.0 * 8.0 + ix as f32 * 8.0;
+                        Spectator::rand(rand, V2::new(xx, yy), true, prob_below, entities);
+                    }
                 }
             }
         }
