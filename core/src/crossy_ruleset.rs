@@ -166,6 +166,8 @@ impl CrossyRulesetFST
                 let bypass = game_config.bypass_lobby && player_states.count_populated() > 0;
                 let enough_players = player_states.count_populated() >= game_config.minimum_players as usize;
                 let all_in_ready_zone = player_states.iter().all(|(_, x)| player_in_lobby_ready_zone(x));
+                //println!("states {:#?}", player_states);
+                //println!("All in ready zone {}, enough players {}", all_in_ready_zone, enough_players);
 
                 if bypass || (enough_players && all_in_ready_zone) {
                     if bypass || (*time_with_all_players_in_ready_zone > 120) { 

@@ -22,13 +22,8 @@ impl Client {
         let mut game_config = GameConfig::default();
         //game_config.bypass_lobby = true;
         //game_config.minimum_players = 1;
-        let mut timeline = Timeline::from_seed(game_config, "ac");
-        timeline.add_player(PlayerId(1), game::Pos::new_coord(7, 7));
-        timeline.add_player(PlayerId(2), game::Pos::new_coord(8, 7));
-
-        let top = timeline.top_state();
-
-        let mut entities = EntityManager::new();
+        let timeline = Timeline::from_seed(game_config, "ac");
+        let entities = EntityManager::new();
 
         Self {
             exit: false,
