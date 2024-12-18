@@ -291,6 +291,9 @@ impl Camera {
                 CrossyRulesetFST::Round(round_state) => {
                     round_state.screen_y as f32
                 },
+                CrossyRulesetFST::RoundCooldown(round_state) => {
+                    round_state.round_state.screen_y as f32
+                },
                 _ => 0.0
             }
         }
@@ -309,8 +312,8 @@ impl Camera {
             let dir = (FroggyRand::new(self.t as u64).gen_unit(0) * 3.141 * 2.0) as f32;
             let mag = visual_effects.screenshake * 0.4;
             let offset = V2::norm_from_angle(dir) * mag;
-            self.x_mod = offset.x;
-            self.y_mod = offset.y;
+            self.x_mod = self.x + offset.x;
+            self.y_mod = self.y + offset.y;
         }
     }
 
