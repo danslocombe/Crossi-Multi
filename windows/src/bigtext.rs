@@ -1,4 +1,7 @@
+use std::pin;
+
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, RulesState}, math::V2, timeline::{self, Timeline}, PlayerId};
+use raylib_sys::Ray;
 
 use crate::{client::{StateTransition, VisualEffects}, entities::EntityContainer, player_local::PlayerLocal};
 
@@ -93,6 +96,7 @@ pub struct BigTextController {
     text: Option<BigText>,
     face: Option<Face>,
     last_rule_state_fst: Option<CrossyRulesetFST>,
+    pinwheel: Option<Pinwheel>,
 }
 
 impl BigTextController {
@@ -134,6 +138,7 @@ impl BigTextController {
                         sprite: "countdown",
                         image_index: 2 - (m_image_index as usize),
                         lifetime: 60,
+                        offset: V2::default(),
                     });
                 }
             }
@@ -144,7 +149,40 @@ impl BigTextController {
                 sprite: "countdown",
                 image_index: 3,
                 lifetime: 60,
+                offset: V2::default(),
             });
+        }
+
+        if transitions.into_winner {
+            self.text = Some(BigText {
+                sprite: "champion",
+                image_index: 0,
+                lifetime: 180,
+                offset: V2::new(0.0, 32.0),
+            });
+
+            self.pinwheel = Some(Pinwheel {
+                pos: V2::default(),
+                t: 0,
+                theta: 0.0,
+                angle_vel: angle_vel_base,
+                color: crate::BEIGE,
+                visible: false,
+            });
+        }
+        else {
+            if let CrossyRulesetFST::EndWinner(state) = rules {
+                if let Some(pinwheel) = self.pinwheel.as_mut() {
+                    if let Some(winner) = players.inner.iter().find(|x| x.player_id == state.winner_id) {
+                        pinwheel.pos = winner.pos * 8.0 + V2::new(4.0, 4.0);
+                        pinwheel.color = winner.skin.color;
+                        pinwheel.visible = true;
+                    }
+                }
+            }
+            else {
+                self.pinwheel = None;
+            }
         }
 
         if let CrossyRulesetFST::RoundCooldown(state) = rules {
@@ -179,6 +217,7 @@ impl BigTextController {
                         sprite: "winner",
                         image_index: 0,
                         lifetime: 120,
+                        offset: V2::default(),
                     })
                 }
                 else {
@@ -186,6 +225,7 @@ impl BigTextController {
                         sprite: "no_winner",
                         image_index: 0,
                         lifetime: 120,
+                        offset: V2::default(),
                     })
                 }
             }
@@ -200,6 +240,7 @@ impl BigTextController {
                         sprite: "no_winner",
                         image_index: 0,
                         lifetime: 120,
+                        offset: V2::default(),
                     })
                 }
             }
@@ -219,7 +260,17 @@ impl BigTextController {
             }
         }
 
+        if let Some(pinwheel) = self.pinwheel.as_mut() {
+            pinwheel.tick();
+        }
+
         self.last_rule_state_fst = Some(rules.clone());
+    }
+
+    pub fn draw_lower(&self) {
+        if let Some(pinwheel) = self.pinwheel.as_ref() {
+            pinwheel.draw();
+        }
     }
 
     pub fn draw(&self) {
@@ -227,7 +278,8 @@ impl BigTextController {
             // @Perf replace with constant
             let w_sprite = crate::sprites::get_sprite(&text.sprite)[0].width;
             // @Perf double lookup
-            crate::sprites::draw(text.sprite, text.image_index, 80.0 - w_sprite as f32 * 0.5, 60.0);
+            let pos = V2::new(80.0 - w_sprite as f32 * 0.5, 60.0) + text.offset;
+            crate::sprites::draw(text.sprite, text.image_index, pos.x, pos.y);
         }
 
         if let Some(face) = self.face.as_ref() {
@@ -236,8 +288,65 @@ impl BigTextController {
     }
 }
 
+#[derive(Debug)]
 struct BigText {
     sprite: &'static str,
     image_index: usize,
     lifetime: i32,
+    offset: V2,
+}
+
+const angle_vel_fast: f32 = 0.0825;
+const angle_vel_base: f32 = 0.0125;
+pub struct Pinwheel {
+    pos: V2,
+    t: i32,
+    theta: f32,
+    angle_vel: f32,
+    visible: bool,
+    color: raylib_sys::Color,
+}
+
+impl Pinwheel {
+    pub fn set_vel_norm(&mut self, x: f32) {
+        self.angle_vel = x * (angle_vel_fast - angle_vel_base) + angle_vel_base;
+    }
+
+    pub fn tick(&mut self) {
+        self.theta += self.angle_vel;
+        self.t += 1;
+
+        self.set_vel_norm((1.0 - (self.t as f32 / 120.0)).max(0.0));
+    }
+
+    pub fn draw(&self) {
+        if (!self.visible) {
+            return;
+        }
+
+        let n = 8;
+        let len = ((160.0 * 160.0 + 160.0 * 160.0) as f32).sqrt();
+
+        let mut angle = self.theta;
+
+        for i in 0..n {
+            let pos1 = self.pos + V2::norm_from_angle(angle) * len;
+            angle += 3.141 * 2.0 / n as f32;
+
+            let pos2 = self.pos + V2::norm_from_angle(angle) * len;
+            angle += 3.141 * 2.0 / n as f32;
+
+            unsafe {
+                raylib_sys::DrawTriangle(
+                    to_vector2(self.pos),
+                    to_vector2(pos2),
+                    to_vector2(pos1),
+                    self.color);
+            }
+        }
+    }
+}
+
+fn to_vector2(x: V2) -> raylib_sys::Vector2 {
+    raylib_sys::Vector2 { x: x.x, y: x.y }
 }

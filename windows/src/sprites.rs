@@ -70,6 +70,7 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_countdown.png", Some(4));
         load_frames("../web-client/static/sprites/spr_winner.png", Some(1));
         load_frames("../web-client/static/sprites/spr_no_winner.png", Some(1));
+        load_frames("../web-client/static/sprites/spr_champion.png", Some(1));
     }
 }
 
@@ -123,7 +124,10 @@ unsafe fn load_frames_unsafe(filename: &str, p_frame_count: Option<usize>) -> Ve
 pub fn get_sprite(name: &str) -> &[raylib_sys::Texture2D] {
     unsafe { 
         let frames = SPRITE_FRAMES.assume_init_ref();
-        let frame_vec = frames.get(name).unwrap_or_else(|| frames.get("unknown").expect(&format!("Could not find {}", name)));
+        let frame_vec = frames.get(name).unwrap_or_else(|| {
+            println!("Could not find {}", name);
+            frames.get("unknown").expect(&format!("Could not find {}", name))
+        });
         &frame_vec[..]
     }
 }

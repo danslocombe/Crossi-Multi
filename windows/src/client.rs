@@ -52,6 +52,12 @@ impl Client {
             //self.visual_effects.whiteout();
         //}
 
+        if (transitions.into_lobby) {
+            self.visual_effects.noise();
+            self.visual_effects.whiteout();
+            self.visual_effects.screenshake();
+        }
+
         if (transitions.into_round_warmup) {
             self.visual_effects.noise();
         }
@@ -233,6 +239,8 @@ impl Client {
             }
         }
 
+        self.big_text_controller.draw_lower();
+
         {
             // @Perf keep some list and insertion sort
             let mut all_entities = Vec::new();
@@ -368,7 +376,7 @@ pub struct StateTransition {
     pub into_round_warmup: bool,
     pub into_round: bool,
     pub into_round_cooldown: bool,
-    pub into_end: bool,
+    pub into_winner: bool,
 }
 
 impl StateTransition {
@@ -386,7 +394,7 @@ impl StateTransition {
         transitions.into_round_cooldown = 
             matches!(current, CrossyRulesetFST::RoundCooldown { .. })
             && !matches!(prev, Some(CrossyRulesetFST::RoundCooldown { .. }));
-        transitions.into_end = 
+        transitions.into_winner = 
             matches!(current, CrossyRulesetFST::EndWinner { .. })
             && !matches!(prev, Some(CrossyRulesetFST::EndWinner { .. }));
 

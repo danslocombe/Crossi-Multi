@@ -1,6 +1,6 @@
 use std::{mem::MaybeUninit, str::FromStr};
 
-use crossy_multi_core::{ring_buffer::RingBuffer, timeline::Timeline, DebugLogger, PlayerId, Pos};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, EndWinnerState, WINNER_TIME_US}, ring_buffer::RingBuffer, timeline::Timeline, DebugLogger, PlayerId, Pos};
 
 use crate::{player_local::{PlayerInputController, Skin}, Client};
 
@@ -29,6 +29,10 @@ pub fn init_console() {
         command_set.commands.push(Command {
             name: "skin".to_owned(),
             lambda: Box::new(do_set_skin),
+        });
+        command_set.commands.push(Command {
+            name: "win".to_owned(),
+            lambda: Box::new(do_win),
         });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
@@ -503,4 +507,30 @@ fn do_set_skin(args: &[&str], client: &mut Client) {
     else {
         err!("Could not find player with PlayerId {}", player_id.0);
     }
+}
+
+fn do_win(args: &[&str], client: &mut Client) {
+    if (args.len() > 1) {
+        err!("Expected zero or one arguments to 'win' got {}", args.len());
+        return;
+    }
+
+    let mut player_id = PlayerId(1);
+
+    if (args.len() == 1) {
+        if let Ok(id) = args[0].parse() {
+            player_id = PlayerId(id);
+        }
+        else {
+            err!("Could not parse {} as a PlayerId (u8)", args[0]);
+            return;
+        }
+    }
+
+    let state = CrossyRulesetFST::EndWinner(EndWinnerState {
+        winner_id: player_id,
+        remaining_us: WINNER_TIME_US,
+    });
+
+    client.timeline.states.front_mut().unwrap().rules_state.fst = state;
 }

@@ -167,6 +167,7 @@ pub struct Skin {
     pub sprite: &'static str,
     pub dead_sprite: &'static str,
     pub dialogue_sprite: &'static str,
+    pub color : raylib_sys::Color,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString)]
@@ -196,12 +197,7 @@ pub const g_all_skins: [PlayerSkin; 8] = [
 
 impl Default for Skin {
     fn default() -> Self {
-        Self {
-            player_skin: PlayerSkin::Frog,
-            sprite: "frog",
-            dead_sprite: "frog_dead",
-            dialogue_sprite: "frog_dialogue",
-        }
+        Self::from_enum(PlayerSkin::Frog)
     }
 }
 
@@ -246,54 +242,63 @@ impl Skin {
                 sprite: "frog",
                 dead_sprite: "frog_dead",
                 dialogue_sprite: "frog_dialogue",
+                color: crate::hex_color("4aef5c".as_bytes()),
             },
             PlayerSkin::Bird => Self {
                 player_skin,
                 sprite: "bird",
                 dead_sprite: "bird_dead",
                 dialogue_sprite: "bird_dialogue_cute",
+                color: crate::hex_color("ff4040".as_bytes()),
             },
             PlayerSkin::Snake => Self {
                 player_skin,
                 sprite: "snake",
                 dead_sprite: "snake_dead",
                 dialogue_sprite: "snake_dialogue",
+                color: crate::hex_color("80ffff".as_bytes()),
             },
             PlayerSkin::Duck => Self {
                 player_skin,
                 sprite: "duck",
                 dead_sprite: "duck_dead",
                 dialogue_sprite: "duck_dialogue",
+                color: crate::hex_color("d9a066".as_bytes()),
             },
             PlayerSkin::Mouse => Self {
                 player_skin,
                 sprite: "mouse",
                 dead_sprite: "mouse_dead",
                 dialogue_sprite: "mouse_dialogue_cute",
+                color: crate::hex_color("884835".as_bytes()),
             },
             PlayerSkin::Wosh => Self {
                 player_skin,
                 sprite: "woshette",
                 dead_sprite: "woshette_dead",
                 dialogue_sprite: "woshette_dialogue",
+                color: crate::hex_color("e3abd1".as_bytes()),
             },
             PlayerSkin::FrogAlt => Self {
                 player_skin,
                 sprite: "frog_alt",
                 dead_sprite: "frog_alt_dead",
                 dialogue_sprite: "frog_alt_dialogue",
+                color: crate::hex_color("819ecf".as_bytes()),
             },
             PlayerSkin::Frog3 => Self {
                 player_skin,
                 sprite: "frog_3",
                 dead_sprite: "frog_3_dead",
                 dialogue_sprite: "frog_3_dialogue",
+                color: crate::hex_color("cab56a".as_bytes()),
             },
             PlayerSkin::Sausage => Self {
                 player_skin,
                 sprite: "sausage",
                 dead_sprite: "sausage_dead",
                 dialogue_sprite: "sausage_dialogue",
+                color: crate::hex_color("734529".as_bytes()),
             },
         }
     }
@@ -385,7 +390,9 @@ impl PlayerLocal {
             //    self.image_index = PLAYER_FRAME_COUNT - 1;
             //}
 
-            self.image_index = 1 + (lerp_t * 4.0).floor() as i32;
+            // @Perf
+            let sprite_count = sprites::get_sprite(self.skin.sprite).len();
+            self.image_index = 1 + (lerp_t * ((sprite_count - 2) as f32)).floor() as i32;
 
             x = x0 + lerp_t * (x1 - x0);
             y = y0 + lerp_t * (y1 - y0);
@@ -529,9 +536,9 @@ impl IsEntity for PlayerLocal {
         }
 
         sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
-        if (self.image_index != 0) {
-            println!("image index {}", self.image_index);
-        }
+        //if (self.image_index != 0) {
+        //    println!("image index {}", self.image_index);
+        //}
         sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
     }
 }

@@ -77,7 +77,7 @@ impl PropController {
             Self::clear_round_entities(entities);
             _ = Self::create_stands(entities);
         }
-        if (transitions.into_end) {
+        if (transitions.into_winner) {
             Self::clear_round_entities(entities);
         }
 
