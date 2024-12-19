@@ -115,7 +115,7 @@ fn main() {
 
                     let iTime_ptr: *const i32 = std::ptr::from_ref(&client.screen_shader.iTime);
                     raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_iTime_loc, iTime_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_INT as i32);
-                    let amp = client.visual_effects.screenshake * 2.0;// / 16.0;
+                    let amp = client.visual_effects.noise * 2.0;// / 16.0;
                     let amp_ptr: *const f32 = std::ptr::from_ref(&amp);
                     raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_amp_loc, amp_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_FLOAT as i32);
                     raylib_sys::BeginShaderMode(client.screen_shader.shader);

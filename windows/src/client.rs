@@ -48,6 +48,20 @@ impl Client {
         let top = self.timeline.top_state();
         let transitions = StateTransition::new(&top.rules_state.fst, &self.prev_rules);
 
+        //if (transitions.into_round) {
+            //self.visual_effects.whiteout();
+        //}
+
+        if (transitions.into_round_warmup) {
+            self.visual_effects.noise();
+        }
+
+        if (!new_players.is_empty())
+        {
+            self.visual_effects.whiteout();
+            self.visual_effects.screenshake();
+        }
+
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects, &transitions);
         self.visual_effects.tick();
 
@@ -129,9 +143,10 @@ impl Client {
             const road_col_0: raylib_sys::Color = hex_color("646469".as_bytes());
             const road_col_1: raylib_sys::Color = hex_color("59595d".as_bytes());
 
-            let screen_y = top.rules_state.fst.get_screen_y();
+            //let screen_y = top.rules_state.fst.get_screen_y();
+            let screen_y = self.camera.y;
             let round_id = top.get_round_id();
-            let rows = self.timeline.map.get_row_view(round_id, screen_y);
+            let rows = self.timeline.map.get_row_view(round_id, screen_y as i32 / 8);
 
             for row_with_y in rows {
                 let row = row_with_y.row;
@@ -270,7 +285,8 @@ impl Camera {
             self.target_y = match &rules_state.fst {
                 CrossyRulesetFST::RoundWarmup(state) => {
                     let remaining_s = state.remaining_us as f32 / 1_000_000.0;
-                    -24.0 * (remaining_s - 2.0).max(0.0)
+                    let t = ((remaining_s - 3.0) / 3.0).max(0.0);
+                    -16.0 * (t * t) * 2.5
                 },
                 CrossyRulesetFST::Round(round_state) => {
                     round_state.screen_y as f32
@@ -322,6 +338,7 @@ impl Camera {
 pub struct VisualEffects {
     pub whiteout: i32,
     pub screenshake: f32,
+    pub noise: f32,
 }
 
 impl VisualEffects {
@@ -331,11 +348,17 @@ impl VisualEffects {
 
     pub fn screenshake(&mut self) {
         self.screenshake = self.screenshake.max(15.0);
+        self.noise = self.noise.max(15.0);
+    }
+
+    pub fn noise(&mut self) {
+        self.noise = self.noise.max(15.0);
     }
 
     pub fn tick(&mut self) {
         self.whiteout = (self.whiteout - 1).max(0);
         self.screenshake *= 0.85;
+        self.noise *= 0.85;
     }
 }
 

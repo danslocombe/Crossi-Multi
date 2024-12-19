@@ -118,6 +118,7 @@ impl BigTextController {
 
         if let CrossyRulesetFST::RoundWarmup(state) = rules {
             let time_s = (state.remaining_us / 1_000_000) as i32;
+            let full_s = (state.time_full_us / 1_000_000) as i32;
             let prev_time_s = if let Some(CrossyRulesetFST::RoundWarmup(last_state)) = &self.last_rule_state_fst {
                 (last_state.remaining_us / 1_000_000) as i32
             }
@@ -126,12 +127,24 @@ impl BigTextController {
             };
 
             if (time_s != prev_time_s) {
-                self.text = Some(BigText {
-                    sprite: "countdown",
-                    image_index: (3 - time_s) as usize,
-                    lifetime: 60,
-                });
+                let m_image_index = time_s;
+                //let m_image_index = ((time_s - 3) - full_s);
+                if (m_image_index <= 2 && m_image_index >= 0) {
+                    self.text = Some(BigText {
+                        sprite: "countdown",
+                        image_index: 2 - (m_image_index as usize),
+                        lifetime: 60,
+                    });
+                }
             }
+        }
+
+        if transitions.into_round {
+            self.text = Some(BigText {
+                sprite: "countdown",
+                image_index: 3,
+                lifetime: 60,
+            });
         }
 
         if let CrossyRulesetFST::RoundCooldown(state) = rules {

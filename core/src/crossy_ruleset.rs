@@ -38,6 +38,7 @@ pub enum AliveState
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WarmupState {
     pub remaining_us : u32,
+    pub time_full_us : u32,
     // If someone joins during the warmup don't throw them in until the next round
     pub alive_states : PlayerIdMap<AliveState>,
     pub win_counts : PlayerIdMap<u8>,
@@ -118,6 +119,7 @@ impl RulesState {
     }
 }
 
+const INTRO_COUNTDOWN_TIME_US : u32 = 6 * 1_000_000;
 const COUNTDOWN_TIME_US : u32 = 3 * 1_000_000;
 const COOLDOWN_TIME_US : u32 = 4 * 1_000_000;
 const WINNER_TIME_US : u32 = 3 * 1_000_000;
@@ -183,7 +185,8 @@ impl CrossyRulesetFST
                         RoundWarmup(WarmupState {
                             win_counts,
                             alive_states,
-                            remaining_us : COUNTDOWN_TIME_US,
+                            remaining_us : INTRO_COUNTDOWN_TIME_US,
+                            time_full_us: INTRO_COUNTDOWN_TIME_US,
                             round_id : 1,
                         })
                     }
@@ -200,6 +203,7 @@ impl CrossyRulesetFST
                     Some(remaining_us) => {
                         RoundWarmup(WarmupState {
                             remaining_us,
+                            time_full_us: state.time_full_us,
                             alive_states : state.alive_states.clone(),
                             win_counts : state.win_counts.clone(),
                             round_id : state.round_id,
@@ -286,6 +290,7 @@ impl CrossyRulesetFST
 
                         RoundWarmup(WarmupState {
                             remaining_us : COUNTDOWN_TIME_US,
+                            time_full_us: COUNTDOWN_TIME_US,
                             win_counts,
                             alive_states,
                             round_id : new_state.round_state.round_id + 1,
