@@ -180,6 +180,7 @@ pub enum PlayerSkin {
     Wosh,
     FrogAlt,
     Frog3,
+    Sausage,
 }
 
 pub const g_all_skins: [PlayerSkin; 8] = [
@@ -226,6 +227,8 @@ fn lobby_spawn_pos_no_overlapping(rand: FroggyRand, existing: &[PlayerLocal]) ->
 
 impl Skin {
     pub fn rand_not_overlapping(rand: FroggyRand, existing: &[PlayerLocal]) -> Skin {
+        //return Self::from_enum(PlayerSkin::Sausage);
+
         let mut options: Vec<PlayerSkin> = g_all_skins.iter().cloned().collect();
         for player in existing {
             if let Some((idx, _)) = options.iter().enumerate().find(|(_, skin)| **skin == player.skin.player_skin) {
@@ -285,6 +288,12 @@ impl Skin {
                 sprite: "frog_3",
                 dead_sprite: "frog_3_dead",
                 dialogue_sprite: "frog_3_dialogue",
+            },
+            PlayerSkin::Sausage => Self {
+                player_skin,
+                sprite: "sausage",
+                dead_sprite: "sausage_dead",
+                dialogue_sprite: "sausage_dialogue",
             },
         }
     }
@@ -365,15 +374,18 @@ impl PlayerLocal {
         let mut x: f32 = 0.0;
         let mut y: f32 = 0.0;
         if (player_state.moving) {
-            let lerp_t = 1.0 - (player_state.remaining_move_dur as f32 / MOVE_T as f32);
+            let tt = (player_state.remaining_move_dur as f32 / MOVE_T as f32);
+            let lerp_t = 1.0 - tt;
 
             let x1 = player_state.t_x as f32;
             let y1 = player_state.t_y as f32;
 
-            self.image_index = (self.image_index + 1);
-            if (self.image_index >= PLAYER_FRAME_COUNT) {
-                self.image_index = PLAYER_FRAME_COUNT - 1;
-            }
+            //self.image_index = (self.image_index + 1);
+            //if (self.image_index >= PLAYER_FRAME_COUNT) {
+            //    self.image_index = PLAYER_FRAME_COUNT - 1;
+            //}
+
+            self.image_index = 1 + (lerp_t * 4.0).floor() as i32;
 
             x = x0 + lerp_t * (x1 - x0);
             y = y0 + lerp_t * (y1 - y0);
@@ -517,6 +529,9 @@ impl IsEntity for PlayerLocal {
         }
 
         sprites::draw("shadow", 0, self.pos.x * 8.0, self.pos.y * 8.0);
+        if (self.image_index != 0) {
+            println!("image index {}", self.image_index);
+        }
         sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
     }
 }

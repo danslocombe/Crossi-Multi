@@ -47,6 +47,10 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_frog_3_dead.png", None);
         load_frames("../web-client/static/sprites/spr_frog_3_dialogue.png", Some(2));
 
+        load_frames("../web-client/static/sprites/spr_sausage.png", None);
+        load_frames("../web-client/static/sprites/spr_sausage_dead.png", None);
+        load_frames("../web-client/static/sprites/spr_sausage_dialogue.png", Some(2));
+
         load_frames("../web-client/static/sprites/spr_shadow.png", None);
         load_frames("../web-client/static/sprites/spr_crown.png", None);
 
