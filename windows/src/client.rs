@@ -42,13 +42,14 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
-        let inputs = self.player_input_controller.tick(&mut self.timeline, &mut self.entities.players);
+        let (inputs, new_players) = self.player_input_controller.tick(&mut self.timeline, &mut self.entities.players);
         self.timeline.tick(Some(inputs), TICK_INTERVAL_US);
-        self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects);
-        self.visual_effects.tick();
 
         let top = self.timeline.top_state();
         let transitions = StateTransition::new(&top.rules_state.fst, &self.prev_rules);
+
+        self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects, &transitions);
+        self.visual_effects.tick();
 
         for local_player in self.entities.players.inner.iter_mut() {
             if let Some(state) = top.player_states.get(local_player.player_id) {
@@ -101,7 +102,7 @@ impl Client {
             let lilly = self.entities.lillipads.get_mut(lilly_id).unwrap();
         }
 
-        self.big_text_controller.tick(&self.timeline, &self.entities.players, &transitions);
+        self.big_text_controller.tick(&self.timeline, &self.entities.players, &transitions, &new_players);
 
         let camera_y_max = top.rules_state.fst.get_screen_y() as f32 + 200.0;
         self.entities.bubbles.prune_dead(camera_y_max);
@@ -262,11 +263,15 @@ impl Camera {
         }
     }
 
-    pub fn tick(&mut self, m_rules_state: Option<&RulesState>, visual_effects: &VisualEffects) {
+    pub fn tick(&mut self, m_rules_state: Option<&RulesState>, visual_effects: &VisualEffects, transitions: &StateTransition) {
         self.t += 1;
 
         if let Some(rules_state) = m_rules_state {
             self.target_y = match &rules_state.fst {
+                CrossyRulesetFST::RoundWarmup(state) => {
+                    let remaining_s = state.remaining_us as f32 / 1_000_000.0;
+                    -24.0 * (remaining_s - 2.0).max(0.0)
+                },
                 CrossyRulesetFST::Round(round_state) => {
                     round_state.screen_y as f32
                 },
@@ -278,7 +283,13 @@ impl Camera {
         }
 
         self.x = 0.0;
-        self.y = dan_lerp(self.y, self.target_y * 8.0, 3.0);
+
+        if transitions.into_round {
+            self.y = self.target_y * 8.0
+        }
+        else {
+            self.y = dan_lerp(self.y, self.target_y * 8.0, 3.0);
+        }
 
         self.x_mod = self.x;
         self.y_mod = self.y;

@@ -33,8 +33,9 @@ pub struct PlayerInputController {
 }
 
 impl PlayerInputController {
-    pub fn tick(&mut self, timeline: &mut Timeline, players_local: &mut EntityContainer<PlayerLocal>) -> PlayerInputs {
+    pub fn tick(&mut self, timeline: &mut Timeline, players_local: &mut EntityContainer<PlayerLocal>) -> (PlayerInputs, Vec<PlayerId>) {
         let mut player_inputs = PlayerInputs::default();
+        let mut new_players = Vec::new();
 
         {
             // Arrows
@@ -52,7 +53,7 @@ impl PlayerInputController {
                 input = game::Input::Down;
             }
 
-            Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local);
+            Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local, &mut new_players);
         }
 
         {
@@ -71,13 +72,19 @@ impl PlayerInputController {
                 input = game::Input::Down;
             }
 
-            Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local);
+            Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, &mut new_players);
         }
 
-        player_inputs
+        (player_inputs, new_players)
     }
 
-    pub fn process_input(id_registration: &mut Option<PlayerId>, input: Input, player_inputs: &mut PlayerInputs, timeline: &mut Timeline, players_local: &mut EntityContainer<PlayerLocal>) {
+    pub fn process_input(
+        id_registration: &mut Option<PlayerId>,
+        input: Input,
+        player_inputs: &mut PlayerInputs,
+        timeline: &mut Timeline,
+        players_local: &mut EntityContainer<PlayerLocal>,
+        new_players: &mut Vec<PlayerId>) {
         if let Some(pid) = *id_registration {
             let player = players_local.inner.iter_mut().find(|x| x.player_id == pid).unwrap();
             player.update_inputs(&*timeline, player_inputs, input);
@@ -97,6 +104,8 @@ impl PlayerInputController {
                 let rand = FroggyRand::new(timeline.len() as u64);
                 player_local.skin = Skin::from_enum(*rand.choose((), &crate::player_local::g_all_skins));
                 player_local.update_inputs(&*timeline, player_inputs, input);
+
+                new_players.push(new_id);
             }
             else {
                 console::info("Unable to create another player");

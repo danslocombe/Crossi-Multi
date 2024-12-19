@@ -139,7 +139,8 @@ impl PropController {
         }
 
         let gen_to_target = rules_state.fst.get_screen_y();
-        while (self.gen_to > gen_to_target - 4) {
+        //while (self.gen_to > gen_to_target - 4) {
+        while (self.gen_to > gen_to_target - 32) {
             let row = map.get_row(round_id as u8, self.gen_to);
             match &row.row_type {
                 RowType::Path{wall_width} => {
