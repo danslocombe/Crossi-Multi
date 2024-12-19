@@ -91,7 +91,7 @@ impl PlayerInputController {
                     if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
                         input = Input::Down;
                     }
-                    Self::process_input(&mut self.controller_a_players[gamepad_id], input, &mut player_inputs, timeline, players_local, &mut new_players);
+                    Self::process_input(&mut self.controller_a_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, &mut new_players);
                 }
 
                 {
@@ -108,7 +108,7 @@ impl PlayerInputController {
                     if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
                         input = Input::Down;
                     }
-                    Self::process_input(&mut self.controller_b_player[gamepad_id], input, &mut player_inputs, timeline, players_local, &mut new_players);
+                    Self::process_input(&mut self.controller_b_player[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, &mut new_players);
                 }
             }
         }
