@@ -1,6 +1,7 @@
 use std::collections::{VecDeque};
 use std::hash::Hash;
 
+use icy::IcyDescr;
 use serde::{Deserialize, Serialize};
 use froggy_rand::FroggyRand;
 
@@ -8,6 +9,7 @@ pub mod road;
 pub mod river;
 pub mod obstacle_row;
 pub mod bushes;
+pub mod icy;
 
 use road::Road;
 use river::{River};
@@ -49,7 +51,7 @@ pub enum RowType {
   Stands,
   Lobby,
   LobbyStands,
-  IcyRow{ wall_width : u32 },
+  IcyRow(IcyDescr),
 }
 
 impl RowType {
@@ -379,7 +381,28 @@ impl MapRound {
             if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.25) {
                 verbose_log!("Generating obtacle row at y={}", row_id.to_y());
 
-                if (rng.gen_unit("feature_type") < 0.5) {
+                if (rng.gen_unit("feature_type") < 0.65) {
+                    // Icy
+                    let lanes = *rng.choose("ice_len", &[3, 5, 6, 7, 8]);
+                    for i in 0..lanes {
+                        let rid = RowId(row_id.0 + i);
+                        let y = rid.to_y();
+                        println!("Icy {}", row_id.to_y());
+                        let seed = rng.gen("bush_seed") as u32;
+                        self.rows.push_front(Row {
+                            row_id: rid,
+                            row_type: RowType::IcyRow(IcyDescr {
+                                path_descr: PathDescr {
+                                    // @TODO, do properly
+                                    wall_width: 4,
+                                },
+                                seed,
+                                y,
+                            }),
+                        });
+                    }
+                }
+                else if (rng.gen_unit("rouda") < 0.5) {
                     verbose_log!("Generating road");
 
                     let lanes = *rng.choose("road_lanes", &[1, 2, 3, 4, 5]);
@@ -464,17 +487,17 @@ impl MapRound {
                     });
                 }
                 //else if (self.seed != 0 && rng.gen_unit("gen_icy") < 0.25)
-                else if (self.seed != 0 && rng.gen_unit("gen_icy") < 0.85)
-                {
-                    println!("Icy {}", row_id.to_y());
-                    let seed = rng.gen("bush_seed") as u32;
-                    self.rows.push_front(Row {
-                        row_id,
-                        row_type: RowType::IcyRow{
-                            wall_width: 4,
-                        }
-                    });
-                }
+                //else if (self.seed != 0 && rng.gen_unit("gen_icy") < 0.85)
+                //{
+                //    println!("Icy {}", row_id.to_y());
+                //    let seed = rng.gen("bush_seed") as u32;
+                //    self.rows.push_front(Row {
+                //        row_id,
+                //        row_type: RowType::IcyRow{
+                //            wall_width: 4,
+                //        }
+                //    });
+                //}
                 else
                 {
                     self.rows.push_front(Row {
@@ -534,6 +557,11 @@ impl Row {
             RowType::Path{wall_width} => {
                 outside_walls(x, *wall_width as i32)
             },
+            RowType::IcyRow(descr) => {
+                // @Perf
+                let hydrated = descr.hydrate();
+                outside_walls(x, descr.path_descr.wall_width as i32) || hydrated.blocks.iter().any(|x| *x == pos.x)
+            }
             RowType::Bushes(s) => {
                 outside_walls(x, s.path_descr.wall_width as i32)
             }
