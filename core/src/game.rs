@@ -41,6 +41,13 @@ pub struct CoordPos {
 }
 
 impl CoordPos {
+    pub fn new(x: i32, y: i32) -> Self {
+        Self {
+            x,
+            y
+        }
+    }
+
     pub fn to_precise(self) -> PreciseCoords {
         PreciseCoords {
             x: self.x as f64,

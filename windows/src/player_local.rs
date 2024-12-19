@@ -132,16 +132,20 @@ impl PlayerInputController {
             let top = timeline.top_state();
             if let Some(new_id) = top.player_states.next_free() {
                 *id_registration = Some(new_id);
-                drop(top);
-                timeline.add_player(new_id, Pos::new_coord(7, 7));
+
+                let rand = FroggyRand::new(timeline.len() as u64);
+                let new_skin = Skin::rand_not_overlapping(rand, &players_local.inner);
+                let pos = lobby_spawn_pos_no_overlapping(rand, &players_local.inner);
+
+                timeline.add_player(new_id, Pos::Coord(pos));
+
 
                 let top = timeline.top_state();
                 let player_state = top.player_states.get(new_id).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
                 let player_local = players_local.create(Pos::Absolute(V2::default()));
                 player_local.set_from(&player_state);
-                let rand = FroggyRand::new(timeline.len() as u64);
-                player_local.skin = Skin::from_enum(*rand.choose((), &crate::player_local::g_all_skins));
                 player_local.update_inputs(&*timeline, player_inputs, input);
+                player_local.skin = new_skin;
 
                 new_players.push(new_id);
             }
@@ -160,7 +164,7 @@ pub struct Skin {
     pub dialogue_sprite: &'static str,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayerSkin {
     Frog,
     Bird,
@@ -194,7 +198,38 @@ impl Default for Skin {
     }
 }
 
+fn lobby_spawn_pos_no_overlapping(rand: FroggyRand, existing: &[PlayerLocal]) -> CoordPos {
+    let mut options = Vec::new();
+    // Not very efficient but doesnt need to be.
+    for x in 7..12 {
+        for y in 7..12 {
+            options.push(CoordPos::new(x, y))
+        }
+    }
+
+    for player in existing {
+        // @Buggy
+        // Rough conversion to coordpos, may occcaassionally put someone on top of another, but should usually be fine
+        if let Some((idx, _)) = options.iter().enumerate().find(|(_, pos)| **pos == CoordPos::new(player.pos.x.round() as i32, player.pos.y.round() as i32)) {
+            options.remove(idx);
+        }
+    }
+
+    *rand.choose("pos", &options)
+}
+
 impl Skin {
+    pub fn rand_not_overlapping(rand: FroggyRand, existing: &[PlayerLocal]) -> Skin {
+        let mut options: Vec<PlayerSkin> = g_all_skins.iter().cloned().collect();
+        for player in existing {
+            if let Some((idx, _)) = options.iter().enumerate().find(|(_, skin)| **skin == player.skin.player_skin) {
+                options.remove(idx);
+            }
+        }
+
+        Self::from_enum(*rand.choose("skin", &options))
+    }
+
     pub fn from_enum(player_skin: PlayerSkin) -> Self {
         match player_skin {
             PlayerSkin::Frog => Self {
