@@ -1,8 +1,8 @@
-use std::{mem::MaybeUninit};
+use std::{mem::MaybeUninit, str::FromStr};
 
 use crossy_multi_core::{ring_buffer::RingBuffer, timeline::Timeline, DebugLogger, PlayerId, Pos};
 
-use crate::{player_local::PlayerInputController, Client};
+use crate::{player_local::{PlayerInputController, Skin}, Client};
 
 pub struct QuakeConsoleLogger {
 }
@@ -26,6 +26,10 @@ pub fn init_console() {
             name: "shader".to_owned(),
             lambda: Box::new(do_toggle_shader),
         });
+        command_set.commands.push(Command {
+            name: "skin".to_owned(),
+            lambda: Box::new(do_set_skin),
+        });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
 }
@@ -36,15 +40,33 @@ pub fn info(s: &str) {
     }
 }
 
+macro_rules! info {
+    ( $( $t:tt )* ) => {
+        info(&format!( $( $t )* ));
+    }
+}
+
 pub fn big(s: &str) {
     unsafe {
         g_console.assume_init_mut().write_with_type(s.to_owned(), LineType::Big);
     }
 }
 
+macro_rules! big {
+    ( $( $t:tt )* ) => {
+        big(&format!( $( $t )* ));
+    }
+}
+
 pub fn err(s: &str) {
     unsafe {
         g_console.assume_init_mut().write_with_type(format!("Error: {}", s), LineType::Error);
+    }
+}
+
+macro_rules! err {
+    ( $( $t:tt )* ) => {
+        err(&format!( $( $t )* ));
     }
 }
 
@@ -412,7 +434,7 @@ struct Command {
 
 fn do_new(args: &[&str], client: &mut Client) {
     if (args.len() > 1) {
-        err(&format!("Expected 0 or 1 argument to new, got {}", args.len()));
+        err!("Expected 0 or 1 argument to new, got {}", args.len());
         info("Usage: new");
         info("Usage: new some_seed");
         return;
@@ -426,7 +448,7 @@ fn do_new(args: &[&str], client: &mut Client) {
         seed = format!("seed_{}", 10);
     }
 
-    big(&format!("New Level Seed '{}'", seed));
+    big!("New Level Seed '{}'", seed);
     let new_game_id = client.timeline.top_state().rules_state.game_id;
     let mut config = client.timeline.top_state().rules_state.config.clone();
     config.bypass_lobby = true;
@@ -441,9 +463,44 @@ fn do_new(args: &[&str], client: &mut Client) {
 
 fn do_toggle_shader(args: &[&str], client: &mut Client) {
     if (args.len() > 0) {
-        err(&format!("Expected no arguments to 'shader' got {}", args.len()));
+        err!("Expected no arguments to 'shader' got {}", args.len());
         return;
     }
 
     client.screen_shader.enabled = !client.screen_shader.enabled;
+}
+
+fn do_set_skin(args: &[&str], client: &mut Client) {
+    if (args.len() != 1 && args.len() != 2) {
+        err!("Expected one or two arguments to 'skin' got {}", args.len());
+        return;
+    }
+
+    let mut player_id = PlayerId(1);
+
+    if (args.len() == 2) {
+        if let Ok(id) = args[0].parse() {
+            player_id = PlayerId(id);
+        }
+        else {
+            err!("Could not parse {} as a PlayerId (u8)", args[0]);
+            return;
+        }
+    }
+
+    let mut skin = Skin::default();
+    if let Ok(s) = crate::player_local::PlayerSkin::from_str(args.last().unwrap()) {
+        skin = Skin::from_enum(s);
+    }
+    else {
+        err!("Could not parse {} as a Skin", args.last().unwrap());
+        return;
+    }
+
+    if let Some(player) = client.entities.players.inner.iter_mut().find(|x| x.player_id == player_id) {
+        player.skin = skin;
+    }
+    else {
+        err!("Could not find player with PlayerId {}", player_id.0);
+    }
 }

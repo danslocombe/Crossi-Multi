@@ -1,5 +1,6 @@
 use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState, CrossyRulesetFST}, game, map::RowType, math::V2, player::PlayerStatePublic, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
+use strum_macros::EnumString;
 
 use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity}, gamepad_pressed, key_pressed, lerp_snap, sprites};
 
@@ -38,17 +39,19 @@ impl PlayerInputController {
         {
             // Arrows
             let mut input = Input::None;
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
-                input = game::Input::Left;
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
-                input = game::Input::Right;
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
-                input = game::Input::Up;
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
-                input = game::Input::Down;
+            if (!console::eating_input()) {
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
+                    input = game::Input::Left;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
+                    input = game::Input::Right;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
+                    input = game::Input::Up;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
+                    input = game::Input::Down;
+                }
             }
 
             Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local, &mut new_players);
@@ -57,17 +60,19 @@ impl PlayerInputController {
         {
             // WASD
             let mut input = Input::None;
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_A)) {
-                input = game::Input::Left;
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_D)) {
-                input = game::Input::Right;
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_W)) {
-                input = game::Input::Up;
-            }
-            if (key_pressed(raylib_sys::KeyboardKey::KEY_S)) {
-                input = game::Input::Down;
+            if (!console::eating_input()) {
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_A)) {
+                    input = game::Input::Left;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_D)) {
+                    input = game::Input::Right;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_W)) {
+                    input = game::Input::Up;
+                }
+                if (key_pressed(raylib_sys::KeyboardKey::KEY_S)) {
+                    input = game::Input::Down;
+                }
             }
 
             Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, &mut new_players);
@@ -164,7 +169,8 @@ pub struct Skin {
     pub dialogue_sprite: &'static str,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString)]
+#[strum(ascii_case_insensitive)]
 pub enum PlayerSkin {
     Frog,
     Bird,
@@ -271,14 +277,14 @@ impl Skin {
             PlayerSkin::FrogAlt => Self {
                 player_skin,
                 sprite: "frog_alt",
-                dead_sprite: "frog_dead",
-                dialogue_sprite: "frog_dialogue",
+                dead_sprite: "frog_alt_dead",
+                dialogue_sprite: "frog_alt_dialogue",
             },
             PlayerSkin::Frog3 => Self {
                 player_skin,
                 sprite: "frog_3",
-                dead_sprite: "frog_dead",
-                dialogue_sprite: "frog_dialogue",
+                dead_sprite: "frog_3_dead",
+                dialogue_sprite: "frog_3_dialogue",
             },
         }
     }

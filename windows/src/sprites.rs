@@ -40,8 +40,12 @@ pub fn init_sprites() {
         //load_frames("../web-client/static/sprites/spr_wosh_dialogue.png", Some(2));
 
         load_frames("../web-client/static/sprites/spr_frog_alt.png", None);
+        load_frames("../web-client/static/sprites/spr_frog_alt_dead.png", None);
+        load_frames("../web-client/static/sprites/spr_frog_alt_dialogue.png", Some(2));
 
         load_frames("../web-client/static/sprites/spr_frog_3.png", None);
+        load_frames("../web-client/static/sprites/spr_frog_3_dead.png", None);
+        load_frames("../web-client/static/sprites/spr_frog_3_dialogue.png", Some(2));
 
         load_frames("../web-client/static/sprites/spr_shadow.png", None);
         load_frames("../web-client/static/sprites/spr_crown.png", None);
