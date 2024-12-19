@@ -463,6 +463,18 @@ impl MapRound {
                         }),
                     });
                 }
+                //else if (self.seed != 0 && rng.gen_unit("gen_icy") < 0.25)
+                else if (self.seed != 0 && rng.gen_unit("gen_icy") < 0.85)
+                {
+                    println!("Icy {}", row_id.to_y());
+                    let seed = rng.gen("bush_seed") as u32;
+                    self.rows.push_front(Row {
+                        row_id,
+                        row_type: RowType::IcyRow{
+                            wall_width: 4,
+                        }
+                    });
+                }
                 else
                 {
                     self.rows.push_front(Row {

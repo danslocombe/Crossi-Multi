@@ -76,6 +76,32 @@ impl CoordPos {
             _  => *self,
         }
     }
+
+    pub fn delta_to_input(self, other: Self) -> Input {
+        if self.x == other.x {
+            if self.y == other.y - 1 {
+                return Input::Up;
+            }
+            if self.y == other.y + 1 {
+                return Input::Down;
+            }
+
+            if self.y == other.y {
+                return Input::None;
+            }
+        }
+
+        if self.y == other.y {
+            if self.x == other.x + 1 {
+                return Input::Right;
+            }
+            if self.x == other.x - 1 {
+                return Input::Left;
+            }
+        }
+
+        panic!("Tried to compute input from two coords not adjacent")
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize)]

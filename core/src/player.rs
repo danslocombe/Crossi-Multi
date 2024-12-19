@@ -37,6 +37,7 @@ pub struct MovingState
     pub remaining_us : u32,
     pub target : Pos,
     pub push_info : PushInfo,
+    pub sliding: bool,
 }
 
 impl MovingState {
@@ -45,6 +46,7 @@ impl MovingState {
             remaining_us : MOVE_DUR,
             push_info : PushInfo::empty_at_frame(frame_id),
             target,
+            sliding: false,
         }
     }
 
@@ -53,6 +55,7 @@ impl MovingState {
             remaining_us : MOVE_DUR,
             target,
             push_info,
+            sliding: false,
         }
     }
 }
@@ -118,6 +121,23 @@ impl PlayerState {
 
                         // rem_ms <= 0 so we add it to the max cooldown
                         new.move_cooldown = MOVE_COOLDOWN_MAX.saturating_sub(leftover_us);
+
+                        //if (moving_state.sliding) {
+                        if let crate::map::RowType::IcyRow { .. } = map.get_row(state.get_round_id(), new.pos.get_coord().y).row_type
+                        {
+                            // Try and continue sliding
+
+                            // Assume we can only slide from coord
+                            let coord_pos = self.pos.get_coord();
+                            if let Pos::Coord(coord) = moving_state.target {
+                                let sliding_input = coord.delta_to_input(coord_pos);
+                                if sliding_input != Input::None {
+                                    if let Some(moving_state) = new.try_move(sliding_input, state, pushes, map) {
+                                        new.move_state = MoveState::Moving(moving_state);
+                                    }
+                                }
+                            }
+                        }
                     },
                 }
             }
@@ -183,7 +203,12 @@ impl PlayerState {
             }
         }
 
-        Some(MovingState::with_push(new_pos, push_info))
+        let mut moving_state = MovingState::with_push(new_pos, push_info);
+        if let crate::map::RowType::IcyRow { .. } = map.get_row(state.get_round_id(), self.pos.get_coord().y).row_type {
+            moving_state.sliding = true;
+        }
+
+        Some(moving_state)
     }
 
     fn try_move_player_initial(

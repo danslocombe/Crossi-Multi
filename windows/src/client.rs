@@ -148,6 +148,8 @@ impl Client {
             const river_col_1: raylib_sys::Color = hex_color("5b5be7".as_bytes());
             const road_col_0: raylib_sys::Color = hex_color("646469".as_bytes());
             const road_col_1: raylib_sys::Color = hex_color("59595d".as_bytes());
+            const icy_col_0: raylib_sys::Color = hex_color("cbdbfc".as_bytes());
+            const icy_col_1: raylib_sys::Color = hex_color("9badb7".as_bytes());
 
             //let screen_y = top.rules_state.fst.get_screen_y();
             let screen_y = self.camera.y;
@@ -164,6 +166,9 @@ impl Client {
                     },
                     RowType::Road(_) => {
                         (road_col_0, road_col_1)
+                    },
+                    RowType::IcyRow{..} => {
+                        (icy_col_0, icy_col_1)
                     },
                     _ => {
                         (grass_col_0, grass_col_1)
