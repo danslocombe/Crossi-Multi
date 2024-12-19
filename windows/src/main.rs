@@ -305,6 +305,12 @@ fn key_pressed(k: raylib_sys::KeyboardKey) -> bool {
     }
 }
 
+fn gamepad_pressed(gamepad_id: i32, button: raylib_sys::GamepadButton) -> bool {
+    unsafe {
+        raylib_sys::IsGamepadButtonPressed(gamepad_id, button as i32)
+    }
+}
+
 fn mouse_button_down(mb: raylib_sys::MouseButton) -> bool {
     unsafe {
         raylib_sys::IsMouseButtonDown(mb as i32)

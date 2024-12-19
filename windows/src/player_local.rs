@@ -1,7 +1,7 @@
 use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState, CrossyRulesetFST}, game, map::RowType, math::V2, player::PlayerStatePublic, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity}, key_pressed, lerp_snap, sprites};
+use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity}, gamepad_pressed, key_pressed, lerp_snap, sprites};
 
 #[derive(Debug)]
 pub struct PlayerLocal {
@@ -26,10 +26,8 @@ const PLAYER_FRAME_COUNT: i32 = 5;
 pub struct PlayerInputController {
     arrow_key_player: Option<PlayerId>,
     wasd_player: Option<PlayerId>,
-    controller_a_player: Option<PlayerId>,
-    controller_b_player: Option<PlayerId>,
-    controller_c_player: Option<PlayerId>,
-    controller_d_player: Option<PlayerId>,
+    controller_a_players: [Option<PlayerId>;4],
+    controller_b_player: [Option<PlayerId>;4],
 }
 
 impl PlayerInputController {
@@ -73,6 +71,46 @@ impl PlayerInputController {
             }
 
             Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, &mut new_players);
+        }
+
+        for gamepad_id in 0..4 {
+        {
+            if (unsafe { raylib_sys::IsGamepadAvailable(gamepad_id) })
+            {
+                {
+                    let mut input = Input::None;
+                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
+                        input = Input::Left;
+                    }
+                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
+                        input = Input::Right;
+                    }
+                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_UP) {
+                        input = Input::Up;
+                    }
+                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
+                        input = Input::Down;
+                    }
+                    Self::process_input(&mut self.controller_a_players[gamepad_id], input, &mut player_inputs, timeline, players_local, &mut new_players);
+                }
+
+                {
+                    let mut input = Input::None;
+                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_LEFT) {
+                        input = Input::Left;
+                    }
+                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) {
+                        input = Input::Right;
+                    }
+                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_UP) {
+                        input = Input::Up;
+                    }
+                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
+                        input = Input::Down;
+                    }
+                    Self::process_input(&mut self.controller_b_player[gamepad_id], input, &mut player_inputs, timeline, players_local, &mut new_players);
+                }
+            }
         }
 
         (player_inputs, new_players)
