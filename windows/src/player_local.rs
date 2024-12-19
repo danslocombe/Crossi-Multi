@@ -271,8 +271,8 @@ impl Skin {
             PlayerSkin::Wosh => Self {
                 player_skin,
                 sprite: "woshette",
-                dead_sprite: "frog_dead",
-                dialogue_sprite: "frog_dialogue",
+                dead_sprite: "woshette_dead",
+                dialogue_sprite: "woshette_dialogue",
             },
             PlayerSkin::FrogAlt => Self {
                 player_skin,

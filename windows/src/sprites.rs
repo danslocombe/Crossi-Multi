@@ -36,8 +36,8 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_mouse_dialogue_cute.png", Some(2));
 
         load_frames("../web-client/static/sprites/spr_woshette.png", None);
-        //load_frames("../web-client/static/sprites/spr_wosh_dead.png", None);
-        //load_frames("../web-client/static/sprites/spr_wosh_dialogue.png", Some(2));
+        load_frames("../web-client/static/sprites/spr_woshette_dead.png", None);
+        load_frames("../web-client/static/sprites/spr_woshette_dialogue.png", Some(2));
 
         load_frames("../web-client/static/sprites/spr_frog_alt.png", None);
         load_frames("../web-client/static/sprites/spr_frog_alt_dead.png", None);
