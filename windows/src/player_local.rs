@@ -73,7 +73,7 @@ impl PlayerInputController {
             Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, &mut new_players);
         }
 
-        for gamepad_id in 0..4 {
+        for gamepad_id in 0..4
         {
             if (unsafe { raylib_sys::IsGamepadAvailable(gamepad_id) })
             {
