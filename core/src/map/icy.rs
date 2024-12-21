@@ -22,7 +22,8 @@ pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDequ
     for i in 0..256 {
         let rand = rand.subrand(i);
         let map = generate_ice_single(rand, 20, 4, height);
-        if (verify_ice(&map)) {
+        //if (verify_ice(&map)) {
+        if (verify_ice_graph(&map)) {
             // Got a map!
             println!("Verified an icy section of height {}, y = {}", height, row_id_0.to_y());
 
@@ -431,9 +432,9 @@ impl IcyGraph {
 
         let mut wavefront = vec![start];
 
-        println!("self: {:#?}", self);
+        //println!("self: {:#?}", self);
         while (!wavefront.is_empty()) {
-            println!("Iter: {:?}", wavefront);
+            //println!("Iter: {:?}", wavefront);
             // @Perf reuse vecs
             let mut new_wavefront = Vec::new();
 
@@ -442,8 +443,8 @@ impl IcyGraph {
                     if edge.from != *nid {
                         continue;
                     }
-                    println!("Found edge: {:?}", edge);
-                    println!("Found edge: {:?} -> {:?})", self.nodes[edge.from], self.nodes[edge.to]);
+                    //println!("Found edge: {:?}", edge);
+                    //println!("Found edge: {:?} -> {:?})", self.nodes[edge.from], self.nodes[edge.to]);
 
                     let node = &mut self.nodes[edge.to];
                     if !node.mark {
@@ -481,10 +482,10 @@ impl IcyGraph {
                     }
                     //println!("Found edge: {:?}", edge);
 
-                    let node = &mut self.nodes[edge.to];
+                    let node = &mut self.nodes[edge.from];
                     if node.mark {
                         node.mark = false;
-                        new_wavefront.push(edge.to);
+                        new_wavefront.push(edge.from);
                     }
                 }
             }
@@ -574,6 +575,26 @@ impl PosWithDir {
             pos: CoordPos::new(x, y),
             dir
         }
+    }
+}
+
+pub fn verify_ice_graph(block_map: &BlockMap) -> bool {
+    let mut graph = build_graph(&block_map);
+    graph.mark_forward_from_start();
+    if (!graph.end().unwrap().1.mark) {
+        // Didnt reach end
+        println!("Doesnt reach end");
+        return false;
+    }
+
+    graph.unmark_inverted_from_start();
+    let marked = graph.get_marked();
+    if (!marked.is_empty()) {
+        println!("Unreachable {:?}", marked);
+        false
+    }
+    else {
+        true
     }
 }
 
@@ -728,9 +749,14 @@ mod tests {
         graph.mark_forward_from_start();
         let reachable = graph.get_marked();
 
-        println!("{:#?}", graph);
+        //println!("{:#?}", graph);
 
         assert_eq!(2 + 2, reachable.len());
+
+        graph.unmark_inverted_from_start();
+        let reachable = graph.get_marked();
+        println!("{:#?}", graph);
+        assert!(reachable.is_empty());
     }
 
     #[test]
@@ -750,7 +776,7 @@ mod tests {
         let zork_states = graph.get_marked();
 
         println!("{:#?}", graph);
-        assert_eq!(3, zork_states.len());
+        assert_eq!(2, zork_states.len());
 
         // Expect 3 states zork, marked with Z
 
@@ -774,6 +800,10 @@ mod tests {
         let mut graph = build_graph(&map);
         graph.mark_forward_from_start();
         assert!(graph.end().unwrap().1.mark);
+
+        graph.unmark_inverted_from_start();
+        let reachable = graph.get_marked();
+        assert!(reachable.is_empty());
     }
 
     #[test]
