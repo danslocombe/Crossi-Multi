@@ -61,5 +61,6 @@ pub mod map;
 pub mod telemetry;
 pub mod ring_buffer;
 pub mod math;
+pub mod bitmap;
 
 pub use game::*;

@@ -382,25 +382,7 @@ impl MapRound {
                 verbose_log!("Generating obtacle row at y={}", row_id.to_y());
 
                 if (rng.gen_unit("feature_type") < 0.65) {
-                    // Icy
-                    let lanes = *rng.choose("ice_len", &[3, 5, 6, 7, 8]);
-                    for i in 0..lanes {
-                        let rid = RowId(row_id.0 + i);
-                        let y = rid.to_y();
-                        println!("Icy {}", row_id.to_y());
-                        let seed = rng.gen("bush_seed") as u32;
-                        self.rows.push_front(Row {
-                            row_id: rid,
-                            row_type: RowType::IcyRow(IcyDescr {
-                                path_descr: PathDescr {
-                                    // @TODO, do properly
-                                    wall_width: 4,
-                                },
-                                seed,
-                                y,
-                            }),
-                        });
-                    }
+                    icy::gen_icy_section(rng, row_id, &mut self.rows);
                 }
                 else if (rng.gen_unit("rouda") < 0.5) {
                     verbose_log!("Generating road");
@@ -559,8 +541,8 @@ impl Row {
             },
             RowType::IcyRow(descr) => {
                 // @Perf
-                let hydrated = descr.hydrate();
-                outside_walls(x, descr.path_descr.wall_width as i32) || hydrated.blocks.iter().any(|x| *x == pos.x)
+                //let hydrated = descr.hydrate();
+                outside_walls(x, descr.path_descr.wall_width as i32) || descr.blocks.get(x)
             }
             RowType::Bushes(s) => {
                 outside_walls(x, s.path_descr.wall_width as i32)

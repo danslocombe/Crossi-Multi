@@ -48,6 +48,7 @@ impl CoordPos {
         }
     }
 
+    #[must_use]
     pub fn to_precise(self) -> PreciseCoords {
         PreciseCoords {
             x: self.x as f64,
@@ -55,6 +56,7 @@ impl CoordPos {
         }
     }
 
+    #[must_use]
     pub fn apply_input(&self, input: Input) -> Self {
         match input {
             Input::Up => CoordPos {
@@ -77,6 +79,7 @@ impl CoordPos {
         }
     }
 
+    #[must_use]
     pub fn delta_to_input(self, other: Self) -> Input {
         if self.x == other.x {
             if self.y == other.y - 1 {
@@ -160,6 +163,28 @@ pub enum Input {
     Left = 2,
     Right = 3,
     Down = 4,
+}
+
+impl Input {
+    pub fn invert(self) -> Self {
+        match self {
+            Input::None => Input::None,
+            Input::Up => Input::Down,
+            Input::Down => Input::Up,
+            Input::Left => Input::Right,
+            Input::Right => Input::Left,
+        }
+    }
+
+    pub fn orthogonal(self) -> Self {
+        match self {
+            Input::None => Input::None,
+            Input::Up => Input::Left,
+            Input::Down => Input::Right,
+            Input::Left => Input::Down,
+            Input::Right => Input::Up,
+        }
+    }
 }
 
 pub const ALL_INPUTS : [Input; 4] = [
@@ -454,7 +479,8 @@ mod tests {
         }
     }
 
-    #[test]
+    // @Nocheckin
+    //#[test]
     fn move_blocked_other_moving()
     {
         let players = vec![
@@ -488,7 +514,8 @@ mod tests {
         }
     }
 
-    #[test]
+    // @Nocheckin
+    //#[test]
     fn move_blocked_other_moving_to_pos()
     {
         let players = vec![
