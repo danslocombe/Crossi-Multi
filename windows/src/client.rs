@@ -195,18 +195,22 @@ impl Client {
                 }
 
                 if let RowType::IcyRow(state) = &row.row_type {
-                    for i in 0..=state.path_descr.wall_width {
-                        sprites::draw("tree_top", 1, i as f32 * 8.0, y as f32 * 8.0);
-                        sprites::draw("tree_top", 1, (19 - i) as f32 * 8.0, y as f32 * 8.0);
-                    }
+                    //for i in 0..=state.path_descr.wall_width {
+                    //    sprites::draw("tree_top", 1, i as f32 * 8.0, y as f32 * 8.0);
+                    //    sprites::draw("tree_top", 1, (19 - i) as f32 * 8.0, y as f32 * 8.0);
+                    //}
 
-                    let hydrated = state.hydrate();
-                    for block in hydrated.blocks {
-                        sprites::draw("tree_top", 1, block as f32 * 8.0, y as f32 * 8.0);
+                    for x in 0..20 {
+                        if state.blocks.get(x) {
+                            sprites::draw("tree_top", 1, x as f32 * 8.0, y as f32 * 8.0);
+                        }
                     }
-                    for ice in hydrated.ice {
-                        sprites::draw("tree_top", 0, ice as f32 * 8.0, y as f32 * 8.0);
-                    }
+                    //for block in hydrated.blocks {
+                    //    sprites::draw("tree_top", 1, block as f32 * 8.0, y as f32 * 8.0);
+                    //}
+                    //for ice in hydrated.ice {
+                    //    sprites::draw("tree_top", 0, ice as f32 * 8.0, y as f32 * 8.0);
+                    //}
                 }
 
                 if let RowType::Path { wall_width } = row.row_type {

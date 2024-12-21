@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use crate::math::V2;
@@ -34,7 +36,7 @@ impl Pos {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Default, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct CoordPos {
     pub x: i32,
     pub y: i32,
@@ -104,6 +106,12 @@ impl CoordPos {
         }
 
         panic!("Tried to compute input from two coords not adjacent")
+    }
+}
+
+impl Display for CoordPos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
     }
 }
 

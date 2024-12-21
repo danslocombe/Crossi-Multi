@@ -381,8 +381,24 @@ impl MapRound {
             if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.25) {
                 verbose_log!("Generating obtacle row at y={}", row_id.to_y());
 
-                if (rng.gen_unit("feature_type") < 0.65) {
-                    icy::gen_icy_section(rng, row_id, &mut self.rows);
+                if rng.gen_unit("feature_type") < 0.65
+                {
+                    //if let Some(new_gen_to) = icy::try_gen_icy_section(rng, row_id, &mut self.rows)
+                    if icy::try_gen_icy_section(rng, row_id, &mut self.rows)
+                    {
+                        // Success!
+                        continue;
+                    }
+                    else {
+                        panic!("@Nocheckin");
+                        self.rows.push_front(Row {
+                            row_id,
+                            row_type: RowType::Path{
+                                wall_width : self.gen_state_wall_width as u32,
+                            },
+                        });
+                        continue;
+                    }
                 }
                 else if (rng.gen_unit("rouda") < 0.5) {
                     verbose_log!("Generating road");

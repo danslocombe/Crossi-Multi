@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, VecDeque};
 use froggy_rand::FroggyRand;
 use num_traits::ops::inv;
 use serde::{Deserialize, Serialize};
-use crate::{bitmap::BitMap, map::RowType, CoordPos, Input, SCREEN_SIZE};
+use crate::{bitmap::BitMap, map::RowType, CoordPos, Input, ALL_INPUTS, SCREEN_SIZE};
 
 use super::{PathDescr, Row, RowId};
 
@@ -15,28 +15,43 @@ pub struct IcyDescr {
     pub blocks: BitMap,
 }
 
-pub fn gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDeque<Row>) {
+pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDeque<Row>) -> bool {
     // Icy
-    let width = *rand.choose("ice_len", &[3, 5, 6, 7, 8]);
-    //println!("Icy {} width {}", row_id_0.to_y(), width);
-    for i in 0..width {
-        let rid = RowId(row_id_0.0 + i);
-        let y = rid.to_y();
-        let seed = rand.gen("icy_seed") as u32;
-        let blocks = BitMap::default();
-        rows.push_front(Row {
-            row_id: rid,
-            row_type: RowType::IcyRow(IcyDescr {
-                path_descr: PathDescr {
-                    // @TODO, do properly
-                    wall_width: 4,
-                },
-                seed,
-                y,
-                blocks,
-            }),
-        });
+    let height = *rand.choose("ice_len", &[3, 5, 6, 7, 8]);
+
+    for i in 0..256 {
+        let rand = rand.subrand(i);
+        let map = generate_ice_single(rand, 20, 4, height);
+        if (verify_ice(&map)) {
+            // Got a map!
+            println!("Verified an icy section of height {}, y = {}", height, row_id_0.to_y());
+
+            for row in 0..height {
+                let rid = RowId(row_id_0.0 + row as u32);
+                let y = rid.to_y();
+                let seed = rand.gen("icy_seed") as u32;
+                let blocks = map.inner[row as usize];
+                rows.push_front(Row {
+                    row_id: rid,
+                    row_type: RowType::IcyRow(IcyDescr {
+                        path_descr: PathDescr {
+                            // @TODO, do properly
+                            wall_width: 4,
+                        },
+                        seed,
+                        y,
+                        blocks,
+                    }),
+                });
+            }
+
+            // Success
+            return true;
+        }
     }
+
+    // Timed out of iterations trying to find a valid map :(
+    false
 }
 
 /*
@@ -196,6 +211,329 @@ pub fn verify_ice(block_map: &BlockMap) -> bool {
     false
 }
 
+fn generate_ice_single(rand: FroggyRand, full_width: i32, wall_width: i32, height: i32) -> BlockMap {
+    let mut inner = Vec::new();
+
+    for y in 0..height {
+        let mut row_map = BitMap::default();
+        for x in 0..full_width {
+            if x < wall_width || x > full_width - wall_width {
+                continue;
+            }
+
+            let pos = CoordPos::new(x, y);
+            if rand.gen_unit(pos) < 0.3 {
+                row_map.set_bit(x);
+            }
+        }
+
+        inner.push(row_map)
+    }
+
+    BlockMap {
+        full_width,
+        wall_width,
+        inner
+    }
+}
+
+pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
+    let mut graph = IcyGraph::default();
+    let start = graph.get_or_add_node(NodeType::Start);
+    let end = graph.get_or_add_node(NodeType::End);
+
+    for x in 0..block_map.full_width {
+        let input = Input::Up;
+        let mut pos = CoordPos::new(x, block_map.height() - 1);
+        let mut prev = None;
+
+        loop {
+            if pos.y < 0 {
+                // Outside
+                // Can go from start to end
+                graph.add_edge(start, end);
+                break;
+            }
+            if block_map.get(pos) {
+                if let Some(p) = prev {
+                    // Hit something and last position was non-empty
+                    // Add a link
+                    let node = graph.get_or_add_node(NodeType::Pos(p));
+                    graph.add_edge(start, node);
+                }
+
+                break;
+            }
+
+            prev = Some(pos);
+            pos = pos.apply_input(input);
+        }
+    }
+
+    // @Dedup with above
+    for x in 0..block_map.full_width {
+        let input = Input::Down;
+        let mut pos = CoordPos::new(x, 0);
+        let mut prev = None;
+
+        loop {
+            if pos.y > block_map.height() - 1 {
+                // Outside
+                // Can go from start to end
+                graph.add_edge(end, start);
+                break;
+            }
+            if block_map.get(pos) {
+                if let Some(p) = prev {
+                    // Hit something and last position was non-empty
+                    // Add a link
+                    let node = graph.get_or_add_node(NodeType::Pos(p));
+                    graph.add_edge(end, node);
+                }
+
+                break;
+            }
+
+            prev = Some(pos);
+            pos = pos.apply_input(input);
+        }
+    }
+
+    /*
+    for x in 0..block_map.full_width {
+        let input = Input::Down;
+        let pos = CoordPos::new(x, 0);
+        let mut prev = None;
+
+        while {
+            pos = pos.apply_input(input);
+
+            if !block_map.get(pos) {
+                if let Some(p) = last {
+                    // Hit something and last position was non-empty
+                    // Add a link
+                    let node = graph.get_or_add_node(NodeType::Pos(p));
+                    graph.add_edge(end, node);
+                }
+            }
+            prev = Some(pos);
+        }
+    }
+    */
+
+    for y in 0..block_map.height() {
+        for x in 0..block_map.full_width {
+            let pos = CoordPos::new(x, y);
+            if block_map.get(pos) {
+                continue;
+            }
+
+            let node = graph.get_or_add_node(NodeType::Pos(pos));
+            for dir in ALL_INPUTS {
+                let mut p = pos;
+                loop {
+                    let last = p;
+                    p = p.apply_input(dir);
+                    if (p.y < 0) {
+                        // Hit the end
+                        graph.add_edge(node, end);
+                        break;
+                    }
+                    if (p.y == block_map.height()) {
+                        // Hit the start
+                        graph.add_edge(node, start);
+                        break;
+                    }
+
+                    if (block_map.get(p)) {
+                        let last_id = graph.get_or_add_node(NodeType::Pos(last));
+                        graph.add_edge(node, last_id);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    graph
+}
+
+#[derive(Default, Debug)]
+pub struct IcyGraph {
+    nodes: Vec<Node>,
+    edges: Vec<Edge>,
+}
+
+impl IcyGraph {
+    pub fn try_get_node(&mut self, node: NodeType) -> Option<usize> {
+        self.nodes.iter().enumerate().filter(|(_, x)| x.inner == node).next().map(|(i, _)| i)
+    }
+
+    pub fn get_or_add_node(&mut self, node: NodeType) -> usize {
+        if let Some(n) = self.try_get_node(node) {
+            n
+        }
+        else {
+            let id = self.nodes.len();
+            self.nodes.push(Node::new(node));
+            id
+        }
+    }
+
+    /*
+    pub fn add_node(&mut self, node: Node) -> usize {
+        let id = self.nodes.len();
+        self.nodes.push(node);
+        id
+    }
+    */
+
+    pub fn add_edge(&mut self, from: usize, to: usize) {
+        // Don't allow self edges
+        // Add check here for cleaner upstream
+        if from == to {
+            return;
+        }
+        let edge = Edge {
+            from,
+            to
+        };
+
+        // @Perf
+        if self.edges.contains(&edge) {
+            return;
+        }
+
+        self.edges.push(edge);
+    }
+
+    pub fn clear_marks(&mut self) {
+        for node in &mut self.nodes {
+            node.mark = false;
+        }
+    }
+
+    pub fn get_marked(&self) -> Vec<Node> {
+        self.nodes.iter().filter(|x| x.mark).cloned().collect()
+    }
+
+    pub fn start(&self) -> Option<(usize, Node)> {
+        // @Cleanup use matches!
+        self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::Start = x.inner {true} else {false}).map(|(i, x)| (i, *x))
+    }
+
+    pub fn end(&self) -> Option<(usize, Node)> {
+        self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::End = x.inner {true} else {false}).map(|(i, x)| (i, *x))
+    }
+
+    pub fn mark_forward_from_start(&mut self) {
+        let start = self.start().unwrap().0;
+        self.nodes[start].mark = true;
+
+        let mut wavefront = vec![start];
+
+        println!("self: {:#?}", self);
+        while (!wavefront.is_empty()) {
+            println!("Iter: {:?}", wavefront);
+            // @Perf reuse vecs
+            let mut new_wavefront = Vec::new();
+
+            for nid in &wavefront {
+                for edge in &self.edges {
+                    if edge.from != *nid {
+                        continue;
+                    }
+                    println!("Found edge: {:?}", edge);
+                    println!("Found edge: {:?} -> {:?})", self.nodes[edge.from], self.nodes[edge.to]);
+
+                    let node = &mut self.nodes[edge.to];
+                    if !node.mark {
+                        node.mark = true;
+                        new_wavefront.push(edge.to);
+                    }
+                }
+            }
+
+            wavefront = new_wavefront;
+        }
+    }
+
+    pub fn unmark_inverted_from_start(&mut self) {
+        //println!("self: {:#?}", self);
+        //println!("STARTING UNMARK =====");
+
+        let start = self.start().unwrap().0;
+        self.nodes[start].mark = false;
+
+        let end = self.end().unwrap().0;
+        self.nodes[end].mark = false;
+
+        let mut wavefront = vec![start];
+
+        while (!wavefront.is_empty()) {
+            //println!("Iter: {:?}", wavefront);
+            // @Perf reuse vecs
+            let mut new_wavefront = Vec::new();
+
+            for nid in &wavefront {
+                for edge in &self.edges {
+                    if edge.to != *nid {
+                        continue;
+                    }
+                    //println!("Found edge: {:?}", edge);
+
+                    let node = &mut self.nodes[edge.to];
+                    if node.mark {
+                        node.mark = false;
+                        new_wavefront.push(edge.to);
+                    }
+                }
+            }
+
+            wavefront = new_wavefront;
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeType {
+    Start,
+    End,
+    Pos(CoordPos),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Node {
+    inner: NodeType,
+    mark: bool,
+}
+
+impl Node {
+    pub fn new(inner: NodeType) -> Self {
+        Self {
+            inner,
+            mark: false,
+        }
+    }
+
+    pub fn start() -> Self {
+        Self::new(NodeType::Start)
+    }
+
+    pub fn end() -> Self {
+        Self::new(NodeType::End)
+    }
+
+    pub fn pos(pos: CoordPos) -> Self {
+        Self::new(NodeType::Pos(pos))
+    }
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Edge {
+    from: usize,
+    to: usize,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PosWithDir {
@@ -334,6 +672,18 @@ mod tests {
         assert!(verify_ice(&map));
     }
 
+    #[test]
+    fn icy_verification_small_negative() {
+        let rows = [
+            "xx  xx",
+            "x    x",
+            "x xx x",
+            "x    x",
+        ];
+
+        let map = generate_map(&rows);
+        assert!(!verify_ice(&map));
+    }
 
     #[test]
     fn icy_verification_negative() {
@@ -347,9 +697,99 @@ mod tests {
         ];
 
         let map = generate_map(&rows);
-        assert!(verify_ice(&map));
+        assert!(!verify_ice(&map));
     }
 
+    #[test]
+    fn icy_graph_trivial() {
+        let rows = [
+            "X X",
+            "X X",
+        ];
+
+        let map = generate_map(&rows);
+        let mut graph = build_graph(&map);
+        println!("{:#?}", graph);
+        //assert_eq!(graph.nodes, Vec::default());
+        graph.mark_forward_from_start();
+        assert!(graph.end().unwrap().1.mark)
+    }
+
+    #[test]
+    fn icy_graph_simple() {
+        let rows = [
+            "X ",
+            "  ",
+        ];
+
+        let map = generate_map(&rows);
+        let mut graph = build_graph(&map);
+        //println!("{:#?}", graph);
+        graph.mark_forward_from_start();
+        let reachable = graph.get_marked();
+
+        println!("{:#?}", graph);
+
+        assert_eq!(2 + 2, reachable.len());
+    }
+
+    #[test]
+    fn icy_graph_zork() {
+        let rows = [
+            "xx x",
+            "    ",
+            "x  x",
+        ];
+
+        let map = generate_map(&rows);
+        let mut graph = build_graph(&map);
+        //println!("{:#?}", graph);
+        graph.mark_forward_from_start();
+        let _reachable = graph.get_marked();
+        graph.unmark_inverted_from_start();
+        let zork_states = graph.get_marked();
+
+        println!("{:#?}", graph);
+        assert_eq!(3, zork_states.len());
+
+        // Expect 3 states zork, marked with Z
+
+        //  "xx x",
+        //  "ZZ Z",
+        //  "x  x",
+    }
+
+    #[test]
+    fn icy_graph_positive() {
+        let rows = [
+            "xxx   xxxx",
+            "x    x   x",
+            "x  x x   x",
+            "x  x     x",
+            "x  xxxx  x",
+            "x        x",
+        ];
+
+        let map = generate_map(&rows);
+        let mut graph = build_graph(&map);
+        graph.mark_forward_from_start();
+        assert!(graph.end().unwrap().1.mark);
+    }
+
+    #[test]
+    fn icy_graph_negative() {
+        let rows = [
+            "xx  xxx",
+            "x     x",
+            "x xx  x",
+        ];
+
+        let map = generate_map(&rows);
+        let mut graph = build_graph(&map);
+        graph.mark_forward_from_start();
+        //println!("{:#?}", graph);
+        assert!(!graph.end().unwrap().1.mark);
+    }
 
     fn generate_map(rows: &[&str]) -> BlockMap {
         let full_width = (rows[0].len() + 2) as i32;
@@ -360,7 +800,7 @@ mod tests {
         for row in rows {
             let mut row_map = BitMap::default();
             for (i, c) in row.chars().enumerate() {
-                if c == 'X' {
+                if c == 'X' || c == 'x' {
                     row_map.set_bit(i as i32 + wall_width);
                 }
             }
