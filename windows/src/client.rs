@@ -201,7 +201,7 @@ impl Client {
                     //}
 
                     for x in 0..20 {
-                        if state.blocks.get(x) {
+                        if x <= state.path_descr.wall_width || x >= 19 - state.path_descr.wall_width || state.blocks.get(x as i32) {
                             sprites::draw("tree_top", 1, x as f32 * 8.0, y as f32 * 8.0);
                         }
                     }

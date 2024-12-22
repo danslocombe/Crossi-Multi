@@ -17,37 +17,69 @@ pub struct IcyDescr {
 
 pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDeque<Row>) -> bool {
     // Icy
-    let height = *rand.choose("ice_len", &[3, 5, 6, 7, 8]);
+    let height = *rand.choose("ice_len", &[5, 7, 7, 9, 9, 13]);
 
-    for i in 0..256 {
+    'outer: for i in 0..256 {
         let rand = rand.subrand(i);
-        let map = generate_ice_single(rand, 20, 4, height);
-        //if (verify_ice(&map)) {
-        if (verify_ice_graph(&map)) {
-            // Got a map!
-            println!("Verified an icy section of height {}, y = {}", height, row_id_0.to_y());
+        let mut map = generate_ice_single(rand, 20, 4, height);
 
-            for row in 0..height {
-                let rid = RowId(row_id_0.0 + row as u32);
-                let y = rid.to_y();
-                let seed = rand.gen("icy_seed") as u32;
-                let blocks = map.inner[row as usize];
-                rows.push_front(Row {
-                    row_id: rid,
-                    row_type: RowType::IcyRow(IcyDescr {
-                        path_descr: PathDescr {
-                            // @TODO, do properly
-                            wall_width: 4,
-                        },
-                        seed,
-                        y,
-                        blocks,
-                    }),
-                });
+        for j in 0..8 {
+            //if (verify_ice(&map)) {
+            match (verify_ice_graph(&map)) {
+                VerifyResult::Bad_Zork => {
+                    continue 'outer;
+                },
+                VerifyResult::Bad_DoesntReachEnd => {
+                    // Remove things.
+                    for y in 0..height {
+                        for x in 0..map.full_width {
+                            let pos = CoordPos::new(x, y);
+                            if rand.gen_unit(("remove", j, pos)) < 0.15 {
+                                map.inner[y as usize].unset_bit(x);
+                            }
+                        }
+                    }
+                    continue;
+                },
+                VerifyResult::Bad_Trivial => {
+                    // Add things
+                    for y in 0..height {
+                        for x in 0..map.full_width {
+                            let pos = CoordPos::new(x, y);
+                            if rand.gen_unit(("add", j, pos)) < 0.15 {
+                                map.inner[y as usize].set_bit(x);
+                            }
+                        }
+                    }
+                    continue;
+                },
+                VerifyResult::Success => {
+                    // Got a map!
+                    println!("Verified an icy section of height {}, y = {}", height, row_id_0.to_y());
+
+                    for row in 0..height {
+                        let rid = RowId(row_id_0.0 + row as u32);
+                        let y = rid.to_y();
+                        let seed = rand.gen("icy_seed") as u32;
+                        let blocks = map.inner[row as usize];
+                        rows.push_front(Row {
+                            row_id: rid,
+                            row_type: RowType::IcyRow(IcyDescr {
+                                path_descr: PathDescr {
+                                    // @TODO, do properly
+                                    wall_width: 4,
+                                },
+                                seed,
+                                y,
+                                blocks,
+                            }),
+                        });
+                    }
+
+                    // Success
+                    return true;
+                }
             }
-
-            // Success
-            return true;
         }
     }
 
@@ -223,7 +255,7 @@ fn generate_ice_single(rand: FroggyRand, full_width: i32, wall_width: i32, heigh
             }
 
             let pos = CoordPos::new(x, y);
-            if rand.gen_unit(pos) < 0.3 {
+            if rand.gen_unit(pos) < 0.6 {
                 row_map.set_bit(x);
             }
         }
@@ -355,13 +387,15 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
             }
         }
     }
+
+    println!("Built graph nodes {} edges {}, w {} h {}", graph.nodes.len(), graph.edges.len(), block_map.full_width - 2*block_map.wall_width, block_map.inner.len());
     graph
 }
 
 #[derive(Default, Debug)]
 pub struct IcyGraph {
     nodes: Vec<Node>,
-    edges: Vec<Edge>,
+    edges: BTreeSet<Edge>,
 }
 
 impl IcyGraph {
@@ -399,12 +433,7 @@ impl IcyGraph {
             to
         };
 
-        // @Perf
-        if self.edges.contains(&edge) {
-            return;
-        }
-
-        self.edges.push(edge);
+        self.edges.insert(edge);
     }
 
     pub fn clear_marks(&mut self) {
@@ -530,7 +559,7 @@ impl Node {
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Edge {
     from: usize,
     to: usize,
@@ -578,24 +607,41 @@ impl PosWithDir {
     }
 }
 
-pub fn verify_ice_graph(block_map: &BlockMap) -> bool {
+pub fn verify_ice_graph(block_map: &BlockMap) -> VerifyResult {
     let mut graph = build_graph(&block_map);
     graph.mark_forward_from_start();
     if (!graph.end().unwrap().1.mark) {
         // Didnt reach end
         println!("Doesnt reach end");
-        return false;
+        return VerifyResult::Bad_DoesntReachEnd;
+    }
+
+    let start_i = graph.start().unwrap().0;
+    let end_i = graph.end().unwrap().0;
+    if (graph.edges.contains(&Edge {from: start_i, to: end_i})) {
+        // Temp if you can directly go then the generated ice is not
+        // interesting.
+        println!("Trivial");
+        return VerifyResult::Bad_Trivial;
     }
 
     graph.unmark_inverted_from_start();
     let marked = graph.get_marked();
     if (!marked.is_empty()) {
-        println!("Unreachable {:?}", marked);
-        false
+        println!("Unreachable");
+        //println!("Unreachable {:?}", marked);
+        VerifyResult::Bad_Zork
     }
     else {
-        true
+        VerifyResult::Success
     }
+}
+
+enum VerifyResult {
+    Success,
+    Bad_Trivial,
+    Bad_DoesntReachEnd,
+    Bad_Zork,
 }
 
 #[cfg(test)]

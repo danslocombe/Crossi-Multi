@@ -6,6 +6,7 @@ pub struct BitMap {
 }
 
 impl BitMap {
+    #[inline]
     fn get_mask(i : u8) -> u8 {
         0x01 << i
     }
@@ -13,7 +14,7 @@ impl BitMap {
     pub fn get(self, i: i32) -> bool {
         debug_assert!(i >= 0 && i < 64);
         let bytes = unsafe { std::mem::transmute::<u64, [u8;8]>(self.inner) };
-        let byte = bytes[i as usize / 8];
+        let byte = bytes[i as usize >> 4];
         let mask = Self::get_mask((i % 8) as u8);
 
         byte & mask != 0
@@ -32,7 +33,7 @@ impl BitMap {
     pub fn set_bit(&mut self, i: i32) {
         debug_assert!(i >= 0 && i < 64);
         let bytes = unsafe { std::mem::transmute::<&mut u64, &mut [u8;8]>(&mut self.inner) };
-        let byte_index = i as usize / 8;
+        let byte_index = i as usize >> 4;
         let mask = Self::get_mask((i % 8) as u8);
         bytes[byte_index] = bytes[byte_index] | mask;
     }
@@ -40,7 +41,7 @@ impl BitMap {
     pub fn unset_bit(&mut self, i: i32) {
         debug_assert!(i >= 0 && i < 64);
         let bytes = unsafe { std::mem::transmute::<&mut u64, &mut [u8;8]>(&mut self.inner) };
-        let byte_index = i as usize / 8;
+        let byte_index = i as usize >> 4;
         let mask = Self::get_mask((i % 8) as u8);
         bytes[byte_index] = bytes[byte_index] & (bytes[byte_index] ^ mask);
     }
