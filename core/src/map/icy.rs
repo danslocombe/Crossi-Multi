@@ -1,8 +1,9 @@
-use std::{collections::{BTreeSet, VecDeque}, num::Wrapping, time::Instant};
+use std::{collections::{BTreeMap, BTreeSet, VecDeque}, num::Wrapping, time::Instant};
 
 use froggy_rand::FroggyRand;
 use num_traits::ops::inv;
 use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use crate::{bitmap::BitMap, map::RowType, CoordPos, Input, ALL_INPUTS, SCREEN_SIZE};
 
 use super::{PathDescr, Row, RowId};
@@ -402,7 +403,8 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
 #[derive(Default, Debug)]
 pub struct IcyGraph {
     //nodes: Vec<Node>,
-    edges: BTreeSet<Edge>,
+    edges: BTreeMap<Node, smallvec::SmallVec<[Node; 4]>>,
+    //edges: BTreeSet<Edge>,
     //edges: Vec<Edge>,
 }
 
@@ -442,12 +444,19 @@ impl IcyGraph {
         if from == to {
             return;
         }
-        let edge = Edge {
-            from,
-            to
-        };
+        //let edge = Edge {
+        //    from,
+        //    to
+        //};
 
-        self.edges.insert(edge);
+        if let Some(existing) = self.edges.get_mut(&from) {
+            existing.push(to);
+        }
+        else {
+            let mut v = SmallVec::new();
+            v.push(to);
+            self.edges.insert(from, v);
+        }
         //if self.edges.contains(&edge) {
         //    return;
         //}
@@ -497,21 +506,11 @@ impl IcyGraph {
             let mut new_wavefront = Vec::new();
 
             for nid in &wavefront {
-                for edge in &self.edges {
-                    if edge.from != *nid {
-                        continue;
-                    }
-                    //println!("Found edge: {:?}", edge);
-                    //println!("Found edge: {:?} -> {:?})", self.nodes[edge.from], self.nodes[edge.to]);
-
-                    //let node = &mut self.nodes[edge.to];
-                    //if !node.mark {
-                    //    node.mark = true;
-                    //    new_wavefront.push(edge.to);
-                    //}
-
-                    if (marked.insert(edge.to)) {
-                        new_wavefront.push(edge.to);
+                if let Some(edges) = self.edges.get(nid) {
+                    for e in edges {
+                        if (marked.insert(*e)) {
+                            new_wavefront.push(*e);
+                        }
                     }
                 }
             }
@@ -543,20 +542,17 @@ impl IcyGraph {
             let mut new_wavefront = Vec::new();
 
             for nid in &wavefront {
-                for edge in &self.edges {
-                    if edge.to != *nid {
-                        continue;
-                    }
-                    //println!("Found edge: {:?}", edge);
+                for (from, edge_set) in &self.edges {
+                    for to in edge_set {
+                        if *to != *nid {
+                            continue;
+                        }
+                        //println!("Found edge: {:?}", edge);
 
-                    if (marked.remove(&edge.from)) {
-                        new_wavefront.push(edge.from);
+                        if (marked.remove(from)) {
+                            new_wavefront.push(*from);
+                        }
                     }
-                    //let node = &mut self.nodes[edge.from];
-                    //if node.mark {
-                    //    node.mark = false;
-                    //    new_wavefront.push(edge.from);
-                    //}
                 }
             }
 
@@ -654,12 +650,18 @@ pub fn verify_ice_graph(block_map: &BlockMap) -> VerifyResult {
     //let start_i = graph.start().unwrap().0;
     //let end_i = graph.end().unwrap().0;
     //if (graph.edges.contains(&Edge {from: start_i, to: end_i})) {
-    if (graph.edges.contains(&Edge {from: Node::start(), to: Node::end()})) {
+    if let Some(edges) = graph.edges.get(&Node::start()) {
+        if (edges.contains(&Node::end())) {
+            return VerifyResult::Bad_Trivial;
+        }
+    }
+
+    //if (graph.edges.contains(&Edge {from: Node::start(), to: Node::end()})) {
         // Temp if you can directly go then the generated ice is not
         // interesting.
         //println!("Trivial");
-        return VerifyResult::Bad_Trivial;
-    }
+     //   return VerifyResult::Bad_Trivial;
+    //}
 
     let mut marked = graph.mark_forward_from_start();
     if !marked.contains(&Node::end()) {
