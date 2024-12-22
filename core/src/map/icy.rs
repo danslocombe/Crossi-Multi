@@ -17,6 +17,7 @@ pub struct IcyDescr {
 
 pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDeque<Row>) -> bool {
     // Icy
+    println!("Icy");
     let start = Instant::now();
     let height = *rand.choose("ice_len", &[5, 7, 7, 9, 9, 13]);
 

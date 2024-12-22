@@ -1,0 +1,7 @@
+[package]
+name = "map_benchmark"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossy_multi_core = { path = "../core" }
