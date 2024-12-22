@@ -36,7 +36,7 @@ impl Pos {
     }
 }
 
-#[derive(Default, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct CoordPos {
     pub x: i32,
     pub y: i32,
@@ -106,6 +106,14 @@ impl CoordPos {
         }
 
         panic!("Tried to compute input from two coords not adjacent")
+    }
+}
+
+impl std::hash::Hash for CoordPos {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // @TODO 
+        let z = self.x + 256*self.y;
+        z.hash(state);
     }
 }
 

@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, VecDeque};
+use std::{collections::{BTreeSet, VecDeque}, time::Instant};
 
 use froggy_rand::FroggyRand;
 use num_traits::ops::inv;
@@ -17,6 +17,7 @@ pub struct IcyDescr {
 
 pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDeque<Row>) -> bool {
     // Icy
+    let start = Instant::now();
     let height = *rand.choose("ice_len", &[5, 7, 7, 9, 9, 13]);
 
     'outer: for i in 0..256 {
@@ -77,6 +78,8 @@ pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDequ
                     }
 
                     // Success
+                    let time = start.elapsed();
+                    println!("Generated in {}ms", time.as_millis());
                     return true;
                 }
             }
@@ -272,6 +275,9 @@ fn generate_ice_single(rand: FroggyRand, full_width: i32, wall_width: i32, heigh
 
 pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
     let mut graph = IcyGraph::default();
+    graph.nodes.reserve(128);
+    graph.edges.reserve(256);
+    //graph.edges.extend_reserve(256);
     let start = graph.get_or_add_node(NodeType::Start);
     let end = graph.get_or_add_node(NodeType::End);
 
@@ -395,12 +401,19 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
 #[derive(Default, Debug)]
 pub struct IcyGraph {
     nodes: Vec<Node>,
-    edges: BTreeSet<Edge>,
+    //edges: BTreeSet<Edge>,
+    edges: Vec<Edge>,
 }
 
 impl IcyGraph {
     pub fn try_get_node(&mut self, node: NodeType) -> Option<usize> {
-        self.nodes.iter().enumerate().filter(|(_, x)| x.inner == node).next().map(|(i, _)| i)
+        for (i, n) in self.nodes.iter().enumerate() {
+            if n.inner == node {
+                return Some(i);
+            }
+        }
+
+        return None;
     }
 
     pub fn get_or_add_node(&mut self, node: NodeType) -> usize {
@@ -433,7 +446,11 @@ impl IcyGraph {
             to
         };
 
-        self.edges.insert(edge);
+        if self.edges.contains(&edge) {
+            return;
+        }
+
+        self.edges.push(edge);
     }
 
     pub fn clear_marks(&mut self) {
@@ -448,11 +465,15 @@ impl IcyGraph {
 
     pub fn start(&self) -> Option<(usize, Node)> {
         // @Cleanup use matches!
-        self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::Start = x.inner {true} else {false}).map(|(i, x)| (i, *x))
+        // @Hack
+        Some((0, self.nodes[0]))
+        //self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::Start = x.inner {true} else {false}).map(|(i, x)| (i, *x))
     }
 
     pub fn end(&self) -> Option<(usize, Node)> {
-        self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::End = x.inner {true} else {false}).map(|(i, x)| (i, *x))
+        // @Hack
+        Some((1, self.nodes[1]))
+        //self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::End = x.inner {true} else {false}).map(|(i, x)| (i, *x))
     }
 
     pub fn mark_forward_from_start(&mut self) {
