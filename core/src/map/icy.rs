@@ -92,42 +92,6 @@ pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDequ
     false
 }
 
-/*
-impl IcyDescr {
-    pub fn hydrate(&self) -> HydratedIcyRow {
-        //let mut ice = Vec::new();
-        //let mut blocks = Vec::new();
-        let mut blocks = bitmaps::Bitmap::new();
-        let rng = FroggyRand::from_hash((self.y, self.seed));
-
-        for x in 0..SCREEN_SIZE {
-            if (x <= self.path_descr.wall_width as i32 || x >= (SCREEN_SIZE - self.path_descr.wall_width as i32 - 1)) {
-                continue;
-            }
-
-            //if (rng.gen_unit((x, 1)) < 0.45) {
-                //ice.push(x);
-            //}
-            if (rng.gen_unit((x, 1)) < 0.45) {
-                blocks.set(x as usize, true);
-            }
-        }
-
-        HydratedIcyRow {
-            //ice,
-            blocks,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HydratedIcyRow {
-    pub blocks : bitmaps::Bitmap<20>,
-    //pub ice : Vec<i32>,
-    //pub blocks : Vec<i32>,
-}
-    */
-
 pub struct BlockMap {
     inner: Vec<BitMap>,
     full_width: i32,
@@ -245,7 +209,6 @@ pub fn verify_ice(block_map: &BlockMap) -> bool {
     }
 
     debug_log!("Err: Verify Ice Timeout");
-    //panic!("aa nodes {} seen {} iter {}", nodes.len(), seen.len(), iter);
     false
 }
 
@@ -277,10 +240,6 @@ fn generate_ice_single(rand: FroggyRand, full_width: i32, wall_width: i32, heigh
 
 pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
     let mut graph = IcyGraph::default();
-    //graph.edges.reserve(256);
-    //graph.edges.extend_reserve(256);
-    //let start = graph.get_or_add_node(NodeType::Start);
-    //let end = graph.get_or_add_node(NodeType::End);
 
     for x in 0..block_map.full_width {
         let input = Input::Up;
@@ -298,7 +257,6 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
                 if let Some(p) = prev {
                     // Hit something and last position was non-empty
                     // Add a link
-                    //let node = graph.get_or_add_node(NodeType::Pos(p));
                     graph.add_edge(Node::start(), Node::pos(p));
                 }
 
@@ -339,28 +297,6 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
         }
     }
 
-    /*
-    for x in 0..block_map.full_width {
-        let input = Input::Down;
-        let pos = CoordPos::new(x, 0);
-        let mut prev = None;
-
-        while {
-            pos = pos.apply_input(input);
-
-            if !block_map.get(pos) {
-                if let Some(p) = last {
-                    // Hit something and last position was non-empty
-                    // Add a link
-                    let node = graph.get_or_add_node(NodeType::Pos(p));
-                    graph.add_edge(end, node);
-                }
-            }
-            prev = Some(pos);
-        }
-    }
-    */
-
     for y in 0..block_map.height() {
         for x in 0..block_map.full_width {
             let pos = CoordPos::new(x, y);
@@ -395,58 +331,21 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
         }
     }
 
-    //println!("Built graph edges {}, w {} h {}", graph.edges.len(), block_map.full_width - 2*block_map.wall_width, block_map.inner.len());
     graph
 }
 
 #[derive(Default, Debug)]
 pub struct IcyGraph {
-    //nodes: Vec<Node>,
     edges: BTreeMap<Node, smallvec::SmallVec<[Node; 4]>>,
-    //edges: BTreeSet<Edge>,
-    //edges: Vec<Edge>,
 }
 
 impl IcyGraph {
-    /*
-    pub fn try_get_node(&mut self, node: NodeType) -> Option<usize> {
-        for (i, n) in self.nodes.iter().enumerate() {
-            if n.inner == node {
-                return Some(i);
-            }
-        }
-
-        return None;
-    }
-
-    pub fn get_or_add_node(&mut self, node: NodeType) -> usize {
-        if let Some(n) = self.try_get_node(node) {
-            n
-        }
-        else {
-            let id = self.nodes.len();
-            self.nodes.push(Node::new(node));
-            id
-        }
-    }
-
-    pub fn add_node(&mut self, node: Node) -> usize {
-        let id = self.nodes.len();
-        self.nodes.push(node);
-        id
-    }
-    */
-
     pub fn add_edge(&mut self, from: Node, to: Node) {
         // Don't allow self edges
         // Add check here for cleaner upstream
         if from == to {
             return;
         }
-        //let edge = Edge {
-        //    from,
-        //    to
-        //};
 
         if let Some(existing) = self.edges.get_mut(&from) {
             existing.push(to);
@@ -456,39 +355,8 @@ impl IcyGraph {
             v.push(to);
             self.edges.insert(from, v);
         }
-        //if self.edges.contains(&edge) {
-        //    return;
-        //}
-
-        //self.edges.push(edge);
     }
 
-    /*
-    pub fn clear_marks(&mut self) {
-        for node in &mut self.nodes {
-            node.mark = false;
-        }
-    }
-    */
-
-    /*
-    pub fn get_marked(&self) -> Vec<Node> {
-        self.nodes.iter().filter(|x| x.mark).cloned().collect()
-    }
-
-    pub fn start(&self) -> Option<(usize, Node)> {
-        // @Cleanup use matches!
-        // @Hack
-        Some((0, self.nodes[0]))
-        //self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::Start = x.inner {true} else {false}).map(|(i, x)| (i, *x))
-    }
-
-    pub fn end(&self) -> Option<(usize, Node)> {
-        // @Hack
-        Some((1, self.nodes[1]))
-        //self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::End = x.inner {true} else {false}).map(|(i, x)| (i, *x))
-    }
-    */
     pub fn mark_forward_from_start(&self) -> BTreeSet<Node> {
         self.mark_forward_from_start_debug(false)
     }
@@ -496,15 +364,12 @@ impl IcyGraph {
     pub fn mark_forward_from_start_debug(&self, debug: bool) -> BTreeSet<Node> {
         let mut marked = BTreeSet::new();
         marked.insert(Node::start());
-        //let start = self.start().unwrap().0;
-        //self.nodes[start].mark = true;
 
         let mut wavefront = vec![Node::start()];
         if (debug) {
             println!("Hello!");
         }
 
-        //println!("self: {:#?}", self);
         while (!wavefront.is_empty()) {
             if debug {
                 println!("Iter: {:?}", wavefront);
@@ -532,22 +397,12 @@ impl IcyGraph {
     }
 
     pub fn unmark_inverted_from_start(&self, marked: &mut BTreeSet<Node>) {
-        //println!("self: {:#?}", self);
-        //println!("STARTING UNMARK =====");
-
-        //let start = self.start().unwrap().0;
-        //self.nodes[start].mark = false;
-
-        //let end = self.end().unwrap().0;
-        //self.nodes[end].mark = false;
-
         marked.remove(&Node::start());
         marked.remove(&Node::end());
 
         let mut wavefront = vec![Node::start()];
 
         while (!wavefront.is_empty()) {
-            //println!("Iter: {:?}", wavefront);
             // @Perf reuse vecs
             let mut new_wavefront = Vec::new();
 
@@ -557,7 +412,6 @@ impl IcyGraph {
                         if *to != *nid {
                             continue;
                         }
-                        //println!("Found edge: {:?}", edge);
 
                         if (marked.remove(from)) {
                             new_wavefront.push(*from);
@@ -581,14 +435,12 @@ pub enum NodeType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node {
     inner: NodeType,
-    //mark: bool,
 }
 
 impl Node {
     pub fn new(inner: NodeType) -> Self {
         Self {
             inner,
-            //mark: false,
         }
     }
 
@@ -655,45 +507,30 @@ impl PosWithDir {
 }
 
 pub fn verify_ice_graph(block_map: &BlockMap) -> VerifyResult {
-    let mut graph = build_graph(&block_map);
+    let graph = build_graph(&block_map);
 
-    //let start_i = graph.start().unwrap().0;
-    //let end_i = graph.end().unwrap().0;
-    //if (graph.edges.contains(&Edge {from: start_i, to: end_i})) {
     if let Some(edges) = graph.edges.get(&Node::start()) {
         if (edges.contains(&Node::end())) {
             return VerifyResult::Bad_Trivial;
         }
     }
 
-    //if (graph.edges.contains(&Edge {from: Node::start(), to: Node::end()})) {
-        // Temp if you can directly go then the generated ice is not
-        // interesting.
-        //println!("Trivial");
-     //   return VerifyResult::Bad_Trivial;
-    //}
-
     let mut marked = graph.mark_forward_from_start();
     if !marked.contains(&Node::end()) {
-    //if (!graph.end().unwrap().1.mark) {
         // Didnt reach end
-        //println!("Doesnt reach end");
         return VerifyResult::Bad_DoesntReachEnd;
     }
 
     graph.unmark_inverted_from_start(&mut marked);
     if (!marked.is_empty()) {
-        //println!("Zork");
-        //println!("Unreachable {:?}", marked);
         VerifyResult::Bad_Zork
     }
     else {
-        //graph.mark_forward_from_start_debug(true);
         VerifyResult::Success
     }
 }
 
-enum VerifyResult {
+pub enum VerifyResult {
     Success,
     Bad_Trivial,
     Bad_DoesntReachEnd,
