@@ -1,7 +1,6 @@
 use std::{collections::{BTreeMap, BTreeSet, VecDeque}, num::Wrapping, time::Instant};
 
 use froggy_rand::FroggyRand;
-use num_traits::ops::inv;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use crate::{bitmap::BitMap, map::RowType, CoordPos, Input, ALL_INPUTS, SCREEN_SIZE};
@@ -18,7 +17,7 @@ pub struct IcyDescr {
 
 pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDeque<Row>) -> bool {
     // Icy
-    println!("Icy");
+    println!("Icy seed = {}", rand.get_seed());
     let start = Instant::now();
     let height = *rand.choose("ice_len", &[5, 7, 7, 9, 9, 13]);
 
@@ -143,8 +142,8 @@ impl BlockMap {
 
     #[inline]
     fn in_bounds(&self, pos: CoordPos) -> bool {
-        pos.x >= self.wall_width
-            && pos.x < self.full_width - self.wall_width
+        pos.x > self.wall_width
+            && pos.x < self.full_width - 1 - self.wall_width
             && pos.y >= 0
             && pos.y < self.height()
     }
@@ -490,18 +489,26 @@ impl IcyGraph {
         //self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::End = x.inner {true} else {false}).map(|(i, x)| (i, *x))
     }
     */
-
     pub fn mark_forward_from_start(&self) -> BTreeSet<Node> {
+        self.mark_forward_from_start_debug(false)
+    }
+
+    pub fn mark_forward_from_start_debug(&self, debug: bool) -> BTreeSet<Node> {
         let mut marked = BTreeSet::new();
         marked.insert(Node::start());
         //let start = self.start().unwrap().0;
         //self.nodes[start].mark = true;
 
         let mut wavefront = vec![Node::start()];
+        if (debug) {
+            println!("Hello!");
+        }
 
         //println!("self: {:#?}", self);
         while (!wavefront.is_empty()) {
-            //println!("Iter: {:?}", wavefront);
+            if debug {
+                println!("Iter: {:?}", wavefront);
+            }
             // @Perf reuse vecs
             let mut new_wavefront = Vec::new();
 
@@ -509,6 +516,9 @@ impl IcyGraph {
                 if let Some(edges) = self.edges.get(nid) {
                     for e in edges {
                         if (marked.insert(*e)) {
+                            if (debug) {
+                                println!("Found edges {:?}->{:?}", nid, e);
+                            }
                             new_wavefront.push(*e);
                         }
                     }
@@ -678,6 +688,7 @@ pub fn verify_ice_graph(block_map: &BlockMap) -> VerifyResult {
         VerifyResult::Bad_Zork
     }
     else {
+        //graph.mark_forward_from_start_debug(true);
         VerifyResult::Success
     }
 }
@@ -909,6 +920,33 @@ mod tests {
         let marked = graph.mark_forward_from_start();
         //println!("{:#?}", graph);
         assert!(!marked.contains(&Node::end()));
+    }
+
+    //#[test]
+    fn test_harness() {
+        let rand = FroggyRand::new(12375972415461437779);
+        let mut rows = Default::default();
+        try_gen_icy_section(rand, RowId::from_y(0), &mut rows);
+
+        for row in rows.iter() {
+            if let RowType::IcyRow(descr) = &row.row_type {
+                for x in 0..20 {
+                    if x < descr.path_descr.wall_width {
+                        print!("X");
+                    }
+                    else if descr.blocks.get(x as i32) {
+                        print!("X");
+                    }
+                    else {
+                        print!(" ");
+                    }
+                }
+
+                println!("");
+            }
+        }
+
+        assert!(false);
     }
 
     fn generate_map(rows: &[&str]) -> BlockMap {
