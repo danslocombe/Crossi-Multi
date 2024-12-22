@@ -34,6 +34,14 @@ impl Pos {
             _ => panic!("Tried to get as v2"),
         }
     }
+
+    pub fn get_y_grid(self) -> i32 {
+        match self {
+            Pos::Coord(coord) => coord.y,
+            Pos::Lillipad(lilly) => lilly.y,
+            Pos::Absolute(_) => panic!("Tried to get y as grid for absolute position"),
+        }
+    }
 }
 
 #[derive(Default, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -495,8 +503,7 @@ mod tests {
         }
     }
 
-    // @Nocheckin
-    //#[test]
+    #[test]
     fn move_blocked_other_moving()
     {
         let players = vec![
@@ -530,8 +537,7 @@ mod tests {
         }
     }
 
-    // @Nocheckin
-    //#[test]
+    #[test]
     fn move_blocked_other_moving_to_pos()
     {
         let players = vec![

@@ -382,7 +382,7 @@ impl MapRound {
                 verbose_log!("Generating obtacle row at y={}", row_id.to_y());
 
                 let prev_was_icy = self.rows.front().map(|x| if let RowType::River(_) = x.row_type {true} else {false}).unwrap_or(false);
-                if !prev_was_icy && rng.gen_unit("feature_type") < 0.65
+                if !prev_was_icy && rng.gen_unit("feature_type") < 0.15
                 {
                     //if let Some(new_gen_to) = icy::try_gen_icy_section(rng, row_id, &mut self.rows)
                     if icy::try_gen_icy_section(rng, row_id, &mut self.rows)
@@ -391,7 +391,6 @@ impl MapRound {
                         continue;
                     }
                     else {
-                        panic!("@Nocheckin");
                         self.rows.push_front(Row {
                             row_id,
                             row_type: RowType::Path{
