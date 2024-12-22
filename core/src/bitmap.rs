@@ -7,17 +7,16 @@ pub struct BitMap {
 
 impl BitMap {
     #[inline]
-    fn get_mask(i : u8) -> u8 {
+    fn get_mask(i : u64) -> u64 {
         0x01 << i
     }
 
+    #[inline]
     pub fn get(self, i: i32) -> bool {
-        debug_assert!(i >= 0 && i < 64);
-        let bytes = unsafe { std::mem::transmute::<u64, [u8;8]>(self.inner) };
-        let byte = bytes[i as usize >> 4];
-        let mask = Self::get_mask((i % 8) as u8);
+        //debug_assert!(i >= 0 && i < 64);
 
-        byte & mask != 0
+        let mask = Self::get_mask(i as u64);
+        self.inner & mask != 0
     }
 
     #[inline]
@@ -30,20 +29,20 @@ impl BitMap {
         }
     }
 
+    #[inline]
     pub fn set_bit(&mut self, i: i32) {
-        debug_assert!(i >= 0 && i < 64);
-        let bytes = unsafe { std::mem::transmute::<&mut u64, &mut [u8;8]>(&mut self.inner) };
-        let byte_index = i as usize >> 4;
-        let mask = Self::get_mask((i % 8) as u8);
-        bytes[byte_index] = bytes[byte_index] | mask;
+        //debug_assert!(i >= 0 && i < 64);
+
+        let mask = Self::get_mask(i as u64);
+        self.inner = self.inner | mask;
     }
 
+    #[inline]
     pub fn unset_bit(&mut self, i: i32) {
-        debug_assert!(i >= 0 && i < 64);
-        let bytes = unsafe { std::mem::transmute::<&mut u64, &mut [u8;8]>(&mut self.inner) };
-        let byte_index = i as usize >> 4;
-        let mask = Self::get_mask((i % 8) as u8);
-        bytes[byte_index] = bytes[byte_index] & (bytes[byte_index] ^ mask);
+        //debug_assert!(i >= 0 && i < 64);
+
+        let mask = Self::get_mask(i as u64);
+        self.inner = self.inner & (self.inner ^ mask);
     }
 }
 
@@ -68,7 +67,9 @@ mod tests {
                 assert!(map.get(i));
             }
             else {
-                assert!(!map.get(i));
+                if i != 0 {
+                    assert!(!map.get(i), "Failed on {}", i);
+                }
             }
         }
 

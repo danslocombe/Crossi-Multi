@@ -370,7 +370,6 @@ impl MapRound {
     }
 
     fn generate_to_y(&mut self, row_id_target : RowId) {
-        println!("Generating to {} seed {}", row_id_target.0, self.seed);
         while self.rows.front().map(|row| row_id_target.0 > row.row_id.0).unwrap_or(true) {
             let row_id = RowId(self.rows.front().map(|row| row.row_id.0 + 1).unwrap_or(0));
             let rng = FroggyRand::from_hash((self.seed, self.round_id, row_id));
