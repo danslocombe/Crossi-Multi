@@ -1,4 +1,4 @@
-use std::{collections::{BTreeSet, VecDeque}, time::Instant};
+use std::{collections::{BTreeSet, VecDeque}, num::Wrapping, time::Instant};
 
 use froggy_rand::FroggyRand;
 use num_traits::ops::inv;
@@ -36,7 +36,8 @@ pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDequ
                     for y in 0..height {
                         for x in 0..map.full_width {
                             let pos = CoordPos::new(x, y);
-                            if rand.gen_unit(("remove", j, pos)) < 0.15 {
+                            //if rand.gen_unit(("remove", j, pos)) < 0.15 {
+                            if gen_unit_perf(rand, j * 1024 + pos.x + pos.y * 128) < 0.15 {
                                 map.inner[y as usize].unset_bit(x);
                             }
                         }
@@ -48,7 +49,7 @@ pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDequ
                     for y in 0..height {
                         for x in 0..map.full_width {
                             let pos = CoordPos::new(x, y);
-                            if rand.gen_unit(("add", j, pos)) < 0.15 {
+                            if gen_unit_perf(rand, 1 + j * 1024 + pos.x + pos.y * 128) < 0.15 {
                                 map.inner[y as usize].set_bit(x);
                             }
                         }
@@ -650,7 +651,7 @@ pub fn verify_ice_graph(block_map: &BlockMap) -> VerifyResult {
     graph.unmark_inverted_from_start();
     let marked = graph.get_marked();
     if (!marked.is_empty()) {
-        println!("Unreachable");
+        println!("Zork");
         //println!("Unreachable {:?}", marked);
         VerifyResult::Bad_Zork
     }
@@ -912,4 +913,20 @@ mod tests {
             inner
         }
     }
+}
+
+fn gen_perf(rand: FroggyRand, seed: i32) -> u64 {
+    let index = (Wrapping(rand.get_seed()) + Wrapping(seed as u64)).0;
+    split_mix_64(index)
+}
+
+fn gen_unit_perf(rand: FroggyRand, seed: i32) -> f32 {
+    (gen_perf(rand, seed) % 1_000_000) as f32 / 1_000_000.0
+}
+
+fn split_mix_64(index : u64) -> u64 {
+    let mut z = Wrapping(index) + Wrapping(0x9E3779B97F4A7C15);
+    z = (z ^ (z >> 30)) * Wrapping(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)) * Wrapping(0x94D049BB133111EB);
+    (z ^ (z >> 31)).0
 }
