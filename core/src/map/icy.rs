@@ -842,8 +842,8 @@ mod tests {
     #[test]
     fn icy_graph_simple() {
         let rows = [
-            "X ",
-            "  ",
+            "xX x",
+            "x  x",
         ];
 
         let map = generate_map(&rows);
@@ -864,9 +864,9 @@ mod tests {
     #[test]
     fn icy_graph_zork() {
         let rows = [
-            "xx x",
-            "    ",
-            "x  x",
+            "xxx xX",
+            "x    X",
+            "xx  xX",
         ];
 
         let map = generate_map(&rows);
