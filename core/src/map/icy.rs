@@ -277,7 +277,7 @@ fn generate_ice_single(rand: FroggyRand, full_width: i32, wall_width: i32, heigh
 
 pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
     let mut graph = IcyGraph::default();
-    graph.edges.reserve(256);
+    //graph.edges.reserve(256);
     //graph.edges.extend_reserve(256);
     //let start = graph.get_or_add_node(NodeType::Start);
     //let end = graph.get_or_add_node(NodeType::End);
@@ -395,15 +395,15 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
         }
     }
 
-    println!("Built graph edges {}, w {} h {}", graph.edges.len(), block_map.full_width - 2*block_map.wall_width, block_map.inner.len());
+    //println!("Built graph edges {}, w {} h {}", graph.edges.len(), block_map.full_width - 2*block_map.wall_width, block_map.inner.len());
     graph
 }
 
 #[derive(Default, Debug)]
 pub struct IcyGraph {
     //nodes: Vec<Node>,
-    //edges: BTreeSet<Edge>,
-    edges: Vec<Edge>,
+    edges: BTreeSet<Edge>,
+    //edges: Vec<Edge>,
 }
 
 impl IcyGraph {
@@ -447,11 +447,12 @@ impl IcyGraph {
             to
         };
 
-        if self.edges.contains(&edge) {
-            return;
-        }
+        self.edges.insert(edge);
+        //if self.edges.contains(&edge) {
+        //    return;
+        //}
 
-        self.edges.push(edge);
+        //self.edges.push(edge);
     }
 
     /*
@@ -599,8 +600,7 @@ impl Node {
 }
 
 
-//#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Edge {
     from: Node,
     to: Node,
@@ -657,7 +657,7 @@ pub fn verify_ice_graph(block_map: &BlockMap) -> VerifyResult {
     if (graph.edges.contains(&Edge {from: Node::start(), to: Node::end()})) {
         // Temp if you can directly go then the generated ice is not
         // interesting.
-        println!("Trivial");
+        //println!("Trivial");
         return VerifyResult::Bad_Trivial;
     }
 
@@ -665,13 +665,13 @@ pub fn verify_ice_graph(block_map: &BlockMap) -> VerifyResult {
     if !marked.contains(&Node::end()) {
     //if (!graph.end().unwrap().1.mark) {
         // Didnt reach end
-        println!("Doesnt reach end");
+        //println!("Doesnt reach end");
         return VerifyResult::Bad_DoesntReachEnd;
     }
 
     graph.unmark_inverted_from_start(&mut marked);
     if (!marked.is_empty()) {
-        println!("Zork");
+        //println!("Zork");
         //println!("Unreachable {:?}", marked);
         VerifyResult::Bad_Zork
     }
