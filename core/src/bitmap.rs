@@ -67,9 +67,7 @@ mod tests {
                 assert!(map.get(i));
             }
             else {
-                if i != 0 {
-                    assert!(!map.get(i), "Failed on {}", i);
-                }
+                assert!(!map.get(i), "Failed on {}", i);
             }
         }
 

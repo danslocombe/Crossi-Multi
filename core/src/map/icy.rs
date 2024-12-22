@@ -277,11 +277,10 @@ fn generate_ice_single(rand: FroggyRand, full_width: i32, wall_width: i32, heigh
 
 pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
     let mut graph = IcyGraph::default();
-    graph.nodes.reserve(128);
     graph.edges.reserve(256);
     //graph.edges.extend_reserve(256);
-    let start = graph.get_or_add_node(NodeType::Start);
-    let end = graph.get_or_add_node(NodeType::End);
+    //let start = graph.get_or_add_node(NodeType::Start);
+    //let end = graph.get_or_add_node(NodeType::End);
 
     for x in 0..block_map.full_width {
         let input = Input::Up;
@@ -292,15 +291,15 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
             if pos.y < 0 {
                 // Outside
                 // Can go from start to end
-                graph.add_edge(start, end);
+                graph.add_edge(Node::start(), Node::end());
                 break;
             }
             if block_map.get(pos) {
                 if let Some(p) = prev {
                     // Hit something and last position was non-empty
                     // Add a link
-                    let node = graph.get_or_add_node(NodeType::Pos(p));
-                    graph.add_edge(start, node);
+                    //let node = graph.get_or_add_node(NodeType::Pos(p));
+                    graph.add_edge(Node::start(), Node::pos(p));
                 }
 
                 break;
@@ -321,15 +320,15 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
             if pos.y > block_map.height() - 1 {
                 // Outside
                 // Can go from start to end
-                graph.add_edge(end, start);
+                graph.add_edge(Node::end(), Node::start());
                 break;
             }
             if block_map.get(pos) {
                 if let Some(p) = prev {
                     // Hit something and last position was non-empty
                     // Add a link
-                    let node = graph.get_or_add_node(NodeType::Pos(p));
-                    graph.add_edge(end, node);
+                    //let node = graph.get_or_add_node(NodeType::Pos(p));
+                    graph.add_edge(Node::end(), Node::pos(p));
                 }
 
                 break;
@@ -369,7 +368,7 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
                 continue;
             }
 
-            let node = graph.get_or_add_node(NodeType::Pos(pos));
+            //let node = graph.get_or_add_node(NodeType::Pos(pos));
             for dir in ALL_INPUTS {
                 let mut p = pos;
                 loop {
@@ -377,18 +376,18 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
                     p = p.apply_input(dir);
                     if (p.y < 0) {
                         // Hit the end
-                        graph.add_edge(node, end);
+                        graph.add_edge(Node::pos(pos), Node::end());
                         break;
                     }
                     if (p.y == block_map.height()) {
                         // Hit the start
-                        graph.add_edge(node, start);
+                        graph.add_edge(Node::pos(pos), Node::start());
                         break;
                     }
 
                     if (block_map.get(p)) {
-                        let last_id = graph.get_or_add_node(NodeType::Pos(last));
-                        graph.add_edge(node, last_id);
+                        //let last_id = graph.get_or_add_node(NodeType::Pos(last));
+                        graph.add_edge(Node::pos(pos), Node::pos(last));
                         break;
                     }
                 }
@@ -396,18 +395,19 @@ pub fn build_graph(block_map: &BlockMap) -> IcyGraph {
         }
     }
 
-    println!("Built graph nodes {} edges {}, w {} h {}", graph.nodes.len(), graph.edges.len(), block_map.full_width - 2*block_map.wall_width, block_map.inner.len());
+    println!("Built graph edges {}, w {} h {}", graph.edges.len(), block_map.full_width - 2*block_map.wall_width, block_map.inner.len());
     graph
 }
 
 #[derive(Default, Debug)]
 pub struct IcyGraph {
-    nodes: Vec<Node>,
+    //nodes: Vec<Node>,
     //edges: BTreeSet<Edge>,
     edges: Vec<Edge>,
 }
 
 impl IcyGraph {
+    /*
     pub fn try_get_node(&mut self, node: NodeType) -> Option<usize> {
         for (i, n) in self.nodes.iter().enumerate() {
             if n.inner == node {
@@ -429,7 +429,6 @@ impl IcyGraph {
         }
     }
 
-    /*
     pub fn add_node(&mut self, node: Node) -> usize {
         let id = self.nodes.len();
         self.nodes.push(node);
@@ -437,7 +436,7 @@ impl IcyGraph {
     }
     */
 
-    pub fn add_edge(&mut self, from: usize, to: usize) {
+    pub fn add_edge(&mut self, from: Node, to: Node) {
         // Don't allow self edges
         // Add check here for cleaner upstream
         if from == to {
@@ -455,12 +454,15 @@ impl IcyGraph {
         self.edges.push(edge);
     }
 
+    /*
     pub fn clear_marks(&mut self) {
         for node in &mut self.nodes {
             node.mark = false;
         }
     }
+    */
 
+    /*
     pub fn get_marked(&self) -> Vec<Node> {
         self.nodes.iter().filter(|x| x.mark).cloned().collect()
     }
@@ -477,12 +479,15 @@ impl IcyGraph {
         Some((1, self.nodes[1]))
         //self.nodes.iter().enumerate().find(|(_, x)| if let NodeType::End = x.inner {true} else {false}).map(|(i, x)| (i, *x))
     }
+    */
 
-    pub fn mark_forward_from_start(&mut self) {
-        let start = self.start().unwrap().0;
-        self.nodes[start].mark = true;
+    pub fn mark_forward_from_start(&self) -> BTreeSet<Node> {
+        let mut marked = BTreeSet::new();
+        marked.insert(Node::start());
+        //let start = self.start().unwrap().0;
+        //self.nodes[start].mark = true;
 
-        let mut wavefront = vec![start];
+        let mut wavefront = vec![Node::start()];
 
         //println!("self: {:#?}", self);
         while (!wavefront.is_empty()) {
@@ -498,9 +503,13 @@ impl IcyGraph {
                     //println!("Found edge: {:?}", edge);
                     //println!("Found edge: {:?} -> {:?})", self.nodes[edge.from], self.nodes[edge.to]);
 
-                    let node = &mut self.nodes[edge.to];
-                    if !node.mark {
-                        node.mark = true;
+                    //let node = &mut self.nodes[edge.to];
+                    //if !node.mark {
+                    //    node.mark = true;
+                    //    new_wavefront.push(edge.to);
+                    //}
+
+                    if (marked.insert(edge.to)) {
                         new_wavefront.push(edge.to);
                     }
                 }
@@ -508,19 +517,24 @@ impl IcyGraph {
 
             wavefront = new_wavefront;
         }
+
+        marked
     }
 
-    pub fn unmark_inverted_from_start(&mut self) {
+    pub fn unmark_inverted_from_start(&self, marked: &mut BTreeSet<Node>) {
         //println!("self: {:#?}", self);
         //println!("STARTING UNMARK =====");
 
-        let start = self.start().unwrap().0;
-        self.nodes[start].mark = false;
+        //let start = self.start().unwrap().0;
+        //self.nodes[start].mark = false;
 
-        let end = self.end().unwrap().0;
-        self.nodes[end].mark = false;
+        //let end = self.end().unwrap().0;
+        //self.nodes[end].mark = false;
 
-        let mut wavefront = vec![start];
+        marked.remove(&Node::start());
+        marked.remove(&Node::end());
+
+        let mut wavefront = vec![Node::start()];
 
         while (!wavefront.is_empty()) {
             //println!("Iter: {:?}", wavefront);
@@ -534,11 +548,14 @@ impl IcyGraph {
                     }
                     //println!("Found edge: {:?}", edge);
 
-                    let node = &mut self.nodes[edge.from];
-                    if node.mark {
-                        node.mark = false;
+                    if (marked.remove(&edge.from)) {
                         new_wavefront.push(edge.from);
                     }
+                    //let node = &mut self.nodes[edge.from];
+                    //if node.mark {
+                    //    node.mark = false;
+                    //    new_wavefront.push(edge.from);
+                    //}
                 }
             }
 
@@ -547,24 +564,24 @@ impl IcyGraph {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NodeType {
     Start,
     End,
     Pos(CoordPos),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Node {
     inner: NodeType,
-    mark: bool,
+    //mark: bool,
 }
 
 impl Node {
     pub fn new(inner: NodeType) -> Self {
         Self {
             inner,
-            mark: false,
+            //mark: false,
         }
     }
 
@@ -582,10 +599,11 @@ impl Node {
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+//#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Edge {
-    from: usize,
-    to: usize,
+    from: Node,
+    to: Node,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -632,24 +650,26 @@ impl PosWithDir {
 
 pub fn verify_ice_graph(block_map: &BlockMap) -> VerifyResult {
     let mut graph = build_graph(&block_map);
-    graph.mark_forward_from_start();
-    if (!graph.end().unwrap().1.mark) {
-        // Didnt reach end
-        println!("Doesnt reach end");
-        return VerifyResult::Bad_DoesntReachEnd;
-    }
 
-    let start_i = graph.start().unwrap().0;
-    let end_i = graph.end().unwrap().0;
-    if (graph.edges.contains(&Edge {from: start_i, to: end_i})) {
+    //let start_i = graph.start().unwrap().0;
+    //let end_i = graph.end().unwrap().0;
+    //if (graph.edges.contains(&Edge {from: start_i, to: end_i})) {
+    if (graph.edges.contains(&Edge {from: Node::start(), to: Node::end()})) {
         // Temp if you can directly go then the generated ice is not
         // interesting.
         println!("Trivial");
         return VerifyResult::Bad_Trivial;
     }
 
-    graph.unmark_inverted_from_start();
-    let marked = graph.get_marked();
+    let mut marked = graph.mark_forward_from_start();
+    if !marked.contains(&Node::end()) {
+    //if (!graph.end().unwrap().1.mark) {
+        // Didnt reach end
+        println!("Doesnt reach end");
+        return VerifyResult::Bad_DoesntReachEnd;
+    }
+
+    graph.unmark_inverted_from_start(&mut marked);
     if (!marked.is_empty()) {
         println!("Zork");
         //println!("Unreachable {:?}", marked);
@@ -801,8 +821,9 @@ mod tests {
         let mut graph = build_graph(&map);
         println!("{:#?}", graph);
         //assert_eq!(graph.nodes, Vec::default());
-        graph.mark_forward_from_start();
-        assert!(graph.end().unwrap().1.mark)
+        let marked = graph.mark_forward_from_start();
+        assert!(marked.contains(&Node::end()));
+        //assert!(graph.end().unwrap().1.mark)
     }
 
     #[test]
@@ -813,17 +834,16 @@ mod tests {
         ];
 
         let map = generate_map(&rows);
-        let mut graph = build_graph(&map);
+        let graph = build_graph(&map);
         //println!("{:#?}", graph);
-        graph.mark_forward_from_start();
-        let reachable = graph.get_marked();
+        let mut reachable = graph.mark_forward_from_start();
 
+        assert!(reachable.contains(&Node::end()));
         //println!("{:#?}", graph);
 
         assert_eq!(2 + 2, reachable.len());
 
-        graph.unmark_inverted_from_start();
-        let reachable = graph.get_marked();
+        graph.unmark_inverted_from_start(&mut reachable);
         println!("{:#?}", graph);
         assert!(reachable.is_empty());
     }
@@ -839,13 +859,13 @@ mod tests {
         let map = generate_map(&rows);
         let mut graph = build_graph(&map);
         //println!("{:#?}", graph);
-        graph.mark_forward_from_start();
-        let _reachable = graph.get_marked();
-        graph.unmark_inverted_from_start();
-        let zork_states = graph.get_marked();
+
+        let mut marked = graph.mark_forward_from_start();
+        assert!(marked.contains(&Node::end()));
+        graph.unmark_inverted_from_start(&mut marked);
 
         println!("{:#?}", graph);
-        assert_eq!(2, zork_states.len());
+        assert_eq!(2, marked.len());
 
         // Expect 3 states zork, marked with Z
 
@@ -867,12 +887,11 @@ mod tests {
 
         let map = generate_map(&rows);
         let mut graph = build_graph(&map);
-        graph.mark_forward_from_start();
-        assert!(graph.end().unwrap().1.mark);
 
-        graph.unmark_inverted_from_start();
-        let reachable = graph.get_marked();
-        assert!(reachable.is_empty());
+        let mut marked = graph.mark_forward_from_start();
+        assert!(marked.contains(&Node::end()));
+        graph.unmark_inverted_from_start(&mut marked);
+        assert!(marked.is_empty());
     }
 
     #[test]
@@ -885,9 +904,9 @@ mod tests {
 
         let map = generate_map(&rows);
         let mut graph = build_graph(&map);
-        graph.mark_forward_from_start();
+        let marked = graph.mark_forward_from_start();
         //println!("{:#?}", graph);
-        assert!(!graph.end().unwrap().1.mark);
+        assert!(!marked.contains(&Node::end()));
     }
 
     fn generate_map(rows: &[&str]) -> BlockMap {

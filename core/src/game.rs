@@ -36,7 +36,7 @@ impl Pos {
     }
 }
 
-#[derive(Default, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Default, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CoordPos {
     pub x: i32,
     pub y: i32,
