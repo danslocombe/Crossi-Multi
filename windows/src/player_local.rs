@@ -188,7 +188,7 @@ pub enum PlayerSkin {
     Sausage,
 }
 
-pub const g_all_skins: [PlayerSkin; 8] = [
+pub const g_all_skins: [PlayerSkin; 9] = [
     PlayerSkin::Frog,
     PlayerSkin::Bird,
     PlayerSkin::Snake,
@@ -197,6 +197,7 @@ pub const g_all_skins: [PlayerSkin; 8] = [
     PlayerSkin::Wosh,
     PlayerSkin::FrogAlt,
     PlayerSkin::Frog3,
+    PlayerSkin::Sausage,
 ];
 
 impl Default for Skin {
@@ -558,5 +559,10 @@ impl IsEntity for PlayerLocal {
         //    println!("image index {}", self.image_index);
         //}
         sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, self.pos.x * 8.0, self.pos.y * 8.0 - 2.0, self.x_flip);
+
+        //export const hat_offsets = [
+        //    [3, 4, 2, 1, 2, 2],
+        //]
+        //sprites::draw_with_flip("wizard_hat", 0, self.pos.x * 8.0, self.pos.y * 8.0 - 8.0 + 1.0, self.x_flip);
     }
 }

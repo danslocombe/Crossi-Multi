@@ -20,7 +20,7 @@ struct Face {
 }
 
 const face_pos_top: V2 = V2::new(150.0, 65.0);
-const face_pos_bot: V2 = V2::new(150.0, 200.0 - 65.0);
+const face_pos_bot: V2 = V2::new(150.0, 200.0 - 75.0);
 
 const fade_in_time: i32 = 16;
 const fade_out_time: i32 = 24;

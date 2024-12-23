@@ -72,6 +72,8 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_winner.png", Some(1));
         load_frames("../web-client/static/sprites/spr_no_winner.png", Some(1));
         load_frames("../web-client/static/sprites/spr_champion.png", Some(1));
+
+        load_frames("../web-client/static/sprites/spr_wizard_hat.png", Some(1));
     }
 }
 
