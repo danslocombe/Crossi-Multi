@@ -201,6 +201,8 @@ impl Client {
             const road_col_1: raylib_sys::Color = hex_color("59595d".as_bytes());
             const icy_col_0: raylib_sys::Color = hex_color("cbdbfc".as_bytes());
             const icy_col_1: raylib_sys::Color = hex_color("9badb7".as_bytes());
+            const lava_col_0: raylib_sys::Color = hex_color("cfb69f".as_bytes());
+            const lava_col_1: raylib_sys::Color = hex_color("b47676".as_bytes());
 
             //let screen_y = top.rules_state.fst.get_screen_y();
             let screen_y = self.camera.y as i32 / 8;
@@ -220,6 +222,9 @@ impl Client {
                     },
                     RowType::IcyRow{..} => {
                         (icy_col_0, icy_col_1)
+                    },
+                    RowType::LavaRow{..} => {
+                        (lava_col_0, lava_col_1)
                     },
                     _ => {
                         (grass_col_0, grass_col_1)
@@ -262,6 +267,14 @@ impl Client {
                     //for ice in hydrated.ice {
                     //    sprites::draw("tree_top", 0, ice as f32 * 8.0, y as f32 * 8.0);
                     //}
+                }
+
+                if let RowType::LavaRow(state) = &row.row_type {
+                    for x in 0..20 {
+                        if x <= state.path_descr.wall_width || x >= 19 - state.path_descr.wall_width || state.blocks.get(x as i32) {
+                            sprites::draw("tree_top", 1, x as f32 * 8.0, y as f32 * 8.0);
+                        }
+                    }
                 }
 
                 if let RowType::Path { wall_width } = row.row_type {
