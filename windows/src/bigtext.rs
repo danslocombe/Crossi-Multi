@@ -3,7 +3,7 @@ use std::pin;
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, RulesState}, math::V2, timeline::{self, Timeline}, PlayerId};
 use raylib_sys::Ray;
 
-use crate::{client::{StateTransition, VisualEffects}, entities::EntityContainer, player_local::PlayerLocal};
+use crate::{client::{StateTransition, VisualEffects}, entities::EntityContainer, player_local::PlayerLocal, to_vector2};
 
 struct Face {
     sprite: &'static str,
@@ -345,8 +345,4 @@ impl Pinwheel {
             }
         }
     }
-}
-
-fn to_vector2(x: V2) -> raylib_sys::Vector2 {
-    raylib_sys::Vector2 { x: x.x, y: x.y }
 }

@@ -12,6 +12,7 @@ mod player_local;
 use std::{mem::MaybeUninit};
 
 use client::Client;
+use crossy_multi_core::math::V2;
 
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
@@ -395,4 +396,8 @@ pub fn lerp_color_rgba(c0: raylib_sys::Color, c1: raylib_sys::Color, t: f32) -> 
 
 pub fn ease_in_quad(x: f32) -> f32 {
     return 1.0 - (1.0 - x) * (1.0 - x);
+}
+
+pub fn to_vector2(x: V2) -> raylib_sys::Vector2 {
+    raylib_sys::Vector2 { x: x.x, y: x.y }
 }

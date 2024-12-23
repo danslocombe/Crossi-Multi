@@ -10,6 +10,7 @@ pub struct PropController {
     gen_to : i32,
     last_generated_round: i32,
     last_generated_game: i32,
+    t: i32,
 }
 
 impl PropController {
@@ -18,6 +19,7 @@ impl PropController {
             gen_to: 20,
             last_generated_game: -1,
             last_generated_round: -1,
+            t: 0,
         }
     }
 
@@ -27,6 +29,7 @@ impl PropController {
         entities.bubbles.inner.clear();
         entities.corpses.inner.clear();
         entities.dust.inner.clear();
+        entities.snowflakes.inner.clear();
     }
 
     pub fn create_stands(entities: &mut EntityManager) -> (CoordPos, CoordPos) {
@@ -61,7 +64,9 @@ impl PropController {
         (stand_left_pos, stand_right_pos)
     }
 
-    pub fn tick(&mut self, rules_state: &RulesState, map: &Map, entities: &mut EntityManager, transitions: &StateTransition) {
+    pub fn tick(&mut self, rules_state: &RulesState, map: &Map, entities: &mut EntityManager, transitions: &StateTransition, screen_y: i32) {
+        self.t += 1;
+
         let round_id = rules_state.fst.get_round_id() as i32;
         let game_id = rules_state.game_id as i32;
 
@@ -167,6 +172,16 @@ impl PropController {
 
             self.gen_to -= 1;
         }
+
+        let rows = map.get_row_view(rules_state.fst.get_round_id(), screen_y);
+        for row in &rows {
+            if let RowType::IcyRow(icy_state) = &row.row.row_type {
+                if rand.gen_unit((self.t, row.y, "snow")) < 0.01 {
+                    let x = rand.gen_unit((self.t, row.y, "x")) as f32 * 160.0;
+                    entities.snowflakes.create(Pos::Absolute(V2::new(x, row.y as f32 * 8.0 - 32.0)));
+                }
+            }
+        }
     }
 }
 
@@ -184,6 +199,7 @@ pub enum EntityType {
     Bubble,
     Dust,
     Crown,
+    Snowflake,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -325,6 +341,7 @@ pub struct EntityManager {
     pub corpses: EntityContainer<Corpse>,
     pub dust: EntityContainer<Dust>,
     pub crowns: EntityContainer<Crown>,
+    pub snowflakes: EntityContainer<Snowflake>,
 }
 
 macro_rules! map_over_entity {
@@ -339,6 +356,7 @@ macro_rules! map_over_entity {
             EntityType::Corpse => $self.corpses.$f($e),
             EntityType::Dust => $self.dust.$f($e),
             EntityType::Crown => $self.crowns.$f($e),
+            EntityType::Snowflake => $self.snowflakes.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -358,6 +376,7 @@ impl EntityManager {
             bubbles: EntityContainer::<Bubble>::new(EntityType::Bubble),
             dust: EntityContainer::<Dust>::new(EntityType::Dust),
             crowns: EntityContainer::<Crown>::new(EntityType::Crown),
+            snowflakes: EntityContainer::<Snowflake>::new(EntityType::Crown),
         }
     }
 
@@ -593,6 +612,22 @@ impl Crown {
             t_max: 120,
             owner: PlayerId(0),
             offset_i: 0,
+        }
+    }
+}
+
+pub struct Snowflake {
+    pub id : i32,
+    pub pos: V2,
+    pub t: i32,
+}
+
+impl Snowflake {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            t: 0,
         }
     }
 }
@@ -909,5 +944,43 @@ impl IsEntity for Crown {
 
     fn alive(&self, _camera_y_max: f32) -> bool {
         self.t < self.t_max
+    }
+}
+
+impl IsEntity for Snowflake {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::Snowflake,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32 + 20
+    }
+
+    fn draw(&mut self) {
+        self.t += 1;
+        self.pos.y += 0.1;
+        self.pos.x += ((self.t as f32) * 0.01).sin() * 0.08;
+        unsafe {
+            let scale = (0.01 * self.t as f32).min(0.5);
+            raylib_sys::DrawCircleLinesV(crate::to_vector2(self.pos), scale, crate::WHITE);
+        }
+    }
+
+    fn alive(&self, _camera_y_max: f32) -> bool {
+        self.t < 500
     }
 }

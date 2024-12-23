@@ -94,7 +94,7 @@ impl Client {
             }
         }
 
-        self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities, &transitions);
+        self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities, &transitions, self.camera.y as i32 / 8);
 
         // @TODO how do we model this?
         // Should cars be ephemeral actors?
@@ -129,6 +129,7 @@ impl Client {
         self.entities.props.prune_dead(camera_y_max);
         self.entities.dust.prune_dead(camera_y_max);
         self.entities.crowns.prune_dead(camera_y_max);
+        self.entities.snowflakes.prune_dead(camera_y_max);
 
         self.prev_rules = Some(top.rules_state.clone().fst);
     }
@@ -152,9 +153,9 @@ impl Client {
             const icy_col_1: raylib_sys::Color = hex_color("9badb7".as_bytes());
 
             //let screen_y = top.rules_state.fst.get_screen_y();
-            let screen_y = self.camera.y;
+            let screen_y = self.camera.y as i32 / 8;
             let round_id = top.get_round_id();
-            let rows = self.timeline.map.get_row_view(round_id, screen_y as i32 / 8);
+            let rows = self.timeline.map.get_row_view(round_id, screen_y);
 
             for row_with_y in rows {
                 let row = row_with_y.row;
