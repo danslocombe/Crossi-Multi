@@ -1,5 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{dan_lerp, entities::{self, Entity, EntityContainer, EntityManager, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, Skin}, sprites, BLACK, WHITE};
+use crate::{dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -42,11 +42,14 @@ impl Client {
     }
 
     pub fn tick(&mut self) {
-        let (inputs, new_players) = self.player_input_controller.tick(&mut self.timeline, &mut self.entities.players);
+
+        let (inputs, new_players) = self.player_input_controller.tick(&mut self.timeline, &mut self.entities.players, &self.entities.outfit_switchers);
         self.timeline.tick(Some(inputs), TICK_INTERVAL_US);
 
-        let top = self.timeline.top_state();
-        let transitions = StateTransition::new(&top.rules_state.fst, &self.prev_rules);
+        let transitions = {
+            let top = self.timeline.top_state();
+            StateTransition::new(&top.rules_state.fst, &self.prev_rules)
+        };
 
         //if (transitions.into_round) {
             //self.visual_effects.whiteout();
@@ -71,6 +74,7 @@ impl Client {
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects, &transitions);
         self.visual_effects.tick();
 
+        let top = self.timeline.top_state();
         for local_player in self.entities.players.inner.iter_mut() {
             if let Some(state) = top.player_states.get(local_player.player_id) {
                 let player_state = state.to_public(top.get_round_id(), top.time_us, &self.timeline.map);
@@ -80,10 +84,12 @@ impl Client {
                     alive_state,
                     &self.timeline,
                     &mut self.visual_effects,
+                    &mut self.big_text_controller,
                     &mut self.entities.dust,
                     &mut self.entities.bubbles,
                     &mut self.entities.corpses,
-                    &mut self.entities.crowns);
+                    &mut self.entities.crowns,
+                    &mut self.entities.outfit_switchers);
             }
         }
 
@@ -95,6 +101,19 @@ impl Client {
         }
 
         self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities, &transitions, self.camera.y as i32 / 8);
+
+        if let CrossyRulesetFST::Lobby { .. } = &top.rules_state.fst {
+            let rand = FroggyRand::from_hash((self.timeline.map.get_seed(), top.rules_state.fst.get_round_id(), top.rules_state.game_id, self.prop_controller.t));
+            create_outfit_switchers(rand, &self.timeline, &self.entities.players, &mut self.entities.outfit_switchers);
+
+            for switcher in self.entities.outfit_switchers.inner.iter() {
+                let rand = rand.subrand(switcher.pos);
+                if (rand.gen_unit(1) < 0.4) {
+                    let dust = create_dust(rand, &mut self.entities.dust, 4.0, 6.0, V2::new(switcher.pos.x as f32 * 8.0 + 4.0, switcher.pos.y as f32 * 8.0 + 4.0));
+                    dust.tint = (Skin::from_enum(switcher.skin).color);
+                }
+            }
+        }
 
         // @TODO how do we model this?
         // Should cars be ephemeral actors?
@@ -424,5 +443,37 @@ impl StateTransition {
             && !matches!(prev, Some(CrossyRulesetFST::EndWinner { .. }));
 
         transitions
+    }
+}
+
+fn create_outfit_switchers(rand: FroggyRand, timeline: &Timeline, players: &EntityContainer<PlayerLocal>, outfit_switchers: &mut EntityContainer<OutfitSwitcher>) {
+    let to_create = 4 - outfit_switchers.inner.len();
+
+    if to_create == 0 {
+        return;
+    }
+
+    let mut options = Vec::new();
+    // Not very efficient but doesnt need to be.
+    for x in 3..16 {
+        for y in 3..7 {
+            options.push(CoordPos::new(x, y))
+        }
+    }
+
+    for player in players.inner.iter() {
+        // @Buggy
+        // Rough conversion to coordpos, may occcaassionally put someone on top of another, but should usually be fine
+        if let Some((idx, _)) = options.iter().enumerate().find(|(_, pos)| **pos == CoordPos::new(player.pos.x.round() as i32, player.pos.y.round() as i32)) {
+            options.remove(idx);
+        }
+    }
+
+    rand.shuffle("shuffle", &mut options);
+
+    for (i, pos) in options.iter().take(to_create).enumerate() {
+        let skin = Skin::rand_not_overlapping(rand.subrand(i), &players.inner, &outfit_switchers.inner);
+        let switcher = outfit_switchers.create(Pos::Coord(*pos));
+        switcher.skin = skin.player_skin;
     }
 }

@@ -2,7 +2,7 @@ use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState,
 use froggy_rand::FroggyRand;
 use strum_macros::EnumString;
 
-use crate::{client::VisualEffects, console, diff, entities::{Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity}, gamepad_pressed, key_pressed, lerp_snap, sprites};
+use crate::{bigtext::BigTextController, client::VisualEffects, console, diff, entities::{create_dust, Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity, OutfitSwitcher}, gamepad_pressed, key_pressed, lerp_snap, sprites};
 
 #[derive(Debug)]
 pub struct PlayerLocal {
@@ -32,7 +32,10 @@ pub struct PlayerInputController {
 }
 
 impl PlayerInputController {
-    pub fn tick(&mut self, timeline: &mut Timeline, players_local: &mut EntityContainer<PlayerLocal>) -> (PlayerInputs, Vec<PlayerId>) {
+    pub fn tick(&mut self,
+            timeline: &mut Timeline,
+            players_local: &mut EntityContainer<PlayerLocal>,
+            outfit_switchers: &EntityContainer<OutfitSwitcher>) -> (PlayerInputs, Vec<PlayerId>) {
         let mut player_inputs = PlayerInputs::default();
         let mut new_players = Vec::new();
 
@@ -54,7 +57,7 @@ impl PlayerInputController {
                 }
             }
 
-            Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local, &mut new_players);
+            Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players);
         }
 
         {
@@ -75,7 +78,7 @@ impl PlayerInputController {
                 }
             }
 
-            Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, &mut new_players);
+            Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players);
         }
 
         for gamepad_id in 0..4
@@ -96,7 +99,7 @@ impl PlayerInputController {
                     if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
                         input = Input::Down;
                     }
-                    Self::process_input(&mut self.controller_a_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, &mut new_players);
+                    Self::process_input(&mut self.controller_a_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players);
                 }
 
                 {
@@ -113,7 +116,7 @@ impl PlayerInputController {
                     if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
                         input = Input::Down;
                     }
-                    Self::process_input(&mut self.controller_b_player[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, &mut new_players);
+                    Self::process_input(&mut self.controller_b_player[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players);
                 }
             }
         }
@@ -127,6 +130,7 @@ impl PlayerInputController {
         player_inputs: &mut PlayerInputs,
         timeline: &mut Timeline,
         players_local: &mut EntityContainer<PlayerLocal>,
+        outfit_switchers: &EntityContainer<OutfitSwitcher>,
         new_players: &mut Vec<PlayerId>) {
         if let Some(pid) = *id_registration {
             let player = players_local.inner.iter_mut().find(|x| x.player_id == pid).unwrap();
@@ -139,7 +143,7 @@ impl PlayerInputController {
                 *id_registration = Some(new_id);
 
                 let rand = FroggyRand::new(timeline.len() as u64);
-                let new_skin = Skin::rand_not_overlapping(rand, &players_local.inner);
+                let new_skin = Skin::rand_not_overlapping(rand, &players_local.inner, &outfit_switchers.inner);
                 let pos = lobby_spawn_pos_no_overlapping(rand, &players_local.inner);
 
                 timeline.add_player(new_id, Pos::Coord(pos));
@@ -222,12 +226,18 @@ fn lobby_spawn_pos_no_overlapping(rand: FroggyRand, existing: &[PlayerLocal]) ->
 }
 
 impl Skin {
-    pub fn rand_not_overlapping(rand: FroggyRand, existing: &[PlayerLocal]) -> Skin {
+    pub fn rand_not_overlapping(rand: FroggyRand, existing: &[PlayerLocal], switchers: &[OutfitSwitcher]) -> Skin {
         //return Self::from_enum(PlayerSkin::Sausage);
 
         let mut options: Vec<PlayerSkin> = g_all_skins.iter().cloned().collect();
         for player in existing {
             if let Some((idx, _)) = options.iter().enumerate().find(|(_, skin)| **skin == player.skin.player_skin) {
+                options.remove(idx);
+            }
+        }
+
+        for switcher in switchers {
+            if let Some((idx, _)) = options.iter().enumerate().find(|(_, skin)| **skin == switcher.skin) {
                 options.remove(idx);
             }
         }
@@ -360,10 +370,13 @@ impl PlayerLocal {
         alive_state: AliveState,
         timeline: &Timeline,
         visual_effects: &mut VisualEffects,
+        bigtext: &mut BigTextController,
         dust: &mut EntityContainer<Dust>,
         bubbles: &mut EntityContainer<Bubble>,
         corpses: &mut EntityContainer<Corpse>,
-        crowns: &mut EntityContainer<Crown>) {
+        crowns: &mut EntityContainer<Crown>,
+        outfit_switchers: &mut EntityContainer<OutfitSwitcher>
+    ) {
         self.t += 1;
 
         if let CrossyRulesetFST::EndWinner(state) = &timeline.top_state().rules_state.fst {
@@ -409,6 +422,22 @@ impl PlayerLocal {
             else {
                 self.image_index = 0;
             }
+
+            let mut remove_id = None;
+            for switcher in outfit_switchers.inner.iter() {
+                if player_state.x.round() as i32 == switcher.pos.x && player_state.y == switcher.pos.y {
+                    // Change outfit!
+                    self.skin = Skin::from_enum(switcher.skin);
+                    bigtext.trigger_dialogue(&self.skin);
+                    visual_effects.screenshake();
+                    visual_effects.whiteout();
+                    remove_id = Some(switcher.id);
+                }
+            }
+
+            if let Some(id) = remove_id {
+                outfit_switchers.delete_entity_id(id);
+            }
         }
 
         if (player_state.moving && !self.moving) {
@@ -416,18 +445,7 @@ impl PlayerLocal {
             let rand = FroggyRand::from_hash((self.player_id.0, self.t));
             for i in 0..2 {
                 let rand = rand.subrand(i);
-                let dust_off = rand.gen_unit("off") * 3.0;
-                let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
-                let pos = self.pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                let eid = dust.create_entity(Entity {
-                    id: 0,
-                    entity_type: EntityType::Dust,
-                    pos: Pos::Absolute(pos),
-                });
-                let dust_part = dust.get_mut(eid).unwrap();
-                dust_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
-                dust_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
+                create_dust(rand, dust, 0.5, 3.0, self.pos * 8.0 + V2::new(4.0, 4.0));
             }
         }
 

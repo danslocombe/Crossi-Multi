@@ -2,6 +2,7 @@ use core::str;
 use std::{collections::BTreeMap, mem::MaybeUninit};
 
 use crossy_multi_core::math::V2;
+use raylib_sys::Color;
 
 
 static mut SPRITE_FRAMES: MaybeUninit<BTreeMap<String, Vec<raylib_sys::Texture2D>>> = MaybeUninit::uninit();
@@ -199,6 +200,10 @@ pub fn draw_with_flip(name: &str, image_index: usize, x: f32, y: f32, x_flip: bo
 }
 
 pub fn draw_scaled(name: &str, image_index: usize, x: f32, y: f32, scale: f32) {
+    draw_scaled_tinted(name, image_index, x, y, scale, crate::WHITE);
+}
+
+pub fn draw_scaled_tinted(name: &str, image_index: usize, x: f32, y: f32, scale: f32, tint: Color) {
     let sprite = get_sprite(name)[image_index];
     let rect = raylib_sys::Rectangle{
         x: 0.0,
@@ -221,6 +226,6 @@ pub fn draw_scaled(name: &str, image_index: usize, x: f32, y: f32, scale: f32) {
             dest,
             raylib_sys::Vector2::zero(),
             0.0,
-            crate::WHITE);
+            tint);
     }
 }

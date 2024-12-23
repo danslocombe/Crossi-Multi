@@ -1,16 +1,17 @@
+use raylib_sys::Color;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::StateTransition, player_local::{PlayerLocal, Skin}, sprites};
+use crate::{client::StateTransition, player_local::{PlayerLocal, PlayerSkin, Skin}, sprites};
 
 pub struct PropController {
     gen_to : i32,
     last_generated_round: i32,
     last_generated_game: i32,
-    t: i32,
+    pub t: i32,
 }
 
 impl PropController {
@@ -200,6 +201,7 @@ pub enum EntityType {
     Dust,
     Crown,
     Snowflake,
+    OutfitSwitcher,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -282,10 +284,10 @@ impl<T: IsEntity> EntityContainer<T> {
         self.inner.iter_mut().find(|x| x.get().id == id)
     }
 
-    pub fn delete_entity(&mut self, e: Entity) -> bool {
+    pub fn delete_entity_id(&mut self, id: i32) -> bool {
         let mut found_index: Option<usize> = None;
         for (i, x) in self.inner.iter().enumerate() {
-            if x.get().id == e.id {
+            if x.get().id == id {
                 found_index = Some(i);
             }
         }
@@ -296,6 +298,10 @@ impl<T: IsEntity> EntityContainer<T> {
         else {
             false
         }
+    }
+
+    pub fn delete_entity(&mut self, e: Entity) -> bool {
+        self.delete_entity_id(e.id)
     }
 
     pub fn prune_dead(&mut self, camera_y_max: f32) {
@@ -342,6 +348,7 @@ pub struct EntityManager {
     pub dust: EntityContainer<Dust>,
     pub crowns: EntityContainer<Crown>,
     pub snowflakes: EntityContainer<Snowflake>,
+    pub outfit_switchers: EntityContainer<OutfitSwitcher>,
 }
 
 macro_rules! map_over_entity {
@@ -357,6 +364,7 @@ macro_rules! map_over_entity {
             EntityType::Dust => $self.dust.$f($e),
             EntityType::Crown => $self.crowns.$f($e),
             EntityType::Snowflake => $self.snowflakes.$f($e),
+            EntityType::OutfitSwitcher => $self.outfit_switchers.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -376,7 +384,8 @@ impl EntityManager {
             bubbles: EntityContainer::<Bubble>::new(EntityType::Bubble),
             dust: EntityContainer::<Dust>::new(EntityType::Dust),
             crowns: EntityContainer::<Crown>::new(EntityType::Crown),
-            snowflakes: EntityContainer::<Snowflake>::new(EntityType::Crown),
+            snowflakes: EntityContainer::<Snowflake>::new(EntityType::Snowflake),
+            outfit_switchers: EntityContainer::<OutfitSwitcher>::new(EntityType::OutfitSwitcher),
         }
     }
 
@@ -576,6 +585,7 @@ pub struct Dust {
     pub image_index: i32,
     pub flipped: bool,
     pub scale: f32,
+    pub tint: Color,
 }
 
 impl Dust {
@@ -586,8 +596,20 @@ impl Dust {
             image_index: 0,
             flipped: false,
             scale: 1.0,
+            tint: crate::WHITE,
         }
     }
+}
+
+pub fn create_dust(rand: FroggyRand, dust: &mut EntityContainer<Dust>, offset_min: f32, offset_max: f32, pos: V2) -> &mut Dust {
+    let dust_off = rand.gen_unit("off") as f32 * (offset_max - offset_min) + offset_min;
+    let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
+    let pos = pos + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+    //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+    let dust_part = dust.create(Pos::Absolute(pos));
+    dust_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
+    dust_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
+    dust_part
 }
 
 pub struct Crown {
@@ -632,6 +654,23 @@ impl Snowflake {
     }
 }
 
+pub struct OutfitSwitcher {
+    pub id : i32,
+    pub pos: CoordPos,
+    pub t: i32,
+    pub skin: PlayerSkin,
+}
+
+impl OutfitSwitcher {
+    pub fn new(id: i32, pos: CoordPos) -> Self {
+        Self {
+            id,
+            pos,
+            t: 0,
+            skin: PlayerSkin::Frog,
+        }
+    }
+}
 /////////////////////////////////////////////////////////////
 
 // Ugh
@@ -903,7 +942,7 @@ impl IsEntity for Dust {
             let size = 8.0 * self.scale;
             let x = self.pos.x - 0.5 * size;
             let y = self.pos.y + 2.0 - 0.5 * size;
-            sprites::draw_scaled("dust", self.image_index as usize, x, y, self.scale);
+            sprites::draw_scaled_tinted("dust", self.image_index as usize, x, y, self.scale, self.tint);
         }
     }
 
@@ -982,5 +1021,76 @@ impl IsEntity for Snowflake {
 
     fn alive(&self, _camera_y_max: f32) -> bool {
         self.t < 500
+    }
+}
+
+impl IsEntity for OutfitSwitcher {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_coord())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::OutfitSwitcher,
+            pos: Pos::Coord(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Coord(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32 * 8 - 10
+    }
+
+    fn draw(&mut self) {
+        self.t += 1;
+        {
+            //let scale = 1.0 + 0.2 * (self.t as f32 / 100.0).sin();
+            //let rand = FroggyRand::new(self.t as u64);
+            //let rand = rand.subrand(self.pos);
+            let t_offset = (FroggyRand::from_hash(self.pos).gen_unit(0) * 3.141 * 2.0) as f32;
+
+            let scale = 1.0;
+            let mut p = V2::new(self.pos.x as f32 * 8.0, self.pos.y as f32 * 8.0);
+            p.y -= 2.0;
+            //p = p + V2::norm_from_angle(rand.gen_unit(0) as f32 * 3.141 * 2.0) * 0.24;
+            p = p + V2::norm_from_angle(self.t as f32 * 0.1 + t_offset) * 1.0;//0.24;
+            let xx = p.x;
+            let yy = p.y;
+
+            let shadow_pos = p + V2::new(0.0, 3.0);
+            sprites::draw("shadow", 0, shadow_pos.x, shadow_pos.y);
+
+            let skin = Skin::from_enum(self.skin);
+            unsafe {
+                let r = 8.0 * scale;
+                let rec = raylib_sys::Rectangle { 
+                    //x: xx + 4.0 - r * 0.5,
+                    //y: yy + 4.0 - r * 0.5,
+                    x: xx,
+                    y: yy,
+                    width: r,
+                    height: r,
+                };
+
+                let mut rec_border = rec;
+                rec_border.x -= 1.0;
+                rec_border.y -= 1.0;
+                rec_border.width += 2.0;
+                rec_border.height += 2.0;
+                //raylib_sys::DrawRectangleLinesEx(rec_border, 1.0, crate::BLACK);
+                raylib_sys::DrawRectangleRec(rec, crate::WHITE);
+            }
+            sprites::draw(&skin.sprite, 0, xx, yy);
+        }
+    }
+
+    fn alive(&self, _camera_y_max: f32) -> bool {
+        true
     }
 }

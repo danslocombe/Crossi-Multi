@@ -3,7 +3,7 @@ use std::pin;
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, RulesState}, math::V2, timeline::{self, Timeline}, PlayerId};
 use raylib_sys::Ray;
 
-use crate::{client::{StateTransition, VisualEffects}, entities::EntityContainer, player_local::PlayerLocal, to_vector2};
+use crate::{client::{StateTransition, VisualEffects}, entities::EntityContainer, player_local::{PlayerLocal, PlayerSkin, Skin}, to_vector2};
 
 struct Face {
     sprite: &'static str,
@@ -100,23 +100,27 @@ pub struct BigTextController {
 }
 
 impl BigTextController {
+    pub fn trigger_dialogue(&mut self, skin: &Skin) {
+        self.face = Some(Face {
+            sprite: skin.dialogue_sprite,
+            t: 0,
+            letterbox: 0.0,
+            face_scale: 0.0,
+            scale_factor: 0.0,
+            face_x_off: 0.0,
+            image_index: 0,
+            t_end: 90,
+            close_triggered: false,
+        });
+    }
+
     pub fn tick(&mut self, timeline: &Timeline, players: &EntityContainer<PlayerLocal>, transitions: &StateTransition, new_players: &[PlayerId]) {
         let rules = &timeline.top_state().rules_state.fst;
 
         if let CrossyRulesetFST::Lobby { .. } = rules {
             if let Some(new_player) = new_players.iter().next() {
                 let player = players.inner.iter().find(|x| x.player_id == *new_player).unwrap();
-                self.face = Some(Face {
-                    sprite: player.skin.dialogue_sprite,
-                    t: 0,
-                    letterbox: 0.0,
-                    face_scale: 0.0,
-                    scale_factor: 0.0,
-                    face_x_off: 0.0,
-                    image_index: 0,
-                    t_end: 90,
-                    close_triggered: false,
-                });
+                self.trigger_dialogue(&player.skin);
             }
         }
 
