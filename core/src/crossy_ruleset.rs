@@ -163,11 +163,13 @@ impl CrossyRulesetFST
     }
 
     pub fn tick(&self, dt : u32, time_us : u32, player_states : &mut PlayerIdMap<PlayerState>, map : &Map, game_config : &GameConfig) -> Self {
+        let player_count = player_count(&player_states);
+
         match self {
             Lobby{time_with_all_players_in_ready_zone} => {
-                let bypass = game_config.bypass_lobby && player_states.count_populated() > 0;
-                let enough_players = player_states.count_populated() >= game_config.minimum_players as usize;
-                let all_in_ready_zone = player_states.iter().all(|(_, x)| player_in_lobby_ready_zone(x));
+                let bypass = game_config.bypass_lobby && player_count > 0;
+                let enough_players = player_count >= game_config.minimum_players as usize;
+                let all_in_ready_zone = player_states.iter().all(|(_, x)| x.hack_actually_a_block || player_in_lobby_ready_zone(x));
                 //println!("states {:#?}", player_states);
                 //println!("All in ready zone {}, enough players {}", all_in_ready_zone, enough_players);
 
@@ -178,8 +180,8 @@ impl CrossyRulesetFST
                         debug_log!("Player States {:?}", player_states);
 
                         // Initialize to all zero
-                        let win_counts = PlayerIdMap::seed_from(player_states, 0);
-                        let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
+                        let win_counts = seed_from_real_players(player_states, 0);
+                        let alive_states = seed_from_real_players(player_states, AliveState::Alive);
                         reset_positions(player_states, ResetPositionTarget::RacePositions);
 
                         RoundWarmup(WarmupState {
@@ -210,7 +212,7 @@ impl CrossyRulesetFST
                         })
                     }
                     _ => {
-                        let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
+                        let alive_states = seed_from_real_players(player_states, AliveState::Alive);
                         Round(RoundState {
                             screen_y : 0,
                             alive_states,
@@ -221,7 +223,7 @@ impl CrossyRulesetFST
                 }
             },
             Round(state) => {
-                if (player_states.count_populated() < game_config.minimum_players as usize)
+                if (player_count < game_config.minimum_players as usize)
                 {
                     // No longer enough players in the game, because people left.
                     return EndAllLeft(EndAllLeftState::default());
@@ -229,7 +231,7 @@ impl CrossyRulesetFST
 
                 let mut new_state = state.clone();
                 // New player joined?
-                new_state.alive_states.seed_missing(player_states, AliveState::NotInGame);
+                seed_missing_real_players(&mut new_state.alive_states, &player_states, AliveState::NotInGame);
                 new_state.screen_y = update_screen_y(new_state.screen_y, player_states, &new_state.alive_states);
 
                 kill_players(time_us, new_state.round_id, &mut new_state.alive_states, map, player_states, new_state.screen_y);
@@ -253,7 +255,7 @@ impl CrossyRulesetFST
             },
             RoundCooldown(state) => {
                 let mut new_state = state.clone();
-                new_state.round_state.alive_states.seed_missing(player_states, AliveState::NotInGame);
+                seed_missing_real_players(&mut new_state.round_state.alive_states, &player_states, AliveState::NotInGame);
                 new_state.round_state.screen_y = update_screen_y(new_state.round_state.screen_y, player_states, &new_state.round_state.alive_states);
                 kill_players(time_us, state.round_state.round_id, &mut new_state.round_state.alive_states, map, player_states, new_state.round_state.screen_y);
 
@@ -282,8 +284,8 @@ impl CrossyRulesetFST
                         }
 
                         // Take into account all players that have joined during the round
-                        let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
-                        win_counts.seed_missing(player_states, 0);
+                        let alive_states = seed_from_real_players(player_states, AliveState::Alive);
+                        seed_missing_real_players(&mut win_counts, &player_states, 0);
                         println!("CALLING RESET_POSITIONS BEFORE {:#?}", player_states);
                         reset_positions(player_states, ResetPositionTarget::RacePositions);
                         println!("CALLING RESET_POSITIONS AFTER {:#?}", player_states);
@@ -420,10 +422,16 @@ enum ResetPositionTarget {
 }
 
 fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>, target : ResetPositionTarget) {
-    let player_count_for_offset = player_states.iter().map(|(id, _)| id.0 as i32).max().unwrap_or(0);
+    let mut new_player_states = PlayerIdMap::default();
 
-    for id in player_states.valid_ids() {
-        let player_state = player_states.get_mut(id).unwrap();
+    let player_count_for_offset = player_states.iter().filter(|(_, x)| !x.hack_actually_a_block).map(|(id, _)| id.0 as i32).max().unwrap_or(0);
+
+    for (id, player_state) in player_states.iter() {
+        if (player_state.hack_actually_a_block) {
+            continue;
+        }
+
+        let mut new_state = player_state.clone();
 
         let x_off_from_count = (player_count_for_offset / 2);
         let x = player_state.id.0 as i32 + 9 - x_off_from_count;
@@ -434,8 +442,11 @@ fn reset_positions(player_states : &mut PlayerIdMap<PlayerState>, target : Reset
             ResetPositionTarget::RacePositions => 16,
         };
 
-        player_state.reset_to_pos(Pos::Coord(CoordPos{x, y}));
+        new_state.reset_to_pos(Pos::Coord(CoordPos{x, y}));
+        new_player_states.set(id, new_state);
     }
+
+    std::mem::swap(&mut new_player_states, player_states);
 }
 
 fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>, alive_states : &PlayerIdMap<AliveState>) -> i32 {
@@ -505,12 +516,17 @@ fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerS
 
 fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<AliveState>, map : &Map, player_states : &mut PlayerIdMap<PlayerState>, screen_y : i32) {
     for id in player_states.valid_ids() {
+        let state = player_states.get(id).unwrap();
+        if state.hack_actually_a_block {
+            continue;
+        }
+
         let alive = alive_states.get_copy(id).unwrap_or(AliveState::NotInGame);
         if (alive != AliveState::Alive) {
             continue;
         }
 
-        if should_kill(time_us, round_id, map, player_states.get(id).unwrap(), screen_y) {
+        if should_kill(time_us, round_id, map, state, screen_y) {
             alive_states.set(id, AliveState::Dead);
         }
     }
@@ -530,5 +546,45 @@ pub fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
     else
     {
         false
+    }
+}
+
+fn player_count(player_id_map: &PlayerIdMap<PlayerState>) -> usize {
+    let mut count = 0;
+    for (_, v) in player_id_map.iter() {
+        if v.hack_actually_a_block {
+            continue;
+        }
+
+        count += 1;
+    }
+
+    count
+}
+
+fn seed_from_real_players<T: Clone>(seed_map: &PlayerIdMap<PlayerState>, val: T) -> PlayerIdMap<T> {
+    let mut new_map : PlayerIdMap<T> = Default::default();
+    for (id, seed_val) in seed_map.iter() {
+        if seed_val.hack_actually_a_block {
+            continue;
+        }
+
+        new_map.set(id, val.clone());
+    }
+
+    new_map
+}
+
+fn seed_missing_real_players<T: Clone>(map: &mut PlayerIdMap<T>, seed_map: &PlayerIdMap<PlayerState>, val: T) {
+    for (id, seed_val) in seed_map.iter() {
+        if seed_val.hack_actually_a_block {
+            continue;
+        }
+
+        if map.contains(id) {
+            continue;
+        }
+
+        map.set(id, val.clone());
     }
 }

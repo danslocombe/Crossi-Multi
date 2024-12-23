@@ -5,7 +5,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::StateTransition, player_local::{PlayerLocal, PlayerSkin, Skin}, sprites};
+use crate::{client::StateTransition, diff, lerp_snap, player_local::{PlayerLocal, PlayerSkin, Skin}, sprites};
 
 pub struct PropController {
     gen_to : i32,
@@ -31,6 +31,8 @@ impl PropController {
         entities.corpses.inner.clear();
         entities.dust.inner.clear();
         entities.snowflakes.inner.clear();
+        entities.outfit_switchers.inner.clear();
+        entities.pushable_blocks.inner.clear();
     }
 
     pub fn create_stands(entities: &mut EntityManager) -> (CoordPos, CoordPos) {
@@ -202,6 +204,7 @@ pub enum EntityType {
     Crown,
     Snowflake,
     OutfitSwitcher,
+    PushableBlock,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -349,6 +352,7 @@ pub struct EntityManager {
     pub crowns: EntityContainer<Crown>,
     pub snowflakes: EntityContainer<Snowflake>,
     pub outfit_switchers: EntityContainer<OutfitSwitcher>,
+    pub pushable_blocks: EntityContainer<PushableBlock>,
 }
 
 macro_rules! map_over_entity {
@@ -365,6 +369,7 @@ macro_rules! map_over_entity {
             EntityType::Crown => $self.crowns.$f($e),
             EntityType::Snowflake => $self.snowflakes.$f($e),
             EntityType::OutfitSwitcher => $self.outfit_switchers.$f($e),
+            EntityType::PushableBlock => $self.pushable_blocks.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -386,6 +391,8 @@ impl EntityManager {
             crowns: EntityContainer::<Crown>::new(EntityType::Crown),
             snowflakes: EntityContainer::<Snowflake>::new(EntityType::Snowflake),
             outfit_switchers: EntityContainer::<OutfitSwitcher>::new(EntityType::OutfitSwitcher),
+            pushable_blocks: EntityContainer::<PushableBlock>::new(EntityType::PushableBlock),
+
         }
     }
 
@@ -669,6 +676,71 @@ impl OutfitSwitcher {
             t: 0,
             skin: PlayerSkin::Frog,
         }
+    }
+}
+
+pub struct PushableBlock {
+    pub id : i32,
+    pub player_id: PlayerId,
+    pub pos: V2,
+    pub t: i32,
+    pub moving: bool,
+}
+
+// @Dedup
+const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
+
+impl PushableBlock {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            player_id: PlayerId(0),
+            t: 0,
+            moving: false,
+        }
+    }
+
+    pub fn tick(&mut self, player_state: &PlayerStatePublic) {
+        self.t += 1;
+
+        // @Cleanup @Dedup
+        // Copypasted from player
+        let x0 = player_state.x as f32;
+        let y0 = player_state.y as f32;
+
+        let mut x: f32 = 0.0;
+        let mut y: f32 = 0.0;
+        if (player_state.moving) {
+            let tt = (player_state.remaining_move_dur as f32 / MOVE_T as f32);
+            let lerp_t = 1.0 - tt;
+
+            let x1 = player_state.t_x as f32;
+            let y1 = player_state.t_y as f32;
+
+            x = x0 + lerp_t * (x1 - x0);
+            y = y0 + lerp_t * (y1 - y0);
+        }
+        else {
+            let new_p = lerp_snap(self.pos.x, self.pos.y, x0, y0);
+            x = new_p.x;
+            y = new_p.y;
+        }
+
+        if (player_state.moving && !self.moving) {
+            // Started moving, do effects.
+            let rand = FroggyRand::from_hash((self.player_id.0, self.t));
+            for i in 0..2 {
+                let rand = rand.subrand(i);
+                // @Incomplete
+                // @TODO, kick up dust
+                //create_dust(rand, dust, 0.5, 3.0, self.pos * 8.0 + V2::new(4.0, 4.0));
+            }
+        }
+
+        self.pos.x = x;
+        self.pos.y = y;
+        self.moving = player_state.moving;
     }
 }
 /////////////////////////////////////////////////////////////
@@ -1088,6 +1160,38 @@ impl IsEntity for OutfitSwitcher {
             }
             sprites::draw(&skin.sprite, 0, xx, yy);
         }
+    }
+
+    fn alive(&self, _camera_y_max: f32) -> bool {
+        true
+    }
+}
+
+impl IsEntity for PushableBlock {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::PushableBlock,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32 * 8
+    }
+
+    fn draw(&mut self) {
+        sprites::draw("block", 0, self.pos.x as f32 * 8.0, self.pos.y as f32 * 8.0);
     }
 
     fn alive(&self, _camera_y_max: f32) -> bool {

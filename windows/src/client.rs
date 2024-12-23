@@ -1,5 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, BLACK, WHITE};
+use crate::{console::err, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -59,6 +59,21 @@ impl Client {
             self.visual_effects.noise();
             self.visual_effects.whiteout();
             self.visual_effects.screenshake();
+
+            {
+                // @Hack
+                // Add block
+                //let mut new_front = self.timeline.states.front().unwrap().clone();
+                //new_front.pushable_blocks.push(PushableBlock {
+                //    pos: CoordPos::new(8, 6),
+                //});
+                //std::mem::swap(self.timeline.states.front_mut().unwrap(), &mut new_front);
+
+                let (block_id, mut new_front) = self.timeline.states.front().unwrap().add_block(Pos::new_coord(6, 4));
+                std::mem::swap(self.timeline.states.front_mut().unwrap(), &mut new_front);
+                let mut pushable_block = self.entities.pushable_blocks.create(Pos::Absolute(V2::new(6.0, 4.0)));
+                pushable_block.player_id = block_id;
+            }
         }
 
         if (transitions.into_round_warmup) {
@@ -97,6 +112,17 @@ impl Client {
         {
             for player in self.entities.players.inner.iter_mut() {
                 player.reset();
+            }
+        }
+
+        for pushable_block in self.entities.pushable_blocks.inner.iter_mut() {
+            if let Some(state) = top.player_states.get(pushable_block.player_id) {
+                // TODO 
+                let player_state = state.to_public(top.get_round_id(), top.time_us, &self.timeline.map);
+                pushable_block.tick(&player_state);
+            }
+            else {
+                crate::console::err(&format!("Could not find pushable block corresponding player {:?}", pushable_block.player_id));
             }
         }
 
@@ -264,6 +290,17 @@ impl Client {
                 }
             }
         }
+
+        //for block in top.pushable_blocks.iter() {
+        //for (id, player) in top.player_states.iter() {
+        //    if !player.hack_actually_a_block {
+        //        continue;
+        //    }
+
+        //    if let Pos::Coord(coord) = player.pos {
+        //        sprites::draw("block", 0, coord.x as f32 * 8.0, coord.y as f32 * 8.0);
+        //    }
+        //}
 
         if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone } = &top.rules_state.fst {
             let x0 = 7.0 * 8.0;

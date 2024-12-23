@@ -276,6 +276,11 @@ pub struct GameState {
     pub player_states: PlayerIdMap<PlayerState>,
     pub rules_state : RulesState,
     pub player_inputs: PlayerInputs,
+
+    // For lava sections 
+    // This will mess up a bunch of the networking
+    // Is this really what we want to do?
+    //pub pushable_blocks: Vec<PushableBlock>,
 }
 
 impl GameState {
@@ -337,10 +342,29 @@ impl GameState {
             pos,
             move_state: MoveState::Stationary,
             move_cooldown: 0,
+            hack_actually_a_block: false,
         };
 
         new.set_player_state(id, state);
         new
+    }
+
+    #[must_use]
+    pub fn add_block(&self, pos: Pos) -> (PlayerId, Self) {
+        let mut new = self.clone();
+
+        let id = self.player_states.next_free().unwrap();
+
+        let state = PlayerState {
+            id,
+            pos,
+            move_state: MoveState::Stationary,
+            move_cooldown: 0,
+            hack_actually_a_block: true,
+        };
+
+        new.set_player_state(id, state);
+        (id, new)
     }
 
     #[must_use]
@@ -448,6 +472,7 @@ mod tests {
                 move_state : MoveState::Stationary,
                 move_cooldown : 0,
                 pos : Pos::new_coord(0, 0),
+                hack_actually_a_block: false,
             }
         ];
 
@@ -477,12 +502,14 @@ mod tests {
                 move_state : MoveState::Stationary,
                 move_cooldown : 0,
                 pos : Pos::new_coord(0, 0),
+                hack_actually_a_block: false,
             },
             PlayerState {
                 id : PlayerId(1),
                 move_state : MoveState::Stationary,
                 move_cooldown : 0,
                 pos : Pos::new_coord(1, 0),
+                hack_actually_a_block: false,
             },
         ];
 
@@ -512,12 +539,14 @@ mod tests {
                 move_state : MoveState::Stationary,
                 move_cooldown : 0,
                 pos : Pos::new_coord(0, 0),
+                hack_actually_a_block: false,
             },
             PlayerState {
                 id : PlayerId(1),
                 move_state : MoveState::Moving(MovingState::new(1, Pos::new_coord(1, 1))),
                 move_cooldown : 0,
                 pos : Pos::new_coord(0, 1),
+                hack_actually_a_block: false,
             },
         ];
 
@@ -546,12 +575,14 @@ mod tests {
                 move_state : MoveState::Stationary,
                 move_cooldown : 0,
                 pos : Pos::new_coord(0, 0),
+                hack_actually_a_block: false,
             },
             PlayerState {
                 id : PlayerId(1),
                 move_state : MoveState::Moving(MovingState::new(1, Pos::new_coord(0, 1))),
                 move_cooldown : 0,
                 pos : Pos::new_coord(1, 1),
+                hack_actually_a_block: false,
             },
         ];
 
@@ -571,3 +602,9 @@ mod tests {
         }
     }
 }
+//
+//#[derive(Debug, Serialize, Deserialize, Clone)]
+//pub struct PushableBlock {
+//    pub pos: CoordPos,
+//    pub move_state: MoveState,
+//}

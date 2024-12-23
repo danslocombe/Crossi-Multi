@@ -12,6 +12,8 @@ pub struct PlayerState {
     pub move_cooldown: u32,
 
     pub pos: Pos,
+
+    pub hack_actually_a_block: bool,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]

@@ -103,7 +103,10 @@ impl<T> PlayerIdMap<T> {
     }
 
     pub fn next_free(&self) -> Option<PlayerId> {
-        for i in 1..8 {
+        let mut i = 0;
+        loop {
+            i += 1;
+        //for i in 1..8 {
             if i < self.inner.len() {
                 if self.inner[i].is_none() {
                     return Some(PlayerId(i as u8));
@@ -114,7 +117,7 @@ impl<T> PlayerIdMap<T> {
             }
         }
 
-        None
+        //None
     }
 }
 

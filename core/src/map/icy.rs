@@ -3,14 +3,14 @@ use std::{collections::{BTreeMap, BTreeSet, VecDeque}, num::Wrapping, time::Inst
 use froggy_rand::FroggyRand;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use crate::{bitmap::BitMap, map::RowType, CoordPos, Input, ALL_INPUTS, SCREEN_SIZE};
+use crate::{bitmap::BitMap, map::RowType, CoordPos, Input, ALL_INPUTS};
 
 use super::{PathDescr, Row, RowId};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IcyDescr {
     pub path_descr : PathDescr,
-    pub seed : u32,
+    pub seed : u64,
     pub y : i32,
     pub blocks: BitMap,
 }
@@ -63,7 +63,6 @@ pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDequ
                     for row in 0..height {
                         let rid = RowId(row_id_0.0 + row as u32);
                         let y = rid.to_y();
-                        let seed = rand.gen("icy_seed") as u32;
                         let blocks = map.inner[row as usize];
                         rows.push_front(Row {
                             row_id: rid,
@@ -72,7 +71,7 @@ pub fn try_gen_icy_section(rand: FroggyRand, row_id_0: RowId, rows: &mut VecDequ
                                     // @TODO, do properly
                                     wall_width: 4,
                                 },
-                                seed,
+                                seed: rand.get_seed(),
                                 y,
                                 blocks,
                             }),
