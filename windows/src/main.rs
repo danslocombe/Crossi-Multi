@@ -263,6 +263,9 @@ impl ScreenShader {
         }
     }
 }
+fn dan_lerp_v2(p0: V2, p: V2, k: f32) -> V2 {
+    V2::new(dan_lerp(p0.x, p0.x, k), dan_lerp(p0.y, p.y, k))
+}
 
 fn dan_lerp(x0 : f32, x : f32, k : f32) -> f32 {
     (x0 * (k-1.0) + x) / k

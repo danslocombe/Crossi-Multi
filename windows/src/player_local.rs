@@ -428,7 +428,7 @@ impl PlayerLocal {
                 if player_state.x.round() as i32 == switcher.pos.x && player_state.y == switcher.pos.y {
                     // Change outfit!
                     self.skin = Skin::from_enum(switcher.skin);
-                    bigtext.trigger_dialogue(&self.skin);
+                    bigtext.trigger_dialogue(&self.skin, self.pos * 8.0);
                     visual_effects.screenshake();
                     visual_effects.whiteout();
                     remove_id = Some(switcher.id);

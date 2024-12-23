@@ -100,7 +100,12 @@ impl Client {
             }
         }
 
-        self.prop_controller.tick(&top.rules_state, &self.timeline.map, &mut self.entities, &transitions, self.camera.y as i32 / 8);
+        self.prop_controller.tick(
+            &top.rules_state,
+            &self.timeline.map,
+            &mut self.entities,
+            &transitions,
+            self.camera.y as i32 / 8);
 
         if let CrossyRulesetFST::Lobby { .. } = &top.rules_state.fst {
             let rand = FroggyRand::from_hash((self.timeline.map.get_seed(), top.rules_state.fst.get_round_id(), top.rules_state.game_id, self.prop_controller.t));
@@ -141,7 +146,7 @@ impl Client {
             let lilly = self.entities.lillipads.get_mut(lilly_id).unwrap();
         }
 
-        self.big_text_controller.tick(&self.timeline, &self.entities.players, &transitions, &new_players);
+        self.big_text_controller.tick(&self.timeline, &self.entities.players, &transitions, &new_players, self.camera.y);
 
         let camera_y_max = top.rules_state.fst.get_screen_y() as f32 + 200.0;
         self.entities.bubbles.prune_dead(camera_y_max);

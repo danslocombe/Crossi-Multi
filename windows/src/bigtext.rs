@@ -8,14 +8,19 @@ use crate::{client::{StateTransition, VisualEffects}, entities::EntityContainer,
 struct Face {
     sprite: &'static str,
     t: i32,
+    face_pos: V2,
     letterbox: f32,
     face_scale: f32,
     scale_factor: f32,
     face_x_off: f32,
     image_index: i32,
     t_end: i32,
+    creator_pos: V2,
     close_triggered: bool,
 }
+
+const face_pos_top: V2 = V2::new(150.0, 65.0);
+const face_pos_bot: V2 = V2::new(150.0, 200.0 - 65.0);
 
 const fade_in_time: i32 = 16;
 const fade_out_time: i32 = 24;
@@ -25,7 +30,7 @@ const face_x_off_max: f32 = 140.0;
 const sound_delay: i32 = 80;
 
 impl Face {
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, screen_y: f32) {
         self.t += 1;
 
         if (self.t < fade_in_time) {
@@ -57,6 +62,14 @@ impl Face {
         }
 
         self.letterbox = self.scale_factor * target_letterbox;
+
+        let delta_y = self.creator_pos.y - screen_y;
+        if delta_y < 50.0 {
+            self.face_pos = crate::dan_lerp_v2(self.face_pos, face_pos_bot, 8.0);
+        }
+        else {
+            self.face_pos = crate::dan_lerp_v2(self.face_pos, face_pos_top, 8.0);
+        }
     }
 
     pub fn trigger_close(&mut self) {
@@ -74,8 +87,8 @@ impl Face {
             raylib_sys::DrawRectangle(0, 160 - self.letterbox as i32, 160, 160, crate::BLACK);
         }
 
-        let x = 150.0 + self.face_x_off;
-        let y = 65.0;
+        let x = self.face_pos.x + self.face_x_off;
+        let y = self.face_pos.y;
 
         // @Perf
         let spr = crate::sprites::get_sprite(&self.sprite)[0];
@@ -100,9 +113,10 @@ pub struct BigTextController {
 }
 
 impl BigTextController {
-    pub fn trigger_dialogue(&mut self, skin: &Skin) {
+    pub fn trigger_dialogue(&mut self, skin: &Skin, creator_pos: V2) {
         self.face = Some(Face {
             sprite: skin.dialogue_sprite,
+            face_pos: face_pos_top,
             t: 0,
             letterbox: 0.0,
             face_scale: 0.0,
@@ -110,17 +124,18 @@ impl BigTextController {
             face_x_off: 0.0,
             image_index: 0,
             t_end: 90,
+            creator_pos,
             close_triggered: false,
         });
     }
 
-    pub fn tick(&mut self, timeline: &Timeline, players: &EntityContainer<PlayerLocal>, transitions: &StateTransition, new_players: &[PlayerId]) {
+    pub fn tick(&mut self, timeline: &Timeline, players: &EntityContainer<PlayerLocal>, transitions: &StateTransition, new_players: &[PlayerId], camera_y: f32) {
         let rules = &timeline.top_state().rules_state.fst;
 
         if let CrossyRulesetFST::Lobby { .. } = rules {
             if let Some(new_player) = new_players.iter().next() {
                 let player = players.inner.iter().find(|x| x.player_id == *new_player).unwrap();
-                self.trigger_dialogue(&player.skin);
+                self.trigger_dialogue(&player.skin, player.pos * 8.0);
             }
         }
 
@@ -203,10 +218,11 @@ impl BigTextController {
 
                 if let Some(winner_id) = winner {
                     // @Hack
-                    let sprite = players.inner.iter().find(|x| x.player_id == winner_id).unwrap().skin.dialogue_sprite;
+                    let player = players.inner.iter().find(|x| x.player_id == winner_id).unwrap();
 
                     self.face = Some(Face {
-                        sprite,
+                        sprite: player.skin.dialogue_sprite,
+                        face_pos: face_pos_top,
                         t: 0,
                         letterbox: 0.0,
                         face_scale: 0.0,
@@ -214,6 +230,7 @@ impl BigTextController {
                         face_x_off: 0.0,
                         image_index: 0,
                         t_end: 120,
+                        creator_pos: player.pos * 8.0,
                         close_triggered: false,
                     });
 
@@ -258,7 +275,7 @@ impl BigTextController {
         }
 
         if let Some(face) = self.face.as_mut() {
-            face.tick();
+            face.tick(camera_y);
             if (face.t > face.t_end) {
                 self.face = None;
             }
