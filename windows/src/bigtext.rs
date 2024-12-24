@@ -1,9 +1,9 @@
 use std::pin;
 
-use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, RulesState}, math::V2, timeline::{self, Timeline}, PlayerId};
+use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, RulesState, INTRO_COUNTDOWN_TIME_US}, math::V2, timeline::{self, Timeline}, PlayerId};
 use raylib_sys::Ray;
 
-use crate::{client::{StateTransition, VisualEffects}, entities::EntityContainer, player_local::{PlayerLocal, PlayerSkin, Skin}, to_vector2};
+use crate::{audio, client::{StateTransition, VisualEffects}, entities::EntityContainer, player_local::{PlayerLocal, PlayerSkin, Skin}, to_vector2};
 
 struct Face {
     sprite: &'static str,
@@ -153,6 +153,7 @@ impl BigTextController {
                 let m_image_index = time_s;
                 //let m_image_index = ((time_s - 3) - full_s);
                 if (m_image_index <= 2 && m_image_index >= 0) {
+                    audio::play("countdown");
                     self.text = Some(BigText {
                         sprite: "countdown",
                         image_index: 2 - (m_image_index as usize),
@@ -163,7 +164,17 @@ impl BigTextController {
             }
         }
 
+        if transitions.into_round_warmup {
+            if let CrossyRulesetFST::RoundWarmup(state) = rules {
+                if state.remaining_us >= INTRO_COUNTDOWN_TIME_US - 1 {
+                    audio::play("viper");
+                }
+            }
+        }
+
         if transitions.into_round {
+
+            audio::play("countdown_go");
             self.text = Some(BigText {
                 sprite: "countdown",
                 image_index: 3,

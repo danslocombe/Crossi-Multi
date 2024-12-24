@@ -68,6 +68,7 @@ impl Client {
         if (!new_players.is_empty())
         {
             audio::play("join");
+            audio::play("car");
             self.visual_effects.whiteout();
             self.visual_effects.screenshake();
         }
@@ -119,6 +120,18 @@ impl Client {
                     dust.tint = (Skin::from_enum(switcher.skin).color);
                 }
             }
+        }
+
+        // Handle crowd sounds.
+        match &top.rules_state.fst {
+            CrossyRulesetFST::RoundWarmup(_) | CrossyRulesetFST::Round(_) | CrossyRulesetFST::RoundCooldown(_)
+            => {
+                let screen_offset = (self.camera.y.min(0.0)).abs();
+                audio::ensure_playing_with_volume("win", 1.0 / (1.0 + 0.1 * screen_offset));
+            },
+            _ => {
+                audio::stop("win");
+            },
         }
 
         // @TODO how do we model this?

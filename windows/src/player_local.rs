@@ -2,7 +2,7 @@ use crossy_multi_core::{crossy_ruleset::{player_in_lobby_ready_zone, AliveState,
 use froggy_rand::FroggyRand;
 use strum_macros::EnumString;
 
-use crate::{bigtext::BigTextController, client::VisualEffects, console, diff, entities::{create_dust, Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity, OutfitSwitcher}, gamepad_pressed, key_pressed, lerp_snap, sprites};
+use crate::{audio, bigtext::BigTextController, client::VisualEffects, console, diff, entities::{create_dust, Bubble, Corpse, Crown, Dust, Entity, EntityContainer, EntityType, IsEntity, OutfitSwitcher}, gamepad_pressed, key_pressed, lerp_snap, sprites};
 
 #[derive(Debug)]
 pub struct PlayerLocal {
@@ -431,6 +431,7 @@ impl PlayerLocal {
                     bigtext.trigger_dialogue(&self.skin, self.pos * 8.0);
                     visual_effects.screenshake();
                     visual_effects.whiteout();
+                    audio::play("car");
                     remove_id = Some(switcher.id);
                 }
             }
@@ -441,6 +442,20 @@ impl PlayerLocal {
         }
 
         if (player_state.moving && !self.moving) {
+            // @Hack
+            let sound = match self.player_id.0 {
+                1 => "move1",
+                2 => "move2",
+                3 => "move3",
+                4 => "move4",
+                _ => "move_alt",
+            };
+            audio::play(sound);
+
+            if (player_state.pushing >= 0) {
+                audio::play("push");
+            }
+
             // Started moving, do effects.
             let rand = FroggyRand::from_hash((self.player_id.0, self.t));
             for i in 0..2 {
@@ -475,11 +490,15 @@ impl PlayerLocal {
                     bubble_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
                     bubble_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
                 }
+
+                audio::play("drown");
+                audio::play("drown_bubbles");
             }
             else {
                 // Hit by car.
                 let corpse = corpses.create(Pos::Absolute(corpse_pos));
                 corpse.skin = self.skin.clone();
+                audio::play("car");
             }
 
             visual_effects.screenshake();
