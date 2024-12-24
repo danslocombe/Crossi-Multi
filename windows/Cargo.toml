@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-#raylib-sys = { path = "../../raylib-rs/raylib-sys", features = ["sdl"] }
 raylib-sys = { path = "../../raylib-rs/raylib-sys" }
 crossy_multi_core = { path = "../core" }
 serde_json = "1.0.133"

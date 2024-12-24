@@ -483,7 +483,7 @@ impl VisualEffects {
                         wLeftMotorSpeed: value,
                         wRightMotorSpeed: value,
                     };
-                    windows_sys::Win32::UI::Input::XboxController::XInputSetState(0, std::ptr::from_ref(&x));
+                    windows_sys::Win32::UI::Input::XboxController::XInputSetState(id as u32, std::ptr::from_ref(&x));
                 }
             }
         }
