@@ -90,30 +90,31 @@ impl CoordPos {
     }
 
     #[must_use]
-    pub fn delta_to_input(self, other: Self) -> Input {
+    pub fn delta_to_input(self, other: Self) -> Option<Input> {
         if self.x == other.x {
             if self.y == other.y - 1 {
-                return Input::Up;
+                return Some(Input::Up);
             }
             if self.y == other.y + 1 {
-                return Input::Down;
+                return Some(Input::Down);
             }
 
             if self.y == other.y {
-                return Input::None;
+                return Some(Input::None);
             }
         }
 
         if self.y == other.y {
             if self.x == other.x + 1 {
-                return Input::Right;
+                return Some(Input::Right);
             }
             if self.x == other.x - 1 {
-                return Input::Left;
+                return Some(Input::Left);
             }
         }
 
-        panic!("Tried to compute input from two coords not adjacent")
+        return None;
+        //panic!("Tried to compute input from two coords not adjacent")
     }
 }
 

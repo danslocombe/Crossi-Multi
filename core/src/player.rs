@@ -125,10 +125,11 @@ impl PlayerState {
 
                             // For now only tile to tile
                             if let (Pos::Coord(coord_pos), Pos::Coord(target_coord)) = (self.pos, moving_state.target) {
-                                let sliding_input = target_coord.delta_to_input(coord_pos);
-                                if sliding_input != Input::None {
-                                    if let Some(moving_state) = new.try_move(sliding_input, state, pushes, map) {
-                                        new.move_state = MoveState::Moving(moving_state);
+                                if let Some(sliding_input) = target_coord.delta_to_input(coord_pos) {
+                                    if sliding_input != Input::None {
+                                        if let Some(moving_state) = new.try_move(sliding_input, state, pushes, map) {
+                                            new.move_state = MoveState::Moving(moving_state);
+                                        }
                                     }
                                 }
                             }

@@ -118,6 +118,12 @@ impl Client {
             }
         }
 
+        if (transitions.into_lobby) {
+            for player in self.entities.players.inner.iter_mut() {
+                player.reset();
+            }
+        }
+
         self.prop_controller.tick(
             &top.rules_state,
             &self.timeline.map,
