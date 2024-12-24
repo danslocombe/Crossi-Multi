@@ -27,6 +27,10 @@ pub fn init_console() {
             lambda: Box::new(do_toggle_shader),
         });
         command_set.commands.push(Command {
+            name: "debug".to_owned(),
+            lambda: Box::new(do_toggle_debug),
+        });
+        command_set.commands.push(Command {
             name: "skin".to_owned(),
             lambda: Box::new(do_set_skin),
         });
@@ -218,6 +222,10 @@ impl Console {
         let size = self.lines.size();
         match &self.state {
             ConsoleMode::Quiet => {
+                if !client.debug {
+                    return;
+                }
+
                 let mut yy: i32 = 20;
                 let xx: i32 = 20;
                 let cutoff = self.t - 60 * 3;
@@ -295,13 +303,13 @@ impl Console {
                 let screen_width = unsafe { raylib_sys::GetScreenWidth() };
                 let screen_height = unsafe { raylib_sys::GetScreenHeight() };
                 let str = crate::c_str_temp(&message.line);
-                let size = unsafe { raylib_sys::MeasureText(str, 28)};
+                let size = unsafe { raylib_sys::MeasureText(str, 32)};
 
                 let yy: i32 = screen_height / 3;
                 let xx: i32 = screen_width / 2 - size / 2;
 
                 unsafe {
-                    raylib_sys::DrawText(str, xx, yy, 28, crate::WHITE);
+                    raylib_sys::DrawText(str, xx, yy, 28, crate::BLACK);
                 }
             }
             else {
@@ -463,6 +471,22 @@ fn do_new(args: &[&str], client: &mut Client) {
 
     client.player_input_controller = PlayerInputController::default();
     client.entities.players.inner.clear();
+}
+
+fn do_toggle_debug(args: &[&str], client: &mut Client) {
+    if (args.len() > 0) {
+        err!("Expected no arguments to 'debug' got {}", args.len());
+        return;
+    }
+
+    client.debug = !client.debug;
+
+    if client.debug {
+        big("Debug mode");
+    }
+    else {
+        big("Disabling debug mode");
+    }
 }
 
 fn do_toggle_shader(args: &[&str], client: &mut Client) {

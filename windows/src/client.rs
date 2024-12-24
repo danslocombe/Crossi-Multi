@@ -5,6 +5,7 @@ use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContain
 use froggy_rand::FroggyRand;
 
 pub struct Client {
+    pub debug: bool,
     pub exit: bool,
     pub timeline: Timeline,
     pub camera: Camera,
@@ -30,6 +31,7 @@ impl Client {
         let entities = EntityManager::new();
 
         Self {
+            debug,
             exit: false,
             timeline,
             camera: Camera::new(),

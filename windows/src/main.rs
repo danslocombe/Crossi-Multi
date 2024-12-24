@@ -56,6 +56,10 @@ fn main() {
         raylib_sys::InitWindow(1000, 800, c_str_leaky("Road Toads"));
         raylib_sys::SetTargetFPS(60);
 
+        if (!debug_param) {
+            raylib_sys::ToggleBorderlessWindowed();
+        }
+
         raylib_sys::InitAudioDevice();
 
         //raylib_sys::SetExitKey(raylib_sys::KeyboardKey::KEY_NULL as i32);
