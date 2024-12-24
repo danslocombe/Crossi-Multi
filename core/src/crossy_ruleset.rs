@@ -119,7 +119,7 @@ impl RulesState {
     }
 }
 
-const INTRO_COUNTDOWN_TIME_US : u32 = 6 * 1_000_000;
+pub const INTRO_COUNTDOWN_TIME_US : u32 = 6 * 1_000_000;
 const COUNTDOWN_TIME_US : u32 = 3 * 1_000_000;
 const COOLDOWN_TIME_US : u32 = 4 * 1_000_000;
 pub const WINNER_TIME_US : u32 = 3 * 1_000_000;

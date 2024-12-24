@@ -1,8 +1,11 @@
+use std::u16;
+
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, BLACK, WHITE};
+use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
+    pub debug: bool,
     pub exit: bool,
     pub timeline: Timeline,
     pub camera: Camera,
@@ -28,6 +31,7 @@ impl Client {
         let entities = EntityManager::new();
 
         Self {
+            debug,
             exit: false,
             timeline,
             camera: Camera::new(),
@@ -67,8 +71,18 @@ impl Client {
 
         if (!new_players.is_empty())
         {
+            audio::play("join");
+            audio::play("car");
             self.visual_effects.whiteout();
             self.visual_effects.screenshake();
+
+            for new in new_players.iter() {
+                if let Some(local) = self.entities.players.inner.iter().find(|x| x.player_id == *new) {
+                    if let Some(cid) = local.controller_id {
+                        self.visual_effects.set_gamepad_vibration(cid);
+                    }
+                }
+            }
         }
 
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects, &transitions);
@@ -118,6 +132,18 @@ impl Client {
                     dust.tint = (Skin::from_enum(switcher.skin).color);
                 }
             }
+        }
+
+        // Handle crowd sounds.
+        match &top.rules_state.fst {
+            CrossyRulesetFST::RoundWarmup(_) | CrossyRulesetFST::Round(_) | CrossyRulesetFST::RoundCooldown(_)
+            => {
+                let screen_offset = (self.camera.y.min(0.0)).abs();
+                audio::ensure_playing_with_volume("win", 1.0 / (1.0 + 0.1 * screen_offset));
+            },
+            _ => {
+                audio::stop("win");
+            },
         }
 
         // @TODO how do we model this?
@@ -391,11 +417,28 @@ impl Camera {
     }
 }
 
-#[derive(Default)]
 pub struct VisualEffects {
     pub whiteout: i32,
     pub screenshake: f32,
     pub noise: f32,
+
+    pub controller_vibrations: Vec<f32>,
+}
+
+impl Default for VisualEffects {
+    fn default() -> Self {
+        let mut vibration = Vec::new();
+        for i in 0..4 {
+            vibration.push(0.0);
+        }
+
+        Self {
+            whiteout: 0,
+            screenshake: 0.0,
+            noise: 0.0,
+            controller_vibrations: vibration,
+        }
+    }
 }
 
 impl VisualEffects {
@@ -412,10 +455,40 @@ impl VisualEffects {
         self.noise = self.noise.max(15.0);
     }
 
+    pub fn set_gamepad_vibration(&mut self, id: i32) {
+        self.controller_vibrations[id as usize] = 15.0;
+    }
+
     pub fn tick(&mut self) {
         self.whiteout = (self.whiteout - 1).max(0);
         self.screenshake *= 0.85;
         self.noise *= 0.85;
+
+        for (i, x) in self.controller_vibrations.iter_mut().enumerate() {
+            *x *= 0.65;
+
+            let id = i as i32;
+            unsafe {
+                if raylib_sys::IsGamepadAvailable(id) {
+                    let value = 
+                    if *x > 0.01 {
+                        (*x * u16::MAX as f32).floor() as u16
+                    }
+                    else {
+                        0 as u16
+                    };
+
+                    // Lifted from
+                    //https://github.com/machlibs/rumble/blob/main/src/up_rumble.h
+                    // Call win32 directly
+                    let x = windows_sys::Win32::UI::Input::XboxController::XINPUT_VIBRATION {
+                        wLeftMotorSpeed: value,
+                        wRightMotorSpeed: value,
+                    };
+                    windows_sys::Win32::UI::Input::XboxController::XInputSetState(id as u32, std::ptr::from_ref(&x));
+                }
+            }
+        }
     }
 }
 

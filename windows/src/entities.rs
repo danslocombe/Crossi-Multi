@@ -31,6 +31,7 @@ impl PropController {
         entities.corpses.inner.clear();
         entities.dust.inner.clear();
         entities.snowflakes.inner.clear();
+        entities.outfit_switchers.inner.clear();
     }
 
     pub fn create_stands(entities: &mut EntityManager) -> (CoordPos, CoordPos) {
@@ -866,7 +867,7 @@ impl IsEntity for Corpse {
     }
 
     fn get_depth(&self) -> i32 {
-        self.pos.y as i32
+        self.pos.y as i32 - 10
     }
 
     fn draw(&mut self) {

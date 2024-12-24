@@ -8,6 +8,7 @@ mod entities;
 mod client;
 mod bigtext;
 mod player_local;
+mod audio;
 
 use std::{mem::MaybeUninit};
 
@@ -55,12 +56,19 @@ fn main() {
         raylib_sys::InitWindow(1000, 800, c_str_leaky("Road Toads"));
         raylib_sys::SetTargetFPS(60);
 
+        if (!debug_param) {
+            raylib_sys::ToggleBorderlessWindowed();
+        }
+
+        raylib_sys::InitAudioDevice();
+
         //raylib_sys::SetExitKey(raylib_sys::KeyboardKey::KEY_NULL as i32);
 
         console::init_console();
         crossy_multi_core::set_debug_logger(Box::new(console::QuakeConsoleLogger{}));
 
         sprites::init_sprites();
+        audio::init_audio();
 
         raylib_sys::GuiLoadStyle(c_str_leaky("style_dark.rgs"));
 
