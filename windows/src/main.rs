@@ -74,7 +74,17 @@ fn main() {
 
         let framebuffer = raylib_sys::LoadRenderTexture(160, 160);
 
-        let mut client = Client::new(debug_param);
+        // Hacky
+        // Generate a random number, should really use rand crate
+        // but dont want more depedencies.
+        // Allocate something in memory then use the ptr as the seed.
+        let seed = {
+            let blah = Box::new(0);
+            let ptr = std::ptr::from_ref(&*blah);
+            std::mem::transmute::<_, usize>(ptr)
+        };
+
+        let mut client = Client::new(debug_param, &format!("{}", seed));
 
         while !raylib_sys::WindowShouldClose() && !client.exit {
             let mapping_info = FrameBufferToScreenInfo::compute(&framebuffer.texture);

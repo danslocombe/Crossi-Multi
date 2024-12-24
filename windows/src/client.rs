@@ -23,11 +23,12 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(debug: bool) -> Self {
+    pub fn new(debug: bool, seed: &str) -> Self {
+        println!("Initialising, Seed {}", seed);
         let mut game_config = GameConfig::default();
         //game_config.bypass_lobby = true;
         //game_config.minimum_players = 1;
-        let timeline = Timeline::from_seed(game_config, "ac");
+        let timeline = Timeline::from_seed(game_config, seed);
         let entities = EntityManager::new();
 
         Self {
