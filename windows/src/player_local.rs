@@ -18,6 +18,7 @@ pub struct PlayerLocal {
     pub t : i32,
     pub skin: Skin,
     pub visible: bool,
+    pub controller_id: Option<i32>,
 }
 
 const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
@@ -57,7 +58,7 @@ impl PlayerInputController {
                 }
             }
 
-            Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players);
+            Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None);
         }
 
         {
@@ -78,7 +79,7 @@ impl PlayerInputController {
                 }
             }
 
-            Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players);
+            Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None);
         }
 
         for gamepad_id in 0..4
@@ -99,7 +100,7 @@ impl PlayerInputController {
                     if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
                         input = Input::Down;
                     }
-                    Self::process_input(&mut self.controller_a_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players);
+                    Self::process_input(&mut self.controller_a_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id));
                 }
 
                 {
@@ -116,7 +117,7 @@ impl PlayerInputController {
                     if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
                         input = Input::Down;
                     }
-                    Self::process_input(&mut self.controller_b_player[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players);
+                    Self::process_input(&mut self.controller_b_player[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id));
                 }
             }
         }
@@ -131,7 +132,8 @@ impl PlayerInputController {
         timeline: &mut Timeline,
         players_local: &mut EntityContainer<PlayerLocal>,
         outfit_switchers: &EntityContainer<OutfitSwitcher>,
-        new_players: &mut Vec<PlayerId>) {
+        new_players: &mut Vec<PlayerId>,
+        controller_id: Option<i32>) {
         if let Some(pid) = *id_registration {
             let player = players_local.inner.iter_mut().find(|x| x.player_id == pid).unwrap();
             player.update_inputs(&*timeline, player_inputs, input);
@@ -155,6 +157,7 @@ impl PlayerInputController {
                 player_local.set_from(&player_state);
                 player_local.update_inputs(&*timeline, player_inputs, input);
                 player_local.skin = new_skin;
+                player_local.controller_id = controller_id;
 
                 new_players.push(new_id);
             }
@@ -329,6 +332,7 @@ impl PlayerLocal {
             t: 0,
             skin: Skin::default(),
             visible: true,
+            controller_id: None,
         }
     }
 
@@ -454,6 +458,16 @@ impl PlayerLocal {
 
             if (player_state.pushing >= 0) {
                 audio::play("push");
+
+                if let Some(id) = self.controller_id {
+                    visual_effects.set_gamepad_vibration(id);
+                }
+            }
+
+            if (player_state.pushed_by >= 0) {
+                if let Some(id) = self.controller_id {
+                    visual_effects.set_gamepad_vibration(id);
+                }
             }
 
             // Started moving, do effects.
@@ -503,6 +517,10 @@ impl PlayerLocal {
 
             visual_effects.screenshake();
             visual_effects.whiteout();
+
+            if let Some(id) = self.controller_id {
+                visual_effects.set_gamepad_vibration(id);
+            }
         }
 
         if (!self.created_crowns) {
