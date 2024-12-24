@@ -1,5 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, BLACK, WHITE};
+use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -67,6 +67,7 @@ impl Client {
 
         if (!new_players.is_empty())
         {
+            audio::play("join");
             self.visual_effects.whiteout();
             self.visual_effects.screenshake();
         }
