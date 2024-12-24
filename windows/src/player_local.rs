@@ -246,6 +246,11 @@ impl Skin {
             }
         }
 
+        if (options.len() == 0) {
+            // Failure case, fall back to just frog :(
+            return Self::from_enum(PlayerSkin::Frog);
+        }
+
         Self::from_enum(*rand.choose("skin", &options))
     }
 
