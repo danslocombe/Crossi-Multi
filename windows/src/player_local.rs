@@ -19,6 +19,7 @@ pub struct PlayerLocal {
     pub skin: Skin,
     pub visible: bool,
     pub controller_id: Option<i32>,
+    pub alive_state: AliveState,
 }
 
 const MOVE_T : i32 = 7 * (1000 * 1000 / 60);
@@ -339,6 +340,7 @@ impl PlayerLocal {
             skin: Skin::default(),
             visible: true,
             controller_id: None,
+            alive_state: AliveState::NotInGame,
         }
     }
 
@@ -387,6 +389,11 @@ impl PlayerLocal {
         crowns: &mut EntityContainer<Crown>,
         outfit_switchers: &mut EntityContainer<OutfitSwitcher>
     ) {
+        self.alive_state = alive_state;
+        if (alive_state == AliveState::NotInGame) {
+            return;
+        }
+
         self.t += 1;
 
         if let CrossyRulesetFST::EndWinner(state) = &timeline.top_state().rules_state.fst {
@@ -588,6 +595,10 @@ impl IsEntity for PlayerLocal {
     }
 
     fn draw(&mut self) {
+        if (self.alive_state == AliveState::NotInGame) {
+            return;
+        }
+
         if (!self.visible) {
             return;
         }
