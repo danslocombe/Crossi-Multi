@@ -7,6 +7,8 @@ use froggy_rand::FroggyRand;
 pub struct Client {
     pub debug: bool,
     pub exit: bool,
+    pub seed: String,
+
     pub timeline: Timeline,
     pub camera: Camera,
 
@@ -33,6 +35,7 @@ impl Client {
 
         Self {
             debug,
+            seed: seed.to_owned(),
             exit: false,
             timeline,
             camera: Camera::new(),

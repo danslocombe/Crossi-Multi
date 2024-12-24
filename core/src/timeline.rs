@@ -125,6 +125,11 @@ impl Timeline {
         self.states.get(0).unwrap()
     }
 
+    // Avoid as this can have weird side effects / break invariants
+    pub fn top_state_mut_unsafe(&mut self) -> &mut GameState {
+        self.states.get_mut(0).unwrap()
+    }
+
     pub fn try_get_state(&self, frame_id : u32) -> Option<&GameState> {
         if (frame_id > self.top_state().frame_id) {
             return None;

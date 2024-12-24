@@ -38,6 +38,18 @@ pub fn init_console() {
             name: "win".to_owned(),
             lambda: Box::new(do_win),
         });
+        command_set.commands.push(Command {
+            name: "min_players".to_owned(),
+            lambda: Box::new(do_set_min_players),
+        });
+        command_set.commands.push(Command {
+            name: "restart".to_owned(),
+            lambda: Box::new(do_restart),
+        });
+        command_set.commands.push(Command {
+            name: "lobby".to_owned(),
+            lambda: Box::new(do_lobby),
+        });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
 }
@@ -461,16 +473,13 @@ fn do_new(args: &[&str], client: &mut Client) {
     }
 
     big!("New Level Seed '{}'", seed);
-    let new_game_id = client.timeline.top_state().rules_state.game_id;
     let mut config = client.timeline.top_state().rules_state.config.clone();
     config.bypass_lobby = true;
     client.timeline = Timeline::from_seed(config, &seed);
-    client.timeline.set_game_id(new_game_id);
-    //client.timeline.add_player(PlayerId(1), Pos::new_coord(7, 7));
-    //client.timeline.add_player(PlayerId(2), Pos::new_coord(8, 7));
+    client.seed = seed;
 
     client.player_input_controller = PlayerInputController::default();
-    client.entities.players.inner.clear();
+    client.entities.clear_round_entities();
 }
 
 fn do_toggle_debug(args: &[&str], client: &mut Client) {
@@ -557,4 +566,58 @@ fn do_win(args: &[&str], client: &mut Client) {
     });
 
     client.timeline.states.front_mut().unwrap().rules_state.fst = state;
+}
+
+fn do_set_min_players(args: &[&str], client: &mut Client) {
+    if (args.len() > 1) {
+        err!("Expected one arguments to 'min_players' got {}", args.len());
+        return;
+    }
+
+    if let Ok(min_count) = args[0].parse() {
+        info!("Setting min_count to {}", min_count);
+        client.timeline.top_state_mut_unsafe().rules_state.config.minimum_players = min_count;
+    }
+    else {
+        err!("Could not parse {} as a number", args[0]);
+    }
+}
+
+fn do_restart(args: &[&str], client: &mut Client) {
+    if (args.len() > 0) {
+        err!("Expected zero arguments to 'restart' got {}", args.len());
+        return;
+    }
+
+    let mut config = client.timeline.top_state().rules_state.config.clone();
+
+    big!("Restarting, preserving seed '{}'", client.seed);
+    client.timeline = Timeline::from_seed(config, &client.seed);
+
+    client.player_input_controller = PlayerInputController::default();
+    client.entities.clear_round_entities();
+}
+
+fn do_lobby(args: &[&str], client: &mut Client) {
+    if (args.len() > 1) {
+        err!("Expected 0 or 1 argument to lobby, got {}", args.len());
+        return;
+    }
+
+    let mut seed = String::default();
+    if args.len() == 1 {
+        seed = args[0].to_owned();
+    }
+    else {
+        seed = format!("seed_{}", 10);
+    }
+
+    big!("Lobby with Seed '{}'", seed);
+    let mut config = client.timeline.top_state().rules_state.config.clone();
+    config.bypass_lobby = false;
+    client.timeline = Timeline::from_seed(config, &seed);
+    client.seed = seed;
+
+    client.player_input_controller = PlayerInputController::default();
+    client.entities.clear_round_entities();
 }

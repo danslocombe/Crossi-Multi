@@ -24,16 +24,6 @@ impl PropController {
         }
     }
 
-    pub fn clear_round_entities(entities: &mut EntityManager) {
-        entities.props.inner.clear();
-        entities.spectators.inner.clear();
-        entities.bubbles.inner.clear();
-        entities.corpses.inner.clear();
-        entities.dust.inner.clear();
-        entities.snowflakes.inner.clear();
-        entities.outfit_switchers.inner.clear();
-    }
-
     pub fn create_stands(entities: &mut EntityManager) -> (CoordPos, CoordPos) {
         let stand_left_id = entities.create_entity(Entity {
             id: 0,
@@ -81,15 +71,15 @@ impl PropController {
         }
 
         if (transitions.into_lobby) {
-            Self::clear_round_entities(entities);
+            entities.clear_round_entities();
             _ = Self::create_stands(entities);
         }
         if (transitions.into_winner) {
-            Self::clear_round_entities(entities);
+            entities.clear_round_entities();
         }
 
         if (transitions.into_round_warmup) {
-            Self::clear_round_entities(entities);
+            entities.clear_round_entities();
             crate::console::info(&format!("PropController Resetting, gameid {} roundid {}", game_id, round_id));
 
             self.last_generated_game = game_id;
@@ -416,6 +406,17 @@ impl EntityManager {
 
     pub fn draw_entity(&mut self, e: Entity) {
         map_over_entity!(self, e, e.entity_type, draw)
+    }
+
+    pub fn clear_round_entities(&mut self) {
+        self.props.inner.clear();
+        self.spectators.inner.clear();
+        self.bubbles.inner.clear();
+        self.corpses.inner.clear();
+        self.dust.inner.clear();
+        self.snowflakes.inner.clear();
+        self.outfit_switchers.inner.clear();
+        self.players.inner.clear();
     }
 }
 
