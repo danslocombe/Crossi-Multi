@@ -416,7 +416,6 @@ impl EntityManager {
         self.dust.inner.clear();
         self.snowflakes.inner.clear();
         self.outfit_switchers.inner.clear();
-        self.players.inner.clear();
     }
 }
 

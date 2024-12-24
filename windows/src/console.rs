@@ -480,6 +480,7 @@ fn do_new(args: &[&str], client: &mut Client) {
 
     client.player_input_controller = PlayerInputController::default();
     client.entities.clear_round_entities();
+    client.entities.players.inner.clear();
 }
 
 fn do_toggle_debug(args: &[&str], client: &mut Client) {
@@ -596,6 +597,7 @@ fn do_restart(args: &[&str], client: &mut Client) {
 
     client.player_input_controller = PlayerInputController::default();
     client.entities.clear_round_entities();
+    client.entities.players.inner.clear();
 }
 
 fn do_lobby(args: &[&str], client: &mut Client) {
@@ -620,4 +622,5 @@ fn do_lobby(args: &[&str], client: &mut Client) {
 
     client.player_input_controller = PlayerInputController::default();
     client.entities.clear_round_entities();
+    client.entities.players.inner.clear();
 }
