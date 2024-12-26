@@ -376,6 +376,16 @@ impl MapRound {
 
             verbose_log!("Generating at {:?}, y={} | {:?}", row_id, row_id.to_y(), &rng);
 
+            // Lobby
+            if (self.seed == 0) {
+                self.rows.push_front(Row {
+                    row_id,
+                    row_type: RowType::Lobby,
+                });
+
+                continue;
+            }
+
             // Seed 0 is reserved for lobbies
             // We shouldnt generate any roads / rivers
             if (self.seed != 0 && rng.gen_unit("gen_feature") < 0.25) {

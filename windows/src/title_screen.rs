@@ -1,6 +1,7 @@
 use crossy_multi_core::{math::V2};
+use froggy_rand::FroggyRand;
 
-use crate::{rope::{self, ConstantForce, RopeWorld}, sprites, to_vector2};
+use crate::{player_local::{g_all_skins, Skin}, rope::{self, ConstantForce, RopeWorld}, sprites, to_vector2};
 
 pub struct TitleScreen {
     t: i32,
@@ -8,18 +9,23 @@ pub struct TitleScreen {
     left_curtain: Curtain,
     right_curtain: Curtain,
 
+    goto_next_t: Option<i32>,
+
     pub draw_bg_tiles: bool,
+
+    actors: Vec<Actor>,
 }
 
 impl Default for TitleScreen {
     fn default() -> Self {
-
         Self {
             t: 0,
             text_pos: V2::new(10.0, 60.0),
-            left_curtain: Curtain::new(V2::new(-10.0, 20.0), V2::new(90.0, 20.0)),
-            right_curtain: Curtain::new(V2::new(170.0, 20.0), V2::new(80.0, 20.0)),
+            left_curtain: Curtain::new(V2::new(-10.0, 20.0), V2::new(84.0, 20.0)),
+            right_curtain: Curtain::new(V2::new(170.0, 20.0), V2::new(86.0, 20.0)),
             draw_bg_tiles: false,
+            actors: Default::default(),
+            goto_next_t: None,
         }
     }
 }
@@ -28,29 +34,63 @@ impl TitleScreen {
     pub fn tick(&mut self) -> bool {
         self.t += 1;
 
-        self.left_curtain.tick();
-        self.right_curtain.tick();
+        // @TODO add controller press.
+        let press = unsafe {
+            raylib_sys::GetKeyPressed() != 0
+        };
 
-        if self.t > 80 {
+        if (self.goto_next_t.is_none() && press) {
+            self.goto_next_t = Some(self.t);
+        }
+
+        self.left_curtain.tick(self.goto_next_t);
+        self.right_curtain.tick(self.goto_next_t);
+
+        if false && self.t > 80 {
             self.text_pos = crate::dan_lerp_v2(self.text_pos, V2::new(10.0, -50.0), 15.);
         }
 
         self.draw_bg_tiles = self.t > 100;
 
-        self.t < 180
+        let music_time = 20;
+        let music_hit = self.t % music_time == 0;
+        let beat = self.t / music_time;
+        if (music_hit && beat % 2 == 0) {
+            self.actors.push(Actor::new(V2::new(20.0, 15.0), FroggyRand::new(self.t as u64)));
+        }
+
+        for actor in self.actors.iter_mut() {
+            actor.tick(music_hit);
+        }
+
+        // @Perf
+        let mut new_actors = self.actors.iter().filter(|x| x.alive()).cloned().collect();
+        std::mem::swap(&mut new_actors, &mut self.actors);
+
+        self.t < 100 + self.goto_next_t.unwrap_or(self.t)
     }
 
     pub fn draw(&mut self) {
+        let fade_out_t = ((self.t as f32 - self.goto_next_t.map(|x| x as f32 + 40.0).unwrap_or(self.t as f32)) / 40.0).clamp(0.0, 1.0);
+
         unsafe {
-            let fade_out_t = ((self.t as f32 - 80.0) / 40.0).clamp(0.0, 1.0);
             let mut col = crate::BLACK;
             col.a = (255.0 * (1.0 - fade_out_t)) as u8;
             raylib_sys::DrawRectangle(0, 0, 200, 200, col);
         }
+
+        unsafe {
+            let rx = 50.0 * (1.0 - fade_out_t);
+            let ry = 26.0 * (1.0 - fade_out_t);
+            raylib_sys::DrawEllipse(80, 120, rx, ry, crate::BROWN);
+            //raylib_sys::DrawRectangle(0, 100, 200, 100, crate::BROWN);
+        }
+
         self.left_curtain.draw();
         self.right_curtain.draw();
-        unsafe {
-            //raylib_sys::DrawText(crate::c_str_leaky("test"), 10, 10, 26, crate::BLACK);
+
+        for actor in self.actors.iter() {
+            actor.draw();
         }
 
         sprites::draw("champion", 0, self.text_pos.x, self.text_pos.y);
@@ -66,15 +106,14 @@ struct Curtain {
 
     on_left: bool,
 
+    wind_norm: f32,
+
     grid: Vec<Vec<usize>>,
 }
 
 impl Curtain {
     pub fn new(top_corner_wall: V2, top_corner_center: V2) -> Self {
         let mut rope_world = RopeWorld::default();
-        rope_world.forces.push(Box::new(ConstantForce {
-            force: V2::new(0.0, 0.03),
-        }));
 
         let node_top_corner_wall = rope_world.add_node_p(top_corner_wall);
         rope_world.get_node_mut(node_top_corner_wall).node_type = rope::NodeType::Fixed;
@@ -101,7 +140,7 @@ impl Curtain {
         let width = 12;
         let height = 12;
         let x_offset = top_corner_center - top_corner_wall;
-        let y_offset = V2::new(0.0, 120.);
+        let y_offset = V2::new(0.0, 100.);
         for y in 0..height {
             //let top_left = top_corner_center + y_offset * (((y + 1) as f32) * 1.0/((height+1) as f32));
             let top_left = top_corner_wall + y_offset * (((y) as f32) * 1.0/((height) as f32));
@@ -159,25 +198,45 @@ impl Curtain {
 
             grid,
 
+            wind_norm: 0.0,
+
             on_left: top_corner_wall.x < top_corner_center.x,
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, goto_next_t: Option<i32>) {
         self.t += 1;
 
-        if self.t > 60 {
-            let w = self.grid[0].len();
-            for x in 0..w {
-                if x % 2 == 0 || x == w-1 {
-                    let id = self.grid[0][x];
-                    let pos = self.rope_world.get_node(id).pos;
-                    let wall = self.rope_world.get_node(self.node_top_corner_wall).pos;
-                    let new_pos = crate::dan_lerp_v2(pos, wall, 35.0);
-                    self.rope_world.get_node_mut(id).pos = new_pos;
+        if let Some(goto_next_t) = goto_next_t {
+            if self.t > goto_next_t {
+                let w = self.grid[0].len();
+                for x in 0..w {
+                    if x % 2 == 0 || x == w-1 {
+                        let id = self.grid[0][x];
+                        let pos = self.rope_world.get_node(id).pos;
+                        let wall = self.rope_world.get_node(self.node_top_corner_wall).pos;
+                        let new_pos = crate::dan_lerp_v2(pos, wall, 25.0);
+                        self.rope_world.get_node_mut(id).pos = new_pos;
+                    }
                 }
             }
         }
+
+        self.wind_norm *= 0.9;
+        let rand = FroggyRand::new(self.t as u64);
+        if rand.gen_unit(0) < 0.01 {
+            if rand.gen_unit(1) < 0.5 {
+                self.wind_norm += 1.0;
+            }
+            else {
+                self.wind_norm += -1.0;
+            }
+        }
+
+        self.rope_world.forces.clear();
+        self.rope_world.forces.push(Box::new(ConstantForce {
+            force: V2::new(self.wind_norm * 0.03, 0.03),
+        }));
 
         self.rope_world.tick(1.0);
     }
@@ -247,5 +306,57 @@ impl Curtain {
                 }
             }
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Actor {
+    skin: Skin,
+    pos_grid: V2,
+    pos_target: V2,
+    image_index: i32,
+    t_since_move: i32,
+}
+
+impl Actor {
+    pub fn new(pos_grid: V2, rand: FroggyRand) -> Self {
+        let skin = rand.choose("skin", &g_all_skins);
+        Self {
+            skin: Skin::from_enum(*skin),
+            pos_grid,
+            pos_target: pos_grid,
+            image_index: 0,
+            t_since_move: 0,
+        }
+    }
+
+    pub fn tick(&mut self, move_all: bool,) {
+        if (move_all) {
+            self.image_index = 0;
+            self.pos_target.x -= 1.0;
+            self.t_since_move = 0;
+        }
+        else {
+            self.t_since_move += 1;
+            if self.t_since_move < 8 {
+                self.image_index = self.t_since_move / 2;
+            }
+            else {
+                self.image_index = 0;
+            }
+
+            self.pos_grid = crate::dan_lerp_v2(self.pos_grid, self.pos_target, 3.0);
+        }
+    }
+
+    pub fn alive(&self) -> bool {
+        self.pos_grid.x > -2.
+    }
+
+    pub fn draw(&self) {
+        let xx = self.pos_grid.x * 8.0;
+        let yy = self.pos_grid.y * 8.0;
+        sprites::draw("shadow", 0, xx, yy + 2.0);
+        sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, xx, yy, true);
     }
 }

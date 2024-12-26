@@ -1,7 +1,7 @@
 use std::u16;
 
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, title_screen::TitleScreen, BLACK, WHITE};
+use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, title_screen::TitleScreen, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -63,6 +63,11 @@ impl Client {
             if !title.tick() {
                 self.title_screen = None;
             }
+            // @Hacky
+            self.camera.k = 100.0;
+            self.camera.y = -200.0;
+            self.camera.y_mod = -200.0;
+            self.camera.target_y = -200.0;
             return;
         }
 
@@ -105,6 +110,7 @@ impl Client {
         }
 
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects, &transitions);
+
         self.visual_effects.tick();
 
         let top = self.timeline.top_state();
@@ -217,7 +223,8 @@ impl Client {
         //const bg_fill_col: raylib_sys::Color = hex_color("3c285d".as_bytes());
         raylib_sys::ClearBackground(BLACK);
 
-        let draw_bg_tiles = self.title_screen.as_ref().map(|x| x.draw_bg_tiles).unwrap_or(true);
+        //let draw_bg_tiles = self.title_screen.as_ref().map(|x| x.draw_bg_tiles).unwrap_or(true);
+        let draw_bg_tiles = true;
 
         if (draw_bg_tiles)
         {
@@ -250,6 +257,21 @@ impl Client {
                     RowType::IcyRow{..} => {
                         (icy_col_0, icy_col_1)
                     },
+                    RowType::Lobby => {
+                        let t = if y > 0 {
+                            //println!("y = {} t = 0", y);
+                            0.0
+                        }
+                        else {
+                            let yy = -y as f32;
+                            let t = (yy as f32 / 6.0).clamp(0.0, 1.0);
+                            //println!("y = {} yy = {} t = {}", y, yy, t);
+                            t
+                        };
+
+                        //let t = (-(y as f32).min(0.0) / 10.0).clamp(0.0, 1.0);
+                        (lerp_color_rgba(grass_col_0, BLACK, t), lerp_color_rgba(grass_col_1, BLACK, t))
+                    }
                     _ => {
                         (grass_col_0, grass_col_1)
                     },
@@ -384,6 +406,7 @@ pub struct Camera {
     y_mod: f32,
     target_y: f32,
     t: i32,
+    k: f32,
 }
 
 impl Camera {
@@ -395,6 +418,7 @@ impl Camera {
             y_mod: 0.0,
             target_y: 0.0,
             t: 0,
+            k: 3.0,
         }
     }
 
@@ -415,7 +439,15 @@ impl Camera {
                     round_state.round_state.screen_y as f32
                 },
                 _ => 0.0
-            }
+            };
+
+            self.k = match &rules_state.fst {
+                CrossyRulesetFST::Lobby{ .. } => {
+                    // Lerp towards 3
+                    dan_lerp(self.k, 3.0, 10.0)
+                },
+                _ => 3.0
+            };
         }
 
         self.x = 0.0;
@@ -424,7 +456,7 @@ impl Camera {
             self.y = self.target_y * 8.0
         }
         else {
-            self.y = dan_lerp(self.y, self.target_y * 8.0, 3.0);
+            self.y = dan_lerp(self.y, self.target_y * 8.0, self.k);
         }
 
         self.x_mod = self.x;
