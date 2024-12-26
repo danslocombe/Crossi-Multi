@@ -66,9 +66,11 @@ impl Client {
             return;
         }
 
+        self.visual_effects.tick();
+
         let mut just_left_title = false;
         if let Some(title) = self.title_screen.as_mut() {
-            if !title.tick() {
+            if !title.tick(&mut self.visual_effects) {
                 self.title_screen = None;
                 just_left_title = true;
             }
@@ -121,8 +123,6 @@ impl Client {
         }
 
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects, &transitions);
-
-        self.visual_effects.tick();
 
         let top = self.timeline.top_state();
         for local_player in self.entities.players.inner.iter_mut() {

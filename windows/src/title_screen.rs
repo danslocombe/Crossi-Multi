@@ -1,7 +1,7 @@
 use crossy_multi_core::{math::V2};
 use froggy_rand::FroggyRand;
 
-use crate::{player_local::{g_all_skins, Skin}, rope::{self, ConstantForce, RopeWorld}, sprites, to_vector2};
+use crate::{client::VisualEffects, player_local::{g_all_skins, Skin}, rope::{self, ConstantForce, RopeWorld}, sprites, to_vector2};
 
 pub struct TitleScreen {
     t: i32,
@@ -34,7 +34,11 @@ impl Default for TitleScreen {
 }
 
 impl TitleScreen {
-    pub fn tick(&mut self) -> bool {
+    pub fn tick(&mut self, visual_effects: &mut VisualEffects) -> bool {
+        if (self.t == 0) {
+            //visual_effects.screenshake();
+        }
+
         self.t += 1;
 
         // @TODO add controller press.
@@ -43,6 +47,7 @@ impl TitleScreen {
         };
 
         if (self.goto_next_t.is_none() && press) {
+            visual_effects.screenshake();
             self.goto_next_t = Some(self.t);
         }
 
@@ -50,7 +55,7 @@ impl TitleScreen {
         self.right_curtain.tick(self.goto_next_t);
 
         if self.t > self.goto_next_t.unwrap_or(self.t) {
-            self.text_pos = crate::dan_lerp_v2(self.text_pos, V2::new(10.0, -50.0), 15.);
+            self.text_pos = crate::dan_lerp_v2(self.text_pos, V2::new(10.0, -80.0), 15.);
         }
 
         self.draw_bg_tiles = self.t > 100;
