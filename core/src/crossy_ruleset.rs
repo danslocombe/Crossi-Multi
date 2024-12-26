@@ -518,8 +518,8 @@ fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<Al
 
 pub const LOBBY_READ_ZONE_X_MIN : i32 = 7;
 pub const LOBBY_READ_ZONE_X_MAX : i32 = 12;
-pub const LOBBY_READ_ZONE_Y_MIN : i32 = 14;
-pub const LOBBY_READ_ZONE_Y_MAX : i32 = 17;
+pub const LOBBY_READ_ZONE_Y_MIN : i32 = 12;
+pub const LOBBY_READ_ZONE_Y_MAX : i32 = 15;
 
 pub fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
     if let Pos::Coord(CoordPos{x, y}) = player.pos {

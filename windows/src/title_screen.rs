@@ -13,18 +13,21 @@ pub struct TitleScreen {
 
     pub draw_bg_tiles: bool,
 
-    actors: Vec<Actor>,
+    actor_controller: ActorController,
 }
 
 impl Default for TitleScreen {
     fn default() -> Self {
+        let mut actor_controller = ActorController::default();
+        actor_controller.spawn_positions_grid.push((V2::new(20.0, 15.0), false));
+
         Self {
             t: 0,
             text_pos: V2::new(10.0, 60.0),
             left_curtain: Curtain::new(V2::new(-10.0, 20.0), V2::new(84.0, 20.0)),
             right_curtain: Curtain::new(V2::new(170.0, 20.0), V2::new(86.0, 20.0)),
             draw_bg_tiles: false,
-            actors: Default::default(),
+            actor_controller,
             goto_next_t: None,
         }
     }
@@ -46,32 +49,20 @@ impl TitleScreen {
         self.left_curtain.tick(self.goto_next_t);
         self.right_curtain.tick(self.goto_next_t);
 
-        if false && self.t > 80 {
+        if self.t > self.goto_next_t.unwrap_or(self.t) {
             self.text_pos = crate::dan_lerp_v2(self.text_pos, V2::new(10.0, -50.0), 15.);
         }
 
         self.draw_bg_tiles = self.t > 100;
 
-        let music_time = 20;
-        let music_hit = self.t % music_time == 0;
-        let beat = self.t / music_time;
-        if (music_hit && beat % 2 == 0) {
-            self.actors.push(Actor::new(V2::new(20.0, 15.0), FroggyRand::new(self.t as u64)));
-        }
 
-        for actor in self.actors.iter_mut() {
-            actor.tick(music_hit);
-        }
+        self.actor_controller.tick();
 
-        // @Perf
-        let mut new_actors = self.actors.iter().filter(|x| x.alive()).cloned().collect();
-        std::mem::swap(&mut new_actors, &mut self.actors);
-
-        self.t < 100 + self.goto_next_t.unwrap_or(self.t)
+        self.t < 60 + self.goto_next_t.unwrap_or(self.t)
     }
 
     pub fn draw(&mut self) {
-        let fade_out_t = ((self.t as f32 - self.goto_next_t.map(|x| x as f32 + 40.0).unwrap_or(self.t as f32)) / 40.0).clamp(0.0, 1.0);
+        let fade_out_t = ((self.t as f32 - self.goto_next_t.map(|x| x as f32 + 20.0).unwrap_or(self.t as f32)) / 40.0).clamp(0.0, 1.0);
 
         unsafe {
             let mut col = crate::BLACK;
@@ -89,9 +80,7 @@ impl TitleScreen {
         self.left_curtain.draw();
         self.right_curtain.draw();
 
-        for actor in self.actors.iter() {
-            actor.draw();
-        }
+        self.actor_controller.draw();
 
         sprites::draw("champion", 0, self.text_pos.x, self.text_pos.y);
     }
@@ -260,8 +249,64 @@ impl Curtain {
         }
         */
 
+        // Pole
+        unsafe {
+            let p0 = self.rope_world.get_node(self.node_top_corner_center).pos;
+            let p1 = self.rope_world.get_node(self.node_top_corner_wall).pos;
+            raylib_sys::DrawLineV(
+                to_vector2(p0),
+                to_vector2(p1),
+                crate::BEIGE);
+        }
+
+        // Shadow
         let h = self.grid.len();
         let w = self.grid[0].len();
+
+        for x in 1..w {
+            let y = h - 1;
+            let mut top_left = self.rope_world.get_node(self.grid[y-1][x-1]).pos;
+            let mut top_right = self.rope_world.get_node(self.grid[y-1][x]).pos;
+            let mut bot_left = self.rope_world.get_node(self.grid[y][x-1]).pos;
+            let mut bot_right = self.rope_world.get_node(self.grid[y][x]).pos;
+
+            let offset = 6.0;
+            top_left.y += offset;
+            top_right.y += offset;
+            bot_left.y += offset;
+            bot_right.y += offset;
+
+            let col = crate::BLACK;
+            if (self.on_left) {
+                unsafe {
+                    raylib_sys::DrawTriangle(
+                        to_vector2(top_left),
+                        to_vector2(bot_left),
+                        to_vector2(top_right),
+                        col);
+                    raylib_sys::DrawTriangle(
+                        to_vector2(bot_right),
+                        to_vector2(top_right),
+                        to_vector2(bot_left),
+                        col);
+                }
+            }
+            else {
+                unsafe {
+                    raylib_sys::DrawTriangle(
+                        to_vector2(top_left),
+                        to_vector2(top_right),
+                        to_vector2(bot_left),
+                        col);
+                    raylib_sys::DrawTriangle(
+                        to_vector2(bot_right),
+                        to_vector2(bot_left),
+                        to_vector2(top_right),
+                        col);
+                }
+            }
+        }
+
         for y in 1..h {
             for x in 1..w {
                 let top_left = self.rope_world.get_node(self.grid[y-1][x-1]).pos;
@@ -309,17 +354,18 @@ impl Curtain {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Actor {
     skin: Skin,
     pos_grid: V2,
     pos_target: V2,
     image_index: i32,
     t_since_move: i32,
+    move_right: bool,
 }
 
 impl Actor {
-    pub fn new(pos_grid: V2, rand: FroggyRand) -> Self {
+    pub fn new(pos_grid: V2, move_right: bool, rand: FroggyRand) -> Self {
         let skin = rand.choose("skin", &g_all_skins);
         Self {
             skin: Skin::from_enum(*skin),
@@ -327,18 +373,24 @@ impl Actor {
             pos_target: pos_grid,
             image_index: 0,
             t_since_move: 0,
+            move_right,
         }
     }
 
     pub fn tick(&mut self, move_all: bool,) {
         if (move_all) {
             self.image_index = 0;
-            self.pos_target.x -= 1.0;
+            if self.move_right {
+                self.pos_target.x += 1.0;
+            }
+            else {
+                self.pos_target.x -= 1.0;
+            }
             self.t_since_move = 0;
         }
         else {
             self.t_since_move += 1;
-            if self.t_since_move < 8 {
+            if self.t_since_move < 6 {
                 self.image_index = self.t_since_move / 2;
             }
             else {
@@ -350,13 +402,57 @@ impl Actor {
     }
 
     pub fn alive(&self) -> bool {
-        self.pos_grid.x > -2.
+        if self.move_right {
+            self.pos_grid.x < 22.
+        }
+        else {
+            self.pos_grid.x > -2.
+        }
     }
 
     pub fn draw(&self) {
         let xx = self.pos_grid.x * 8.0;
         let yy = self.pos_grid.y * 8.0;
-        sprites::draw("shadow", 0, xx, yy + 2.0);
-        sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, xx, yy, true);
+        sprites::draw("shadow", 0, xx, yy);
+        sprites::draw_with_flip(&self.skin.sprite, self.image_index as usize, xx, yy - 2.0, !self.move_right);
+    }
+}
+
+#[derive(Default)]
+pub struct ActorController {
+    t: i32,
+    actors: Vec<Actor>,
+    pub spawn_positions_grid: Vec<(V2, bool)>,
+}
+
+impl ActorController {
+    pub fn tick(&mut self) {
+        self.t += 1;
+        let music_time = 20;
+        let music_hit = self.t % music_time == 0;
+        let beat = self.t / music_time;
+        if (music_hit && beat % 2 == 0) {
+            for (spawn_pos, walk_dir) in self.spawn_positions_grid.iter() {
+                self.actors.push(Actor::new(*spawn_pos, *walk_dir, FroggyRand::new(self.t as u64)));
+            }
+        }
+
+        for actor in self.actors.iter_mut() {
+            actor.tick(music_hit);
+        }
+
+        // @Perf
+        let mut new_actors = self.actors.iter().filter(|x| x.alive()).cloned().collect();
+        std::mem::swap(&mut new_actors, &mut self.actors);
+    }
+
+    pub fn reset(&mut self) {
+        self.actors.clear();
+    }
+
+    pub fn draw(&self) {
+        for actor in self.actors.iter() {
+            actor.draw();
+        }
     }
 }

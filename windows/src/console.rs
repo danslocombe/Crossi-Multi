@@ -570,7 +570,7 @@ fn do_win(args: &[&str], client: &mut Client) {
 }
 
 fn do_set_min_players(args: &[&str], client: &mut Client) {
-    if (args.len() > 1) {
+    if (args.len() != 1) {
         err!("Expected one arguments to 'min_players' got {}", args.len());
         return;
     }

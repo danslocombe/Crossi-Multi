@@ -1,7 +1,7 @@
 use std::u16;
 
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, title_screen::TitleScreen, BLACK, WHITE};
+use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -25,6 +25,8 @@ pub struct Client {
     pub player_input_controller: PlayerInputController,
 
     prev_rules: Option<CrossyRulesetFST>,
+
+    actor_controller: ActorController,
 }
 
 impl Client {
@@ -35,6 +37,10 @@ impl Client {
         //game_config.minimum_players = 1;
         let timeline = Timeline::from_seed(game_config, seed);
         let entities = EntityManager::new();
+
+        let mut actor_controller = ActorController::default();
+        actor_controller.spawn_positions_grid.push((V2::new(20.0, 17.0), false));
+        actor_controller.spawn_positions_grid.push((V2::new(0.0, 2.0), true));
 
         Self {
             debug,
@@ -50,7 +56,8 @@ impl Client {
             player_input_controller: PlayerInputController::default(),
             prev_rules: Default::default(),
             pause: None,
-            title_screen: Some(TitleScreen::default())
+            title_screen: Some(TitleScreen::default()),
+            actor_controller,
         }
     }
 
@@ -59,16 +66,20 @@ impl Client {
             return;
         }
 
+        let mut just_left_title = false;
         if let Some(title) = self.title_screen.as_mut() {
             if !title.tick() {
                 self.title_screen = None;
+                just_left_title = true;
             }
-            // @Hacky
-            self.camera.k = 100.0;
-            self.camera.y = -200.0;
-            self.camera.y_mod = -200.0;
-            self.camera.target_y = -200.0;
-            return;
+            else {
+                // @Hacky
+                self.camera.k = 100.0;
+                self.camera.y = -200.0;
+                self.camera.y_mod = -200.0;
+                self.camera.target_y = -200.0;
+                return;
+            }
         }
 
         let (inputs, new_players) = self.player_input_controller.tick(&mut self.timeline, &mut self.entities.players, &self.entities.outfit_switchers);
@@ -83,7 +94,7 @@ impl Client {
             //self.visual_effects.whiteout();
         //}
 
-        if (transitions.into_lobby) {
+        if (transitions.into_lobby && !just_left_title) {
             self.visual_effects.noise();
             self.visual_effects.whiteout();
             self.visual_effects.screenshake();
@@ -213,6 +224,13 @@ impl Client {
         self.entities.snowflakes.prune_dead(camera_y_max);
 
         self.prev_rules = Some(top.rules_state.clone().fst);
+
+        if let CrossyRulesetFST::Lobby { .. } = &top.rules_state.fst {
+            self.actor_controller.tick();
+        }
+        else {
+            self.actor_controller.reset();
+        }
     }
 
     pub unsafe fn draw(&mut self) {
@@ -344,7 +362,7 @@ impl Client {
 
         if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone } = &top.rules_state.fst {
             let x0 = 7.0 * 8.0;
-            let y0 = 14.0 * 8.0;
+            let y0 = 12.0 * 8.0;
             let w_base = 6.0 * 8.0;
             let h = 4.0 * 8.0;
 
@@ -366,6 +384,7 @@ impl Client {
         }
 
         self.big_text_controller.draw_lower();
+        self.actor_controller.draw();
 
         {
             // @Perf keep some list and insertion sort
@@ -603,7 +622,7 @@ fn create_outfit_switchers(rand: FroggyRand, timeline: &Timeline, players: &Enti
     let mut options = Vec::new();
     // Not very efficient but doesnt need to be.
     for x in 3..16 {
-        for y in 3..7 {
+        for y in 5..9 {
             options.push(CoordPos::new(x, y))
         }
     }
