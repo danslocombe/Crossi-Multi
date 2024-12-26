@@ -1,7 +1,7 @@
 use crossy_multi_core::{math::V2};
 use froggy_rand::FroggyRand;
 
-use crate::{client::VisualEffects, player_local::{g_all_skins, Skin}, rope::{self, ConstantForce, RopeWorld}, sprites, to_vector2};
+use crate::{audio, client::VisualEffects, player_local::{g_all_skins, Skin}, rope::{self, ConstantForce, RopeWorld}, sprites, to_vector2};
 
 pub struct TitleScreen {
     t: i32,
@@ -47,6 +47,7 @@ impl TitleScreen {
         };
 
         if (self.goto_next_t.is_none() && press) {
+            audio::play("car");
             visual_effects.screenshake();
             self.goto_next_t = Some(self.t);
         }
