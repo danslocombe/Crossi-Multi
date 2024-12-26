@@ -1,13 +1,16 @@
 use std::u16;
 
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, BLACK, WHITE};
+use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, title_screen::TitleScreen, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
     pub debug: bool,
     pub exit: bool,
     pub seed: String,
+
+    pub pause: Option<Pause>,
+    pub title_screen: Option<TitleScreen>,
 
     pub timeline: Timeline,
     pub camera: Camera,
@@ -46,10 +49,22 @@ impl Client {
             big_text_controller: Default::default(),
             player_input_controller: PlayerInputController::default(),
             prev_rules: Default::default(),
+            pause: None,
+            title_screen: Some(TitleScreen::default())
         }
     }
 
     pub fn tick(&mut self) {
+        if (self.pause.is_some()) {
+            return;
+        }
+
+        if let Some(title) = self.title_screen.as_mut() {
+            if !title.tick() {
+                self.title_screen = None;
+            }
+            return;
+        }
 
         let (inputs, new_players) = self.player_input_controller.tick(&mut self.timeline, &mut self.entities.players, &self.entities.outfit_switchers);
         self.timeline.tick(Some(inputs), TICK_INTERVAL_US);
@@ -199,10 +214,14 @@ impl Client {
 
         raylib_sys::BeginMode2D(self.camera.to_raylib());
 
+        //const bg_fill_col: raylib_sys::Color = hex_color("3c285d".as_bytes());
+        raylib_sys::ClearBackground(BLACK);
+
+        let draw_bg_tiles = self.title_screen.as_ref().map(|x| x.draw_bg_tiles).unwrap_or(true);
+
+        if (draw_bg_tiles)
         {
             // Draw background
-            const bg_fill_col: raylib_sys::Color = hex_color("3c285d".as_bytes());
-            raylib_sys::ClearBackground(bg_fill_col);
             const grass_col_0: raylib_sys::Color = hex_color("c4e6b5".as_bytes());
             const grass_col_1: raylib_sys::Color = hex_color("d1bfdb".as_bytes());
             const river_col_0: raylib_sys::Color = hex_color("6c6ce2".as_bytes());
@@ -339,6 +358,14 @@ impl Client {
         }
 
         raylib_sys::EndMode2D();
+
+        if let Some(pause) = self.pause.as_mut() {
+            // TODO
+        }
+
+        if let Some(title) = self.title_screen.as_mut() {
+            title.draw();
+        }
 
         self.big_text_controller.draw();
 
@@ -564,4 +591,8 @@ fn create_outfit_switchers(rand: FroggyRand, timeline: &Timeline, players: &Enti
         let switcher = outfit_switchers.create(Pos::Coord(*pos));
         switcher.skin = skin.player_skin;
     }
+}
+
+struct Pause {
+
 }

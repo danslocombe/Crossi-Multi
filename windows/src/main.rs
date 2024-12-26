@@ -9,6 +9,8 @@ mod client;
 mod bigtext;
 mod player_local;
 mod audio;
+mod rope;
+mod title_screen;
 
 use std::{mem::MaybeUninit};
 
@@ -145,6 +147,8 @@ fn main() {
                 if (client.screen_shader.enabled) {
                     raylib_sys::EndShaderMode();
                 }
+
+                raylib_sys::DrawFPS(raylib_sys::GetScreenWidth() - 100, 20);
                 /*
                 if let Some(editor) = client.game.editor.as_mut() {
                     gui_editor::draw_gui(&mut client.game.local_simulation.simulation, editor);
@@ -282,7 +286,7 @@ impl ScreenShader {
     }
 }
 fn dan_lerp_v2(p0: V2, p: V2, k: f32) -> V2 {
-    V2::new(dan_lerp(p0.x, p0.x, k), dan_lerp(p0.y, p.y, k))
+    V2::new(dan_lerp(p0.x, p.x, k), dan_lerp(p0.y, p.y, k))
 }
 
 fn dan_lerp(x0 : f32, x : f32, k : f32) -> f32 {
