@@ -41,8 +41,8 @@ impl Client {
         let entities = EntityManager::new();
 
         let mut actor_controller = ActorController::default();
-        actor_controller.spawn_positions_grid.push((V2::new(20.0, 17.0), false));
-        actor_controller.spawn_positions_grid.push((V2::new(0.0, 2.0), true));
+        //actor_controller.spawn_positions_grid.push((V2::new(20.0, 17.0), false));
+        actor_controller.spawn_positions_grid.push((V2::new(0.0, 3.0), true));
 
         Self {
             debug,
@@ -286,7 +286,7 @@ impl Client {
                 let y = row_with_y.y;
 
                 let (col_0, col_1) = match row.row_type {
-                    RowType::River(_) => {
+                    RowType::River(_) | RowType::LobbyRiver => {
                         (river_col_0, river_col_1)
                     },
                     RowType::Road(_) => {
@@ -332,6 +332,25 @@ impl Client {
                         sprites::draw("tree_top", 1, (19 - i) as f32 * 8.0, y as f32 * 8.0);
                     }
                     let hydrated = bush_descr.hydrate();
+                }
+
+                if let RowType::LobbyRiver = &row.row_type {
+                    for i in 8..12 {
+                        sprites::draw("log", 0, i as f32 * 8.0, y as f32 * 8.0);
+                    }
+                }
+
+                if let RowType::LobbyRiverBankLower = &row.row_type {
+                    for i in 0..20 {
+                        sprites::draw("tree_top", 1, i as f32 * 8.0, y as f32 * 8.0);
+                    }
+                }
+
+                if let RowType::LobbyMain = &row.row_type {
+                    let i = 1;
+                    sprites::draw("tree_top", 1, i as f32 * 8.0, y as f32 * 8.0);
+                    let i = 18;
+                    sprites::draw("tree_top", 1, i as f32 * 8.0, y as f32 * 8.0);
                 }
 
                 if let RowType::IcyRow(state) = &row.row_type {
@@ -381,6 +400,7 @@ impl Client {
         }
 
         if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone } = &top.rules_state.fst {
+            /*
             let x0 = 7.0 * 8.0;
             let y0 = 12.0 * 8.0;
             let w_base = 6.0 * 8.0;
@@ -401,6 +421,7 @@ impl Client {
                     height: h,
                 }, 1.0, BLACK);
             }
+            */
         }
 
         self.big_text_controller.draw_lower();

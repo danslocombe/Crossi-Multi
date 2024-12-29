@@ -50,7 +50,10 @@ pub enum RowType {
   StartingBarrier,
   Stands,
   Lobby,
+  LobbyRiver,
   LobbyStands,
+  LobbyMain,
+  LobbyRiverBankLower,
   IcyRow(IcyDescr),
 }
 
@@ -354,19 +357,47 @@ impl MapRound {
 
     fn generate_lobby(&mut self) {
         // One extra in lobby as we dont have the starting barrier
-        for i in 0..9 {
+        for i in 0..3 {
             self.rows.push_front(Row {
                 row_id : RowId(i),
-                row_type : RowType::LobbyStands,
+                row_type : RowType::LobbyRiverBankLower,
             });
         }
 
-        for i in 0..20 {
+        for i in 0..4 {
             self.rows.push_front(Row {
-                row_id : RowId(9 + i),
-                row_type: RowType::Lobby,
+                row_id : RowId(self.rows.len() as u32),
+                row_type : RowType::LobbyRiver,
+            });
+        }
+
+        //for i in 0..9 {
+        //    self.rows.push_front(Row {
+        //        row_id : RowId(i),
+        //        row_type : RowType::LobbyStands,
+        //    });
+        //}
+
+        for i in 0..10 {
+            self.rows.push_front(Row {
+                row_id : RowId(self.rows.len() as u32),
+                row_type: RowType::LobbyMain,
             })
         }
+
+        self.rows.push_front(Row {
+            row_id : RowId(self.rows.len() as u32),
+            row_type: RowType::Lobby,
+        });
+        self.rows.push_front(Row {
+            row_id : RowId(self.rows.len() as u32),
+            row_type: RowType::Lobby,
+        });
+
+        self.rows.push_front(Row {
+            row_id : RowId(self.rows.len() as u32),
+            row_type: RowType::LobbyRiverBankLower,
+        })
     }
 
     fn generate_to_y(&mut self, row_id_target : RowId) {
