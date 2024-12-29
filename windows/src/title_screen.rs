@@ -4,12 +4,12 @@ use froggy_rand::FroggyRand;
 use crate::{audio, client::VisualEffects, player_local::{g_all_skins, Skin}, rope::{self, ConstantForce, RopeWorld}, sprites, to_vector2};
 
 pub struct TitleScreen {
-    t: i32,
+    pub t: i32,
     text_pos: V2,
     left_curtain: Curtain,
     right_curtain: Curtain,
 
-    goto_next_t: Option<i32>,
+    pub goto_next_t: Option<i32>,
 
     pub draw_bg_tiles: bool,
 
@@ -18,23 +18,25 @@ pub struct TitleScreen {
 
 impl Default for TitleScreen {
     fn default() -> Self {
-        let mut actor_controller = ActorController::default();
-        actor_controller.spawn_positions_grid.push((V2::new(20.0, 15.0), false));
+        {
+            let mut actor_controller = ActorController::default();
+            actor_controller.spawn_positions_grid.push((V2::new(20.0, 15.0), false));
 
-        Self {
-            t: 0,
-            text_pos: V2::new(10.0, 60.0),
-            left_curtain: Curtain::new(V2::new(-10.0, 20.0), V2::new(84.0, 20.0)),
-            right_curtain: Curtain::new(V2::new(170.0, 20.0), V2::new(86.0, 20.0)),
-            draw_bg_tiles: false,
-            actor_controller,
-            goto_next_t: None,
+            Self {
+                t: 0,
+                text_pos: V2::new(10.0, 60.0),
+                left_curtain: Curtain::new(V2::new(-10.0, 20.0), V2::new(84.0, 20.0)),
+                right_curtain: Curtain::new(V2::new(170.0, 20.0), V2::new(86.0, 20.0)),
+                draw_bg_tiles: false,
+                actor_controller,
+                goto_next_t: None,
+            }
         }
     }
 }
 
 impl TitleScreen {
-    pub fn tick(&mut self, visual_effects: &mut VisualEffects) -> bool {
+    pub fn tick(&mut self, visual_effects: &mut VisualEffects, music_current_time_in_secs: f32) -> bool {
         if (self.t == 0) {
             //visual_effects.screenshake();
         }
@@ -61,8 +63,7 @@ impl TitleScreen {
 
         self.draw_bg_tiles = self.t > 100;
 
-
-        self.actor_controller.tick();
+        self.actor_controller.tick(music_current_time_in_secs);
 
         self.t < 60 + self.goto_next_t.unwrap_or(self.t)
     }
@@ -88,7 +89,7 @@ impl TitleScreen {
 
         self.actor_controller.draw();
 
-        sprites::draw("champion", 0, self.text_pos.x, self.text_pos.y);
+        sprites::draw("roadtoads", 0, self.text_pos.x, self.text_pos.y);
     }
 }
 
@@ -396,14 +397,14 @@ impl Actor {
         }
         else {
             self.t_since_move += 1;
-            if self.t_since_move < 6 {
-                self.image_index = self.t_since_move / 2;
+            if self.t_since_move < 8 {
+                self.image_index = self.t_since_move / 4;
             }
             else {
                 self.image_index = 0;
             }
 
-            self.pos_grid = crate::dan_lerp_v2(self.pos_grid, self.pos_target, 3.0);
+            self.pos_grid = crate::dan_lerp_v2(self.pos_grid, self.pos_target, 4.0);
         }
     }
 
@@ -427,17 +428,33 @@ impl Actor {
 #[derive(Default)]
 pub struct ActorController {
     t: i32,
+    t_music: f32,
+    beat: i32,
     actors: Vec<Actor>,
     pub spawn_positions_grid: Vec<(V2, bool)>,
 }
 
 impl ActorController {
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, music_current_time_in_secs: f32) {
         self.t += 1;
-        let music_time = 20;
-        let music_hit = self.t % music_time == 0;
-        let beat = self.t / music_time;
-        if (music_hit && beat % 2 == 0) {
+
+        // Small offset so characters are moving on the beat.
+        let t_music = music_current_time_in_secs - 0.15;
+
+        let bps = 60.0 / 100.0;
+        let k = 4.0 * bps;
+        let prev_rounded = (self.t_music * k).floor();
+        let cur_rounded = (t_music * k).floor();
+
+        let music_hit = cur_rounded != prev_rounded;
+
+        if (music_hit) {
+            self.beat += 1;
+        }
+
+        self.t_music = t_music;
+
+        if (music_hit && self.beat % 2 == 0) {
             for (spawn_pos, walk_dir) in self.spawn_positions_grid.iter() {
                 self.actors.push(Actor::new(*spawn_pos, *walk_dir, FroggyRand::new(self.t as u64)));
             }

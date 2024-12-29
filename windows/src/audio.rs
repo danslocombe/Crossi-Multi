@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, mem::{MaybeUninit}};
 
 static mut g_muted: bool = false;
 static mut g_sfx_volume: f32 = 0.2;
-static mut g_music_volume: f32 = 0.3;
+static mut g_music_volume: f32 = 0.6;
 
 static mut SFX: MaybeUninit<BTreeMap<String, Sound>> = MaybeUninit::uninit();
 
@@ -33,6 +33,8 @@ pub fn init_audio() {
         load_sfx("snd_mouse_win_2.wav", 1.0);
         load_sfx("snd_win.wav", 1.0);
         load_sfx("snd_viper.mp3", 1.0);
+
+        //load_music("mus_jump_at_sun_3.mp3", 1.0);
     }
 }
 
@@ -47,6 +49,31 @@ fn load_sfx(filename: &str, base_volume: f32) {
         let sound = raylib_sys::LoadSound(filename_c);
 
         raylib_sys::SetSoundVolume(sound, base_volume * g_sfx_volume);
+
+        let path = std::path::Path::new(&path);
+        let mut name = path.file_stem().unwrap().to_str().unwrap();
+        if name.starts_with("snd_") {
+            name = &name["snd_".len()..];
+        }
+
+        SFX.assume_init_mut().insert(name.to_owned(), Sound {
+            sound,
+            base_volume,
+        });
+    }
+}
+
+// @Dedup with above
+fn load_music(filename: &str, base_volume: f32) {
+    let path_base = "../web-client/static/sounds";
+    let path = format!("{}/{}", path_base, filename);
+    println!("Loading {}", path);
+
+    unsafe {
+        let filename_c = crate::c_str_temp(&path);
+        let sound = raylib_sys::LoadSound(filename_c);
+
+        raylib_sys::SetSoundVolume(sound, base_volume * g_music_volume);
 
         let path = std::path::Path::new(&path);
         let mut name = path.file_stem().unwrap().to_str().unwrap();

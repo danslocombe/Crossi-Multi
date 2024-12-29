@@ -27,6 +27,8 @@ pub struct Client {
     prev_rules: Option<CrossyRulesetFST>,
 
     actor_controller: ActorController,
+
+    bg_music: TitleBGMusic,
 }
 
 impl Client {
@@ -58,10 +60,13 @@ impl Client {
             pause: None,
             title_screen: Some(TitleScreen::default()),
             actor_controller,
+            bg_music: TitleBGMusic::new(),
         }
     }
 
     pub fn tick(&mut self) {
+        self.bg_music.tick();
+
         if (self.pause.is_some()) {
             return;
         }
@@ -70,7 +75,14 @@ impl Client {
 
         let mut just_left_title = false;
         if let Some(title) = self.title_screen.as_mut() {
-            if !title.tick(&mut self.visual_effects) {
+            if (title.t - title.goto_next_t.unwrap_or(title.t) > 10) {
+                self.bg_music.mode = BGMusicMode::FadingOutLowpass;
+            }
+            else {
+                self.bg_music.mode = BGMusicMode::Lowpassed;
+            }
+
+            if !title.tick(&mut self.visual_effects, self.bg_music.current_time_in_secs()) {
                 self.title_screen = None;
                 just_left_title = true;
             }
@@ -81,6 +93,14 @@ impl Client {
                 self.camera.y_mod = -200.0;
                 self.camera.target_y = -200.0;
                 return;
+            }
+        }
+        else {
+            if let CrossyRulesetFST::Lobby { .. } = &self.timeline.top_state().rules_state.fst {
+                self.bg_music.mode = BGMusicMode::Normal;
+            }
+            else {
+                self.bg_music.mode = BGMusicMode::Paused;
             }
         }
 
@@ -226,7 +246,7 @@ impl Client {
         self.prev_rules = Some(top.rules_state.clone().fst);
 
         if let CrossyRulesetFST::Lobby { .. } = &top.rules_state.fst {
-            self.actor_controller.tick();
+            self.actor_controller.tick(self.bg_music.current_time_in_secs());
         }
         else {
             self.actor_controller.reset();
@@ -646,4 +666,112 @@ fn create_outfit_switchers(rand: FroggyRand, timeline: &Timeline, players: &Enti
 
 struct Pause {
 
+}
+
+#[derive(Debug)]
+enum BGMusicMode {
+    Lowpassed,
+    FadingOutLowpass,
+    Normal,
+    Paused,
+}
+
+struct TitleBGMusic {
+    pub music: raylib_sys::Music,
+    pub mode: BGMusicMode,
+
+    // Note this should not be relied on, its just to avoid perf issues.
+    // repeatedly trying to fetch state.
+    pub playing_unsynced: bool,
+}
+
+impl TitleBGMusic {
+    pub fn new() -> Self {
+        let music = unsafe {
+            let mut music = raylib_sys::LoadMusicStream(crate::c_str_leaky("../web-client/static/sounds/mus_jump_at_sun_3.mp3"));
+            raylib_sys::SetMusicVolume(music, 0.6);
+            music.looping = true;
+            raylib_sys::AttachAudioStreamProcessor(music.stream, Some(rl_low_pass));
+            music
+        };
+
+        Self {
+            music,
+            mode: BGMusicMode::Paused,
+            playing_unsynced: false,
+        }
+    }
+
+    pub fn current_time_in_secs(&self) -> f32 {
+        unsafe {
+            raylib_sys::GetMusicTimePlayed(self.music)
+        }
+    }
+
+    pub fn tick(&mut self) {
+        match self.mode {
+            BGMusicMode::Lowpassed => {
+                unsafe {
+                    LP_FREQ = dan_lerp(LP_FREQ, 100.0, 10.0);
+                }
+            },
+            BGMusicMode::FadingOutLowpass => {
+                unsafe {
+                    LP_FREQ = dan_lerp(LP_FREQ, 50_000.0, 500.0);
+                }
+            },
+            BGMusicMode::Normal => {
+                unsafe {
+                    LP_FREQ = dan_lerp(LP_FREQ, 50_000.0, 10.0);
+                }
+            },
+            _ => {},
+        }
+
+        match self.mode {
+            BGMusicMode::Paused => {
+                unsafe {
+                    if self.playing_unsynced {
+                        raylib_sys::PauseMusicStream(self.music);
+                        self.playing_unsynced = false;
+                    }
+                }
+            },
+            _ => {
+                unsafe {
+                    if !self.playing_unsynced {
+                        raylib_sys::PlayMusicStream(self.music);
+                        self.playing_unsynced = true;
+                    }
+                }
+            },
+        }
+
+        unsafe {
+            raylib_sys::UpdateMusicStream(self.music);
+        }
+    }
+}
+
+static mut LP_DATA: [f32;2] = [0.0, 0.0];
+static mut LP_FREQ: f32 = 100.0;
+
+unsafe extern "C" fn rl_low_pass(buffer_void: *mut ::std::os::raw::c_void, frames: ::std::os::raw::c_uint) {
+    let cutoff = LP_FREQ / 44100.0; // 70 Hz lowpass filter
+    let k = cutoff / (cutoff + 0.1591549431); // RC filter formula
+
+    // Converts the buffer data before using it
+    let buffer_raw : *mut f32 = buffer_void.cast();
+    let buffer = std::slice::from_raw_parts_mut(buffer_raw, frames as usize * 2);
+    for i in 0..(frames as usize) {
+        let index = i * 2;
+
+        let l = buffer[index];
+        let r = buffer[index+1];
+
+        LP_DATA[0] += k * (l - LP_DATA[0]);
+        LP_DATA[1] += k * (r - LP_DATA[1]);
+        buffer[index] = LP_DATA[0];
+        buffer[index + 1] = LP_DATA[1];
+    }
 }
