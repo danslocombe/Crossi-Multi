@@ -321,8 +321,13 @@ impl Curtain {
                 let bot_left = self.rope_world.get_node(self.grid[y][x-1]).pos;
                 let bot_right = self.rope_world.get_node(self.grid[y][x]).pos;
 
+                const curtain_lighter: raylib_sys::Color = crate::hex_color("e94476".as_bytes());
+                const curtain_darker: raylib_sys::Color = crate::hex_color("be3d64".as_bytes());
+
                 let col = if x % 2 == 0 {
-                    crate::PURPLE
+                    //crate::PURPLE
+                    //curtain_lighter
+                    curtain_darker
                 }
                 else {
                     crate::RED
