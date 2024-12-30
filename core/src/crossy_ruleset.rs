@@ -191,7 +191,7 @@ impl CrossyRulesetFST
 
                 if bypass || (enough_players && all_in_ready_zone) {
                     //if bypass || (*time_with_all_players_in_ready_zone > 120) { 
-                    if bypass || (*time_with_all_players_in_ready_zone > 16) { 
+                    if bypass || (*time_with_all_players_in_ready_zone > 40) { 
                         if (*raft_pos > 20.0) {
                             debug_log!("Starting Game! ...");
                             debug_log!("Player States {:?}", player_states);
@@ -212,7 +212,7 @@ impl CrossyRulesetFST
                         else {
                             Lobby{
                                 time_with_all_players_in_ready_zone: time_with_all_players_in_ready_zone + 1,
-                                raft_pos: *raft_pos + 0.06,
+                                raft_pos: *raft_pos + 0.05,
                             }
                         }
                     }
