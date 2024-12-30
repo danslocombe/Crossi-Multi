@@ -190,35 +190,43 @@ impl CrossyRulesetFST
                 //println!("All in ready zone {}, enough players {}", all_in_ready_zone, enough_players);
 
                 if bypass || (enough_players && all_in_ready_zone) {
-                    if bypass || (*time_with_all_players_in_ready_zone > 120) { 
+                    //if bypass || (*time_with_all_players_in_ready_zone > 120) { 
+                    if bypass || (*time_with_all_players_in_ready_zone > 16) { 
+                        if (*raft_pos > 20.0) {
+                            debug_log!("Starting Game! ...");
+                            debug_log!("Player States {:?}", player_states);
 
-                        debug_log!("Starting Game! ...");
-                        debug_log!("Player States {:?}", player_states);
+                            // Initialize to all zero
+                            let win_counts = PlayerIdMap::seed_from(player_states, 0);
+                            let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
+                            reset_positions(player_states, ResetPositionTarget::RacePositions);
 
-                        // Initialize to all zero
-                        let win_counts = PlayerIdMap::seed_from(player_states, 0);
-                        let alive_states = PlayerIdMap::seed_from(player_states, AliveState::Alive);
-                        reset_positions(player_states, ResetPositionTarget::RacePositions);
-
-                        RoundWarmup(WarmupState {
-                            win_counts,
-                            alive_states,
-                            remaining_us : INTRO_COUNTDOWN_TIME_US,
-                            time_full_us: INTRO_COUNTDOWN_TIME_US,
-                            round_id : 1,
-                        })
+                            RoundWarmup(WarmupState {
+                                win_counts,
+                                alive_states,
+                                remaining_us : INTRO_COUNTDOWN_TIME_US,
+                                time_full_us: INTRO_COUNTDOWN_TIME_US,
+                                round_id : 1,
+                            })
+                        }
+                        else {
+                            Lobby{
+                                time_with_all_players_in_ready_zone: time_with_all_players_in_ready_zone + 1,
+                                raft_pos: *raft_pos + 0.06,
+                            }
+                        }
                     }
                     else {
                         Lobby{
                             time_with_all_players_in_ready_zone: time_with_all_players_in_ready_zone + 1,
-                            raft_pos: *raft_pos,
+                            raft_pos: dan_lerp(*raft_pos, 8.0, 50.0),
                         }
                     }
                 }
                 else {
                     Lobby{
                         time_with_all_players_in_ready_zone: (*time_with_all_players_in_ready_zone as f32 * 0.8).round() as u32,
-                        raft_pos: *raft_pos,
+                        raft_pos: dan_lerp(*raft_pos, 8.0, 50.0),
                     }
                 }
             },
@@ -546,6 +554,7 @@ pub const LOBBY_READ_ZONE_Y_MIN : i32 = 12;
 pub const LOBBY_READ_ZONE_Y_MAX : i32 = 15;
 
 pub fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
+    /*
     if let Pos::Coord(CoordPos{x, y}) = player.pos {
         x >= LOBBY_READ_ZONE_X_MIN && x <= LOBBY_READ_ZONE_X_MAX 
         &&
@@ -555,4 +564,18 @@ pub fn player_in_lobby_ready_zone(player : &PlayerState) -> bool {
     {
         false
     }
+    */
+
+    // In raft
+    if let Pos::Lillipad(_lilly) = player.pos {
+        true
+    }
+    else {
+        false
+    }
+}
+
+// @Dedup
+fn dan_lerp(x0 : f32, x : f32, k : f32) -> f32 {
+    (x0 * (k-1.0) + x) / k
 }

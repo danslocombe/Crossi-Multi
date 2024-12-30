@@ -2,7 +2,7 @@ use raylib_sys::Color;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crossy_multi_core::{crossy_ruleset::{AliveState, CrossyRulesetFST, GameConfig, RulesState}, game, map::{Map, RowType}, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, GameState, Input, PlayerId, PlayerInputs, Pos};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, RulesState}, map::{Map, RowType}, math::V2, CoordPos, PlayerId, Pos};
 use froggy_rand::FroggyRand;
 
 use crate::{client::StateTransition, player_local::{PlayerLocal, PlayerSkin, Skin}, sprites};
@@ -167,7 +167,7 @@ impl PropController {
 
         let rows = map.get_row_view(rules_state.fst.get_round_id(), screen_y);
         for row in &rows {
-            if let RowType::IcyRow(icy_state) = &row.row.row_type {
+            if let RowType::IcyRow(_icy_state) = &row.row.row_type {
                 if rand.gen_unit((self.t, row.y, "snow")) < 0.01 {
                     let x = rand.gen_unit((self.t, row.y, "x")) as f32 * 160.0;
                     entities.snowflakes.create(Pos::Absolute(V2::new(x, row.y as f32 * 8.0 - 32.0)));
@@ -193,6 +193,7 @@ pub enum EntityType {
     Crown,
     Snowflake,
     OutfitSwitcher,
+    RaftSail,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -340,6 +341,7 @@ pub struct EntityManager {
     pub crowns: EntityContainer<Crown>,
     pub snowflakes: EntityContainer<Snowflake>,
     pub outfit_switchers: EntityContainer<OutfitSwitcher>,
+    pub raft_sails: EntityContainer<RaftSail>,
 }
 
 macro_rules! map_over_entity {
@@ -356,6 +358,7 @@ macro_rules! map_over_entity {
             EntityType::Crown => $self.crowns.$f($e),
             EntityType::Snowflake => $self.snowflakes.$f($e),
             EntityType::OutfitSwitcher => $self.outfit_switchers.$f($e),
+            EntityType::RaftSail => $self.raft_sails.$f($e),
             EntityType::Unknown => {
                 panic!()
             }
@@ -377,6 +380,7 @@ impl EntityManager {
             crowns: EntityContainer::<Crown>::new(EntityType::Crown),
             snowflakes: EntityContainer::<Snowflake>::new(EntityType::Snowflake),
             outfit_switchers: EntityContainer::<OutfitSwitcher>::new(EntityType::OutfitSwitcher),
+            raft_sails: EntityContainer::<RaftSail>::new(EntityType::RaftSail),
         }
     }
 
@@ -669,6 +673,22 @@ impl OutfitSwitcher {
             pos,
             t: 0,
             skin: PlayerSkin::Frog,
+        }
+    }
+}
+
+pub struct RaftSail {
+    pub id : i32,
+    pub pos: V2,
+    pub t: i32,
+}
+
+impl RaftSail {
+    pub fn new(id: i32, pos: V2) -> Self {
+        Self {
+            id,
+            pos,
+            t: 0,
         }
     }
 }
@@ -1089,6 +1109,51 @@ impl IsEntity for OutfitSwitcher {
             }
             sprites::draw(&skin.sprite, 0, xx, yy);
         }
+    }
+
+    fn alive(&self, _camera_y_max: f32) -> bool {
+        true
+    }
+}
+
+impl IsEntity for RaftSail {
+    fn create(e: Entity) -> Self {
+        Self::new(e.id, e.pos.get_abs())
+    }
+
+    fn get(&self) -> Entity {
+        Entity {
+            id: self.id,
+            entity_type: EntityType::RaftSail,
+            pos: Pos::Absolute(self.pos),
+        }
+    }
+
+    fn set_pos(&mut self, pos : Pos) {
+        if let Pos::Absolute(p) = pos {
+            self.pos = p;
+        }
+    }
+
+    fn get_depth(&self) -> i32 {
+        self.pos.y as i32 + 40 - 8
+    }
+
+    fn draw(&mut self) {
+        self.t += 1;
+        {
+            let xx = self.pos.x;
+            let yy = self.pos.y;
+            sprites::draw("raft", 0, xx, yy);
+        }
+
+        //unsafe {
+        //    let text = crate::c_str_temp(&format!("{} / {}", 0, 2));
+        //    //let pos = V2::new(*raft_pos as f32 * 8.0 + 16.0, y as f32 * 8.0);
+        //    let pos = self.pos + V2::new(0.0, 4.0) * 8.0;
+        //    raylib_sys::DrawTextEx(crate::FONT_m3x6.assume_init_read(), text, crate::to_vector2(pos), 16.0, 1.0, crate::WHITE);
+        //    //raylib_sys::DrawText(text, pos.x as i32, pos.y as i32, 6, crate::WHITE);
+        //}
     }
 
     fn alive(&self, _camera_y_max: f32) -> bool {

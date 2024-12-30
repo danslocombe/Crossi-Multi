@@ -1,7 +1,7 @@
 use std::u16;
 
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, game, map::RowType, math::V2, player::{PlayerState, PlayerStatePublic}, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, Prop, PropController, Spectator}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
+use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -122,6 +122,13 @@ impl Client {
             self.visual_effects.screenshake();
         }
 
+        if (transitions.leaving_lobby) {
+            self.visual_effects.noise();
+            self.visual_effects.whiteout();
+            self.visual_effects.screenshake();
+            audio::play("car");
+        }
+
         if (transitions.into_round_warmup) {
             self.visual_effects.noise();
         }
@@ -223,6 +230,7 @@ impl Client {
         // Should cars be ephemeral actors?
         self.entities.cars.inner.clear();
         self.entities.lillipads.inner.clear();
+        self.entities.raft_sails.inner.clear();
         //let rows = self.timeline.map.get_row_view(top.get_round_id(), top.rules_state.fst.get_screen_y());
         let pub_cars = self.timeline.map.get_cars(top.get_round_id(), top.time_us);
         for pub_car in pub_cars {
@@ -243,6 +251,12 @@ impl Client {
                 pos: Pos::Absolute(V2::new(pub_lilly.0 as f32 * 8.0, pub_lilly.1 as f32 * 8.0)),
             });
             let lilly = self.entities.lillipads.get_mut(lilly_id).unwrap();
+        }
+
+        if let CrossyRulesetFST::Lobby { raft_pos, .. } = &top.rules_state.fst {
+            let pos = V2::new(*raft_pos, 10.0) * 8.0;
+            //sprites::draw("raft", 0, 8.0 * 8.0, 10.0 * 8.0);
+            self.entities.raft_sails.create(Pos::Absolute(pos));
         }
 
         self.big_text_controller.tick(&self.timeline, &self.entities.players, &transitions, &new_players, self.camera.y);
@@ -346,8 +360,19 @@ impl Client {
                 }
 
                 if let RowType::LobbyRiver = &row.row_type {
-                    for i in 8..12 {
-                        sprites::draw("log", 0, i as f32 * 8.0, y as f32 * 8.0);
+                    if let CrossyRulesetFST::Lobby { raft_pos, time_with_all_players_in_ready_zone } = &top.rules_state.fst {
+                        for i in 0..4 {
+                            sprites::draw("log", 0, (*raft_pos as f32 + i as f32) * 8.0, y as f32 * 8.0);
+                        }
+
+                        //if (*time_with_all_players_in_ready_zone == 0) {
+                        //    unsafe {
+                        //        let text = crate::c_str_temp(&format!("{} / {}", 0, 2));
+                        //        let pos = V2::new(*raft_pos as f32 * 8.0 + 16.0, y as f32 * 8.0);
+                        //        raylib_sys::DrawTextEx(crate::FONT_m3x6.assume_init_read(), text, crate::to_vector2(pos), 12.0, 1.0, crate::WHITE);
+                        //        //raylib_sys::DrawText(text, pos.x as i32, pos.y as i32, 6, crate::WHITE);
+                        //    }
+                        //}
                     }
                 }
 
@@ -410,9 +435,31 @@ impl Client {
             }
         }
 
-        if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone, .. } = &top.rules_state.fst {
+        if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone, raft_pos } = &top.rules_state.fst {
             // @Hack
-            sprites::draw("raft", 0, 8.0 * 8.0, 10.0 * 8.0);
+            //sprites::draw("raft", 0, 8.0 * 8.0, 10.0 * 8.0);
+
+            let players_in_ready_zone = top.player_states.iter().filter(|(_, x)| crossy_multi_core::crossy_ruleset::player_in_lobby_ready_zone(x)).count();
+            let total_player_count = top.player_states.count_populated();
+            //let players_in_
+
+            if (total_player_count >= top.rules_state.config.minimum_players as usize)
+            {
+                let pos = V2::new(*raft_pos, 10.0) * 8.0 + V2::new(1.0, 6.0) * 8.0;
+                let image_index = players_in_ready_zone + 1;
+                if (image_index > 9) {
+                    // error aahhhh
+                    // @Todo cap number of players
+                }
+                else {
+                    sprites::draw("font_linsenn_m5x7_numbers", image_index, pos.x, pos.y);
+                }
+                let pos = pos + V2::new(6.0, 0.0);
+                sprites::draw("font_linsenn_m5x7_numbers", 0, pos.x, pos.y);
+                let pos = pos + V2::new(6.0, 0.0);
+                let image_index = total_player_count + 1;
+                sprites::draw("font_linsenn_m5x7_numbers", image_index, pos.x, pos.y);
+            }
 
             /*
             let x0 = 7.0 * 8.0;
@@ -642,6 +689,8 @@ pub struct StateTransition {
     pub into_round: bool,
     pub into_round_cooldown: bool,
     pub into_winner: bool,
+
+    pub leaving_lobby: bool,
 }
 
 impl StateTransition {
@@ -650,6 +699,10 @@ impl StateTransition {
         transitions.into_lobby = 
             matches!(current, CrossyRulesetFST::Lobby { .. })
             && !matches!(prev, Some(CrossyRulesetFST::Lobby { .. }));
+        transitions.leaving_lobby = 
+            !matches!(current, CrossyRulesetFST::Lobby { .. })
+            && matches!(prev, Some(CrossyRulesetFST::Lobby { .. }));
+
         transitions.into_round_warmup = 
             matches!(current, CrossyRulesetFST::RoundWarmup { .. })
             && !matches!(prev, Some(CrossyRulesetFST::RoundWarmup { .. }));
@@ -662,6 +715,7 @@ impl StateTransition {
         transitions.into_winner = 
             matches!(current, CrossyRulesetFST::EndWinner { .. })
             && !matches!(prev, Some(CrossyRulesetFST::EndWinner { .. }));
+
 
         transitions
     }

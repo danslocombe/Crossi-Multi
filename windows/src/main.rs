@@ -20,6 +20,8 @@ use crossy_multi_core::math::V2;
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 
+//static mut FONT_m3x6: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
+
 pub fn c_str_temp(s: &str) -> *const i8 {
     unsafe {
         c_string_temp_allocator.assume_init_mut().alloc(s)
@@ -85,6 +87,8 @@ fn main() {
             let ptr = std::ptr::from_ref(&*blah);
             std::mem::transmute::<_, usize>(ptr)
         };
+
+        //FONT_m3x6 = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/m5x7.ttf")));
 
         let mut client = Client::new(debug_param, &format!("{}", seed));
 
