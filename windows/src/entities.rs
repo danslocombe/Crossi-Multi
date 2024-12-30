@@ -5,7 +5,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, RulesState}, map::{Map, RowType}, math::V2, CoordPos, PlayerId, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::StateTransition, player_local::{PlayerLocal, PlayerSkin, Skin}, sprites};
+use crate::{client::StateTransition, hex_color, player_local::{PlayerLocal, PlayerSkin, Skin}, rope::RopeWorld, sprites, to_vector2};
 
 pub struct PropController {
     gen_to : i32,
@@ -142,6 +142,27 @@ impl PropController {
             match &row.row_type {
                 RowType::Path{wall_width} => {
                     for xu in *wall_width..(19-*wall_width) {
+                        let x = xu as i32;
+                        if rand.gen_unit((x, self.gen_to, "prop")) < 0.15 {
+                            let pos = Pos::new_coord(x as i32, self.gen_to);
+                            //println!("Pos wallwidth {} {} {:?}", *wall_width, xu, pos);
+                            let prop_id = entities.create_entity(Entity {
+                                id: 0,
+                                entity_type: EntityType::Prop,
+                                pos,
+                            });
+                            let foliage = entities.props.get_mut(prop_id).unwrap();
+                            foliage.sprite = "foliage";
+                            let image_count = sprites::get_sprite("foliage").len();
+                            foliage.image_index = (rand.gen_unit((x, self.gen_to, "ii")) * image_count as f64).floor() as i32;
+                            foliage.dynamic_depth = Some(-100.0);
+                        }
+                    }
+                },
+                RowType::LobbyMain => {
+                    // @Dedup with above
+                    // Copypaste
+                    for xu in 1..18 {
                         let x = xu as i32;
                         if rand.gen_unit((x, self.gen_to, "prop")) < 0.15 {
                             let pos = Pos::new_coord(x as i32, self.gen_to);
@@ -680,7 +701,11 @@ impl OutfitSwitcher {
 pub struct RaftSail {
     pub id : i32,
     pub pos: V2,
+    //pub prev_pos: V2,
     pub t: i32,
+    pub rope_world: RopeWorld,
+    pub wind_norm: f32,
+    pub grid: Vec<Vec<usize>>,
 }
 
 impl RaftSail {
@@ -688,7 +713,11 @@ impl RaftSail {
         Self {
             id,
             pos,
+            //prev_pos: pos,
             t: 0,
+            rope_world: Default::default(),
+            wind_norm: 0.0,
+            grid: Default::default(),
         }
     }
 }
@@ -1142,9 +1171,93 @@ impl IsEntity for RaftSail {
     fn draw(&mut self) {
         self.t += 1;
         {
-            let xx = self.pos.x - 4.0;
+            //let xx = self.pos.x - 4.0;
+            let xx = self.pos.x + 2.0;
             let yy = self.pos.y + 8.0;
+            //sprites::draw("raft_sail_frame", 0, xx, yy);
             sprites::draw("raft", 0, xx, yy);
+        }
+
+        unsafe {
+            //raylib_sys::DrawCircleLinesV(to_vector2(self.pos), 3.0, crate::WHITE);
+            //for n in self.rope_world.nodes.iter() {
+            //    let pos = n.pos + self.pos;
+            //    println!("Drawing {}", pos);
+            //    raylib_sys::DrawCircleLinesV(to_vector2(pos), 3.0, crate::WHITE);
+            //}
+
+            let base_pos = self.pos + V2::new(2.0, 16.0);
+
+            const brown_frame: raylib_sys::Color = crate::hex_color("8f563b".as_bytes());
+            raylib_sys::DrawLineV(to_vector2(base_pos), to_vector2(base_pos + V2::new(0.0, 16.0)), brown_frame);
+
+            for edge in self.rope_world.ropes.iter() {
+                let from_pos = base_pos + self.rope_world.nodes[edge.from].pos;
+                let to_pos = base_pos + self.rope_world.nodes[edge.to].pos;
+                raylib_sys::DrawLineV(to_vector2(from_pos), to_vector2(to_pos), crate::WHITE);
+            }
+
+            // @Dedup copypasted from curtains
+
+            let h = self.grid.len();
+            let w = self.grid[0].len();
+            for y in 1..h {
+                for x in 1..w {
+                    let top_left = base_pos + self.rope_world.get_node(self.grid[y-1][x-1]).pos;
+                    let top_right = base_pos + self.rope_world.get_node(self.grid[y-1][x]).pos;
+                    let bot_left = base_pos + self.rope_world.get_node(self.grid[y][x-1]).pos;
+                    let bot_right = base_pos + self.rope_world.get_node(self.grid[y][x]).pos;
+
+                    let col_a = if (x + y) % 2 == 0 {
+                        //crate::PURPLE
+                        //curtain_lighter
+                        crate::WHITE
+                        //curtain_darker
+                    }
+                    else {
+                        crate::GREEN
+                    };
+
+                    let col_b = if (x + y) % 2 == 0 {
+                        //crate::PURPLE
+                        //curtain_lighter
+                        crate::WHITE
+                        //curtain_darker
+                    }
+                    else {
+                        crate::RED
+                    };
+
+                    //if false {
+                        unsafe {
+                            raylib_sys::DrawTriangle(
+                                to_vector2(top_left),
+                                to_vector2(bot_left),
+                                to_vector2(top_right),
+                                col_b);
+                            raylib_sys::DrawTriangle(
+                                to_vector2(bot_right),
+                                to_vector2(top_right),
+                                to_vector2(bot_left),
+                                col_b);
+                        }
+                    //}
+                    //else {
+                        unsafe {
+                            raylib_sys::DrawTriangle(
+                                to_vector2(top_left),
+                                to_vector2(top_right),
+                                to_vector2(bot_left),
+                                col_a);
+                            raylib_sys::DrawTriangle(
+                                to_vector2(bot_right),
+                                to_vector2(bot_left),
+                                to_vector2(top_right),
+                                col_a);
+                        }
+                    //}
+                }
+            }
         }
 
         //unsafe {

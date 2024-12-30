@@ -634,6 +634,12 @@ impl Row {
                 // @FIXME allow going around the top
                 outside_walls(x, STANDS_WIDTH)
             }
+            RowType::Lobby | RowType::LobbyRiverBankLower => {
+                true
+            }
+            RowType::LobbyMain => {
+                outside_walls(x, 1)
+            }
             _ => false,
         }
     }

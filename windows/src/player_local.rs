@@ -43,7 +43,7 @@ impl PlayerInputController {
 
         if let Some(pid) = self.wasd_player {
             if remove_player_id == pid {
-                self.arrow_key_player = None;
+                self.wasd_player = None;
             }
         }
 
@@ -167,8 +167,9 @@ impl PlayerInputController {
         new_players: &mut Vec<PlayerId>,
         controller_id: Option<i32>) {
         if let Some(pid) = *id_registration {
-            let player = players_local.inner.iter_mut().find(|x| x.player_id == pid).unwrap();
-            player.update_inputs(&*timeline, player_inputs, input);
+            if let Some(player) = players_local.inner.iter_mut().find(|x| x.player_id == pid) {
+                player.update_inputs(&*timeline, player_inputs, input);
+            }
         }
         else if input != Input::None{
             // Create player.

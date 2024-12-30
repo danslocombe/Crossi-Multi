@@ -77,6 +77,7 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_wizard_hat.png", Some(1));
 
         load_frames("../web-client/static/sprites/spr_raft.png", Some(1));
+        load_frames("../web-client/static/sprites/spr_raft_sail_frame.png", Some(1));
 
         load_frames("../web-client/static/sprites/spr_font_linsenn_m5x7_numbers.png", Some(10));
     }

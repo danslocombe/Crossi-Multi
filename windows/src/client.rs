@@ -1,7 +1,5 @@
-use std::u16;
-
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
+use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -230,7 +228,7 @@ impl Client {
         // Should cars be ephemeral actors?
         self.entities.cars.inner.clear();
         self.entities.lillipads.inner.clear();
-        self.entities.raft_sails.inner.clear();
+
         //let rows = self.timeline.map.get_row_view(top.get_round_id(), top.rules_state.fst.get_screen_y());
         let pub_cars = self.timeline.map.get_cars(top.get_round_id(), top.time_us);
         for pub_car in pub_cars {
@@ -255,8 +253,116 @@ impl Client {
 
         if let CrossyRulesetFST::Lobby { raft_pos, .. } = &top.rules_state.fst {
             let pos = V2::new(*raft_pos, 10.0) * 8.0;
-            //sprites::draw("raft", 0, 8.0 * 8.0, 10.0 * 8.0);
-            self.entities.raft_sails.create(Pos::Absolute(pos));
+
+            if self.entities.raft_sails.inner.is_empty() {
+                let raft = self.entities.raft_sails.create(Pos::Absolute(pos));
+                /*
+                let top = raft.rope_world.add_node(0.0, 0.0);
+
+
+                raft.rope_world.nodes[top].node_type = crate::rope::NodeType::Fixed;
+
+                let mut prev = None;
+                for i in 0..6 {
+                    let node = raft.rope_world.add_node(0.0 + 2.0 * i as f32, 24.0);
+                    if (i == 0) {
+                        //raft.rope_world.nodes[node].node_type = crate::rope::NodeType::Fixed;
+                    }
+                    raft.rope_world.add_rope(top, node);
+
+                    if let Some(p) = prev {
+                        raft.rope_world.add_rope(p, node);
+                    }
+
+                    prev = Some(node);
+                }
+                */
+
+                // @Dedup
+                // @Hack
+                // Copypasted from curtain
+                let width = 6;
+                let height = 6;
+                let x_offset = V2::new(10.0, 0.0);
+                let y_offset = V2::new(0.0, 8.0);
+                for y in 0..height {
+                    //let top_left = top_corner_center + y_offset * (((y + 1) as f32) * 1.0/((height+1) as f32));
+                    let top_left = V2::new(0.0, 0.0) + y_offset * (((y) as f32) * 1.0/((height) as f32));
+
+                    let mut row = Vec::new();
+                    for x in 0..width {
+                        let mut created = false;
+                        //if (y == 0) {
+                        //    if (x == 0) {
+                        //        row.push(node_top_corner_wall);
+                        //        created = true;
+                        //    }
+                        //    if (x == width - 1) {
+                        //        row.push(node_top_corner_center);
+                        //        created = true;
+                        //    }
+                        //}
+
+                        if !created {
+                            //let p = top_left + x_offset * (((x + 1) as f32) * 1.0/((width+1) as f32));
+                            let p = top_left + x_offset * (((x) as f32) * 1.0/((width - 1) as f32));
+                            //println!("Creating {}", p);
+                            let id = raft.rope_world.add_node_p(p);
+                            row.push(id);
+                        }
+
+                        let id = *row.last().unwrap();
+
+                        if y > 0 {
+                            let above = raft.grid[y - 1][x];
+                            raft.rope_world.add_rope(above, id);
+                        }
+
+                        if x > 0 {
+                            let left = row[row.len() - 2];
+                            raft.rope_world.add_rope(left, id);
+                        }
+                    }
+
+                    raft.grid.push(row);
+                }
+
+                for row in raft.grid.iter() {
+                    raft.rope_world.nodes[row[0]].node_type = NodeType::Fixed;
+                }
+            }
+
+            let raft = self.entities.raft_sails.inner.first_mut().unwrap();
+            raft.t += 1;
+
+            raft.wind_norm *= 0.9;
+            let rand = FroggyRand::new(raft.t as u64);
+            if rand.gen_unit(0) < 0.01 {
+                if rand.gen_unit(1) < 0.5 {
+                    raft.wind_norm += 1.0;
+                }
+                else {
+                    raft.wind_norm += -1.0;
+                }
+            }
+
+            let delta = (pos - raft.pos).x;
+            // Add delta to the wind norm
+
+            raft.wind_norm -= delta * 1.5;
+
+            raft.rope_world.forces.clear();
+            raft.rope_world.forces.push(Box::new(crate::rope::ConstantForce {
+                force: V2::new(raft.wind_norm * 0.03, 0.03),
+            }));
+
+
+            //raft.prev_pos = pos;
+            raft.pos = pos;
+            raft.rope_world.tick(1.0);
+        }
+        else {
+            self.entities.raft_sails.inner.clear();
         }
 
         self.big_text_controller.tick(&self.timeline, &self.entities.players, &transitions, &new_players, self.camera.y);
@@ -774,11 +880,14 @@ struct TitleBGMusic {
     pub playing_unsynced: bool,
 }
 
+//const g_music_volume: f32 = 0.6;
+const g_music_volume: f32 = 0.0;
+
 impl TitleBGMusic {
     pub fn new() -> Self {
         let music = unsafe {
             let mut music = raylib_sys::LoadMusicStream(crate::c_str_leaky("../web-client/static/sounds/mus_jump_at_sun_3.mp3"));
-            raylib_sys::SetMusicVolume(music, 0.6);
+            raylib_sys::SetMusicVolume(music, g_music_volume);
             music.looping = true;
             raylib_sys::AttachAudioStreamProcessor(music.stream, Some(rl_low_pass));
             music
