@@ -145,9 +145,10 @@ impl Client {
         self.camera.tick(Some(self.timeline.top_state().get_rule_state()), &self.visual_effects, &transitions);
 
         let top = self.timeline.top_state();
+        let mut to_remove = Vec::new();
         for local_player in self.entities.players.inner.iter_mut() {
             if let Some(state) = top.player_states.get(local_player.player_id) {
-                let player_state = state.to_public(top.get_round_id(), top.time_us, &self.timeline.map);
+                let player_state = state.to_public(top.get_round_id(), top.time_us, &self.timeline.map, &top.rules_state.fst);
                 let alive_state = top.rules_state.fst.get_player_alive(local_player.player_id);
                 local_player.tick(
                     &player_state,
@@ -161,6 +162,16 @@ impl Client {
                     &mut self.entities.crowns,
                     &mut self.entities.outfit_switchers);
             }
+            else {
+                // Remove the player
+                local_player.kill_animation(&mut self.visual_effects, None, &self.timeline, &mut self.entities.corpses, &mut self.entities.bubbles);
+                to_remove.push((local_player.player_id, local_player.entity_id));
+            }
+        }
+
+        for (remove_player_id, remove_entity_id) in to_remove {
+            self.player_input_controller.remove(remove_player_id);
+            self.entities.players.delete_entity_id(remove_entity_id);
         }
 
         if (transitions.into_round_warmup)
@@ -399,7 +410,10 @@ impl Client {
             }
         }
 
-        if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone } = &top.rules_state.fst {
+        if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone, .. } = &top.rules_state.fst {
+            // @Hack
+            sprites::draw("raft", 0, 8.0 * 8.0, 10.0 * 8.0);
+
             /*
             let x0 = 7.0 * 8.0;
             let y0 = 12.0 * 8.0;

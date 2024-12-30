@@ -16,7 +16,7 @@ use river::{River};
 use obstacle_row::{ObstaclePublic, ObstacleRowDescr};
 use bushes::BushDescr;
 
-use crate::crossy_ruleset::{RulesState, CrossyRulesetFST};
+use crate::crossy_ruleset::{CrossyRulesetFST, LobbyState, RulesState};
 use crate::game::CoordPos;
 use crate::SCREEN_SIZE;
 use crate::{Pos, PreciseCoords, Input};
@@ -176,9 +176,10 @@ impl Map {
         round.get_row(RowId::from_y(pos.y)).solid(time_us, rule_state, pos)
     }
 
-    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : PreciseCoords) -> Option<crate::LillipadId> {
+    pub fn lillipad_at_pos(&self, round_id : u8, time_us : u32, pos : PreciseCoords, rule_state : &RulesState) -> Option<crate::LillipadId> {
         let mut guard = self.inner.lock().unwrap();
-        guard.get_mut(round_id).generate_to_y(RowId::from_y(pos.y));
+        let row_id = RowId::from_y(pos.y);
+        guard.get_mut(round_id).generate_to_y(row_id);
 
         for (_i, (_y, river)) in guard.get(round_id).rivers.iter().enumerate() {
             if let Some(lid) = river.lillipad_at_pos(round_id, time_us, pos) {
@@ -186,15 +187,28 @@ impl Map {
             }
         }
 
+        if let RowType::LobbyRiver = &guard.get_mut(round_id).get_row(row_id).row_type {
+            return river::lobby_raft_at_pos(round_id, pos, &rule_state.fst);
+        }
+
         None
     }
 
-    pub fn get_lillipad_screen_x(&self, time_us : u32, lillipad : &crate::LillipadId) -> f64 {
+    pub fn get_lillipad_screen_x(&self, time_us : u32, lillipad : &crate::LillipadId, ruleset_fst : &CrossyRulesetFST) -> f64 {
         let mut guard = self.inner.lock().unwrap();
         let round_id = lillipad.round_id;
 
+        let row_id = RowId::from_y(lillipad.y);
+
         // Do we need this gen to?
-        guard.get_mut(round_id).generate_to_y(RowId::from_y(lillipad.y));
+        // Dont really as we fetch the row below, but good to be explicit?
+        guard.get_mut(round_id).generate_to_y(row_id);
+
+        if let RowType::LobbyRiver = &guard.get_mut(round_id).get_row(row_id).row_type {
+            if let CrossyRulesetFST::Lobby { raft_pos, .. } = &ruleset_fst {
+                return *raft_pos as f64 + lillipad.id as f64;
+            }
+        }
 
         for (y, river) in &guard.get(round_id).rivers {
             if (*y == lillipad.y) {
@@ -205,13 +219,13 @@ impl Map {
         panic!("Error, could not find a lillipad from lillipad_id {:?}", lillipad);
     }
 
-    pub fn realise_pos(&self, time_us : u32, pos : &crate::Pos) -> PreciseCoords {
+    pub fn realise_pos(&self, time_us : u32, pos : &crate::Pos, ruleset_fst : &CrossyRulesetFST) -> PreciseCoords {
         match pos {
             crate::Pos::Coord(coord) => {
                 coord.to_precise()
             },
             crate::Pos::Lillipad(lilli_id) => {
-                let x = self.get_lillipad_screen_x(time_us, lilli_id);
+                let x = self.get_lillipad_screen_x(time_us, lilli_id, ruleset_fst);
                 PreciseCoords{x, y: lilli_id.y}
             },
             _ => {
@@ -222,10 +236,10 @@ impl Map {
 
     pub fn try_apply_input(&self, time_us : u32, rule_state : &crate::crossy_ruleset::RulesState, pos : &crate::Pos, input : Input) -> Option<Pos> {
         let round_id = rule_state.fst.get_round_id();
-        let pos = self.realise_pos(time_us, pos);
+        let pos = self.realise_pos(time_us, pos, &rule_state.fst);
         let precise = pos.apply_input(input);
 
-        if let Some(lillipad_id) = self.lillipad_at_pos(round_id, time_us, precise) {
+        if let Some(lillipad_id) = self.lillipad_at_pos(round_id, time_us, precise, rule_state) {
             Some(Pos::Lillipad(lillipad_id))
         }
         else {

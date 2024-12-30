@@ -761,7 +761,7 @@ impl Client {
                                 }
                             };
 
-                            let lilly_moves = get_lilly_moves(&precise_coords, on_lillypad, top_state.get_round_id(), top_state.time_us, &self.timeline.map);
+                            let lilly_moves = get_lilly_moves(&precise_coords, on_lillypad, top_state.get_round_id(), top_state.time_us, &self.timeline.map, &top_state.rules_state);
                             Some(lilly_moves)
 
                         }
@@ -824,13 +824,13 @@ struct LillyOverlay {
     input : Input,
 }
 
-fn get_lilly_moves(initial_pos : &PreciseCoords, on_lilly: bool, round_id : u8, time_us : u32, map : &map::Map) -> Vec<LillyOverlay>
+fn get_lilly_moves(initial_pos : &PreciseCoords, on_lilly: bool, round_id : u8, time_us : u32, map : &map::Map, rule_state: &RulesState) -> Vec<LillyOverlay>
 {
     let mut moves = vec![];
 
     for input in &ALL_INPUTS {
         let mut applied = initial_pos.apply_input(*input);
-        if let Some(lilly) = map.lillipad_at_pos(round_id, time_us, applied) {
+        if let Some(lilly) = map.lillipad_at_pos(round_id, time_us, applied, rule_state) {
             let screen_x = map.get_lillipad_screen_x(time_us, &lilly);
             moves.push(LillyOverlay {
                 precise_coords: PreciseCoords {

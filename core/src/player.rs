@@ -349,17 +349,17 @@ pub struct PlayerStatePublic
 }
 
 impl PlayerState {
-    pub fn to_public(&self, _round_id : u8, time_us : u32, map : &Map) -> PlayerStatePublic {
+    pub fn to_public(&self, _round_id : u8, time_us : u32, map : &Map, ruleset_fst: &CrossyRulesetFST) -> PlayerStatePublic {
         let mut player_state_public = PlayerStatePublic::default();
 
         player_state_public.id = self.id.0;
 
-        let PreciseCoords{x, y} = map.realise_pos(time_us, &self.pos);
+        let PreciseCoords{x, y} = map.realise_pos(time_us, &self.pos, ruleset_fst);
         player_state_public.x = x;
         player_state_public.y = y;
         
         if let MoveState::Moving(ms) = &self.move_state {
-            let PreciseCoords{x: t_x, y: t_y} = map.realise_pos(time_us, &ms.target);
+            let PreciseCoords{x: t_x, y: t_y} = map.realise_pos(time_us, &ms.target, ruleset_fst);
             player_state_public.moving = true;
             player_state_public.t_x = t_x;
             player_state_public.t_y = t_y;

@@ -1,5 +1,6 @@
 use froggy_rand::FroggyRand;
 
+use crate::crossy_ruleset::CrossyRulesetFST;
 use crate::map::obstacle_row::*;
 use crate::{LillipadId};
 
@@ -103,4 +104,57 @@ impl River {
         let lillipad = self.row.get_obstacle(time_us, lillipad_id.id as usize);
         self.row.realise_obstacle(&lillipad)
     }
+}
+
+pub fn lobby_raft_at_pos(round_id : u8, pos : crate::PreciseCoords, ruleset_fst: &CrossyRulesetFST) -> Option<LillipadId>
+{
+    // @Hack @Dedup
+    // Copypasted and adapted from lillipad_at_pos
+    let frog_centre = pos.x;
+
+    let mut closest = None;
+    let mut closest_dist = f64::MAX;
+
+    let raft_pos = if let CrossyRulesetFST::Lobby { raft_pos, .. } = ruleset_fst {
+        *raft_pos as f64
+    }
+    else {
+        debug_assert!(false,  "Unreachable, somehow we are testing a lobby river row in a non-lobby context");
+        0.0
+    };
+
+    // @Perf
+    // @Hacky
+    let raft_positions = [
+        raft_pos,
+        raft_pos + 1.0,
+        raft_pos + 2.0,
+        raft_pos + 3.0,
+    ];
+
+    for (id, realised) in raft_positions.iter().enumerate()
+    {
+        let dist = (frog_centre - realised).abs();
+
+        if (dist < closest_dist) {
+            closest_dist = dist;
+            closest = Some(id);
+        }
+    }
+
+    //const MARGIN : f64 = LILLIPAD_WIDTH_TILES / 1.9;
+    const MARGIN : f64 = 0.9;
+    if (closest_dist < MARGIN) {
+        if let Some(id) = closest {
+            let lillipad_id = LillipadId {
+                y : pos.y,
+                id : id  as u8,
+                round_id,
+            };
+
+            return Some(lillipad_id);
+        }
+    }
+
+    None
 }

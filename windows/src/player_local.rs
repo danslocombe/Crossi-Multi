@@ -30,10 +30,38 @@ pub struct PlayerInputController {
     arrow_key_player: Option<PlayerId>,
     wasd_player: Option<PlayerId>,
     controller_a_players: [Option<PlayerId>;4],
-    controller_b_player: [Option<PlayerId>;4],
+    controller_b_players: [Option<PlayerId>;4],
 }
 
 impl PlayerInputController {
+    pub fn remove(&mut self, remove_player_id: PlayerId) {
+        if let Some(pid) = self.arrow_key_player {
+            if remove_player_id == pid {
+                self.arrow_key_player = None;
+            }
+        }
+
+        if let Some(pid) = self.wasd_player {
+            if remove_player_id == pid {
+                self.arrow_key_player = None;
+            }
+        }
+
+        for i in 0..4 {
+            if let Some(pid) = self.controller_a_players[i] {
+                if remove_player_id == pid {
+                    self.controller_a_players[i] = None;
+                }
+            }
+
+            if let Some(pid) = self.controller_b_players[i] {
+                if remove_player_id == pid {
+                    self.controller_b_players[i] = None;
+                }
+            }
+        }
+    }
+
     pub fn tick(&mut self,
             timeline: &mut Timeline,
             players_local: &mut EntityContainer<PlayerLocal>,
@@ -121,7 +149,7 @@ impl PlayerInputController {
                     if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
                         input = Input::Down;
                     }
-                    Self::process_input(&mut self.controller_b_player[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id));
+                    Self::process_input(&mut self.controller_b_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id));
                 }
             }
         }
@@ -156,7 +184,7 @@ impl PlayerInputController {
 
 
                 let top = timeline.top_state();
-                let player_state = top.player_states.get(new_id).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map);
+                let player_state = top.player_states.get(new_id).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map, &top.rules_state.fst);
                 let player_local = players_local.create(Pos::Absolute(V2::default()));
                 player_local.set_from(&player_state);
                 player_local.update_inputs(&*timeline, player_inputs, input);
@@ -373,7 +401,7 @@ impl PlayerLocal {
         }
 
         let top = timeline.top_state();
-        if (top.player_states.get(self.player_id).unwrap().can_move()) {
+        if (top.player_states.get(self.player_id).map(|x| x.can_move()).unwrap_or(false)) {
             player_inputs.set(self.player_id, self.buffered_input);
             self.buffered_input = Input::None;
         }
@@ -496,47 +524,7 @@ impl PlayerLocal {
 
         if (alive_state == AliveState::Dead && !self.created_corpse) {
             self.created_corpse = true;
-
-            //let target_pos = V2::new((player_state.t_x * 8.0) as f32, player_state.t_y as f32 * 8.0);
-            let corpse_pos = if player_state.moving {
-                V2::new(player_state.t_x as f32, player_state.t_y as f32)
-            }
-            else {
-                V2::new(player_state.x as f32, player_state.y as f32)
-            } * 8.0;
-
-            let top_state = timeline.top_state();
-            let row = timeline.map.get_row(top_state.rules_state.fst.get_round_id(), player_state.y);
-            if let RowType::River(_) = row.row_type {
-                // Drowning.
-                let rand = FroggyRand::from_hash((self.player_id.0, self.t));
-                for i in 0..2 {
-                    let rand = rand.subrand(i);
-                    let dust_off = rand.gen_unit("off") * 3.0;
-                    let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
-                    let pos = corpse_pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                    //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
-                    let bubble_part = bubbles.create(Pos::Absolute(pos));
-                    bubble_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
-                    bubble_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
-                }
-
-                audio::play("drown");
-                audio::play("drown_bubbles");
-            }
-            else {
-                // Hit by car.
-                let corpse = corpses.create(Pos::Absolute(corpse_pos));
-                corpse.skin = self.skin.clone();
-                audio::play("car");
-            }
-
-            visual_effects.screenshake();
-            visual_effects.whiteout();
-
-            if let Some(id) = self.controller_id {
-                visual_effects.set_gamepad_vibration(id);
-            }
+            self.kill_animation(visual_effects, Some(player_state), timeline, corpses, bubbles);
         }
 
         if (!self.created_crowns) {
@@ -571,6 +559,57 @@ impl PlayerLocal {
         self.pos.x = x;
         self.pos.y = y;
         self.moving = player_state.moving;
+    }
+
+    pub fn kill_animation(&self, visual_effects: &mut VisualEffects, player_state: Option<&PlayerStatePublic>, timeline: &Timeline, corpses: &mut EntityContainer<Corpse>, bubbles: &mut EntityContainer<Bubble>) {
+        //let target_pos = V2::new((player_state.t_x * 8.0) as f32, player_state.t_y as f32 * 8.0);
+        let (corpse_pos, y) = if let Some(player_state) = player_state {
+            let pos = if player_state.moving {
+                V2::new(player_state.t_x as f32, player_state.t_y as f32) * 8.0
+            }
+            else {
+                V2::new(player_state.x as f32, player_state.y as f32) * 8.0
+            };
+            (pos, player_state.y)
+        }
+        else {
+            (self.pos * 8.0, self.pos.y.round() as i32)
+        };
+
+        let top_state = timeline.top_state();
+        let row = timeline.map.get_row(top_state.rules_state.fst.get_round_id(), y);
+        match row.row_type {
+            RowType::River(_) | RowType::LobbyRiver => {
+                // Drowning.
+                let rand = FroggyRand::from_hash((self.player_id.0, self.t));
+                for i in 0..2 {
+                    let rand = rand.subrand(i);
+                    let dust_off = rand.gen_unit("off") * 3.0;
+                    let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
+                    let pos = corpse_pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+                    //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+                    let bubble_part = bubbles.create(Pos::Absolute(pos));
+                    bubble_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
+                    bubble_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
+                }
+
+                audio::play("drown");
+                audio::play("drown_bubbles");
+            },
+            _ => {
+                // Hit by car.
+                let corpse = corpses.create(Pos::Absolute(corpse_pos));
+                corpse.skin = self.skin.clone();
+                audio::play("car");
+            }
+        }
+
+        visual_effects.screenshake();
+        visual_effects.whiteout();
+
+        if let Some(id) = self.controller_id {
+            visual_effects.set_gamepad_vibration(id);
+        }
     }
 }
 

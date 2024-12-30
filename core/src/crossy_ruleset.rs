@@ -93,7 +93,7 @@ impl Default for EndAllLeftState {
 #[serde(tag = "type")]
 pub enum CrossyRulesetFST
 {
-    Lobby{time_with_all_players_in_ready_zone : u32},
+    Lobby{time_with_all_players_in_ready_zone : u32, raft_pos: f32,},
     RoundWarmup(WarmupState),
     Round(RoundState),
     RoundCooldown(CooldownState),
@@ -159,12 +159,30 @@ impl CrossyRulesetFST
     pub fn start() -> Self {
         Lobby{
             time_with_all_players_in_ready_zone: 0,
+            raft_pos: 8.0,
         }
     }
 
     pub fn tick(&self, dt : u32, time_us : u32, player_states : &mut PlayerIdMap<PlayerState>, map : &Map, game_config : &GameConfig) -> Self {
         match self {
-            Lobby{time_with_all_players_in_ready_zone} => {
+            Lobby{time_with_all_players_in_ready_zone, raft_pos} => {
+
+                // "kill players" by removing them from the lobby
+                let mut to_kill = Vec::new();
+                for (id, state) in player_states.iter() {
+                    if let Pos::Coord(coord_pos) = &state.pos {
+                        let row = map.get_row(0, coord_pos.y);
+                        if let RowType::LobbyRiver = row.row_type {
+                            debug_log!("Killing {:?}",id);
+                            to_kill.push(id);
+                        }
+                    }
+                }
+
+                for kill in to_kill {
+                    player_states.remove(kill);
+                }
+
                 let bypass = game_config.bypass_lobby && player_states.count_populated() > 0;
                 let enough_players = player_states.count_populated() >= game_config.minimum_players as usize;
                 let all_in_ready_zone = player_states.iter().all(|(_, x)| player_in_lobby_ready_zone(x));
@@ -191,11 +209,17 @@ impl CrossyRulesetFST
                         })
                     }
                     else {
-                        Lobby{ time_with_all_players_in_ready_zone: time_with_all_players_in_ready_zone + 1 }
+                        Lobby{
+                            time_with_all_players_in_ready_zone: time_with_all_players_in_ready_zone + 1,
+                            raft_pos: *raft_pos,
+                        }
                     }
                 }
                 else {
-                    Lobby{ time_with_all_players_in_ready_zone: (*time_with_all_players_in_ready_zone as f32 * 0.8).round() as u32}
+                    Lobby{
+                        time_with_all_players_in_ready_zone: (*time_with_all_players_in_ready_zone as f32 * 0.8).round() as u32,
+                        raft_pos: *raft_pos,
+                    }
                 }
             },
             RoundWarmup(state) => {
@@ -232,7 +256,7 @@ impl CrossyRulesetFST
                 new_state.alive_states.seed_missing(player_states, AliveState::NotInGame);
                 new_state.screen_y = update_screen_y(new_state.screen_y, player_states, &new_state.alive_states);
 
-                kill_players(time_us, new_state.round_id, &mut new_state.alive_states, map, player_states, new_state.screen_y);
+                kill_players(time_us, new_state.round_id, &mut new_state.alive_states, map, player_states, new_state.screen_y, self);
 
                 let alive_player_count = new_state.alive_states.iter().filter(|(_, x)| **x == AliveState::Alive).count();
 
@@ -255,7 +279,7 @@ impl CrossyRulesetFST
                 let mut new_state = state.clone();
                 new_state.round_state.alive_states.seed_missing(player_states, AliveState::NotInGame);
                 new_state.round_state.screen_y = update_screen_y(new_state.round_state.screen_y, player_states, &new_state.round_state.alive_states);
-                kill_players(time_us, state.round_state.round_id, &mut new_state.round_state.alive_states, map, player_states, new_state.round_state.screen_y);
+                kill_players(time_us, state.round_state.round_id, &mut new_state.round_state.alive_states, map, player_states, new_state.round_state.screen_y, &self);
 
                 match state.remaining_us.checked_sub(dt) {
                     Some(remaining_us) => {
@@ -457,7 +481,7 @@ fn update_screen_y(mut screen_y : i32, player_states : &PlayerIdMap<PlayerState>
     screen_y
 }
 
-fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerState, screen_y : i32) -> bool{
+fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerState, screen_y : i32, ruleset_fst: &CrossyRulesetFST) -> bool{
     // TODO also check position you are moving to
     //if let Stationary = player_state.move_state {
         match &player_state.pos {
@@ -492,7 +516,7 @@ fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerS
                 false
             },
             Pos::Lillipad(lillypad_id) => {
-                let precise_pos = map.get_lillipad_screen_x(time_us, lillypad_id);
+                let precise_pos = map.get_lillipad_screen_x(time_us, lillypad_id, ruleset_fst);
                 const KILL_OFF_MAP_THRESH : f64 = 2.5;
                 precise_pos < -KILL_OFF_MAP_THRESH || precise_pos > (160.0 / 8.0 + KILL_OFF_MAP_THRESH)
             },
@@ -503,14 +527,14 @@ fn should_kill(time_us : u32, round_id : u8, map : &Map, player_state : &PlayerS
     //}
 }
 
-fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<AliveState>, map : &Map, player_states : &mut PlayerIdMap<PlayerState>, screen_y : i32) {
+fn kill_players(time_us : u32, round_id : u8, alive_states : &mut PlayerIdMap<AliveState>, map : &Map, player_states : &mut PlayerIdMap<PlayerState>, screen_y : i32, ruleset_fst: &CrossyRulesetFST) {
     for id in player_states.valid_ids() {
         let alive = alive_states.get_copy(id).unwrap_or(AliveState::NotInGame);
         if (alive != AliveState::Alive) {
             continue;
         }
 
-        if should_kill(time_us, round_id, map, player_states.get(id).unwrap(), screen_y) {
+        if should_kill(time_us, round_id, map, player_states.get(id).unwrap(), screen_y, ruleset_fst) {
             alive_states.set(id, AliveState::Dead);
         }
     }

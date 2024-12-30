@@ -75,6 +75,8 @@ pub fn init_sprites() {
         load_frames("../web-client/static/sprites/spr_roadtoads.png", Some(1));
 
         load_frames("../web-client/static/sprites/spr_wizard_hat.png", Some(1));
+
+        load_frames("../web-client/static/sprites/spr_raft.png", Some(1));
     }
 }
 
