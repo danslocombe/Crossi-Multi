@@ -1142,8 +1142,8 @@ impl IsEntity for RaftSail {
     fn draw(&mut self) {
         self.t += 1;
         {
-            let xx = self.pos.x;
-            let yy = self.pos.y;
+            let xx = self.pos.x - 4.0;
+            let yy = self.pos.y + 8.0;
             sprites::draw("raft", 0, xx, yy);
         }
 
