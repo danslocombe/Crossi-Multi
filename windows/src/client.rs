@@ -256,110 +256,11 @@ impl Client {
 
             if self.entities.raft_sails.inner.is_empty() {
                 let raft = self.entities.raft_sails.create(Pos::Absolute(pos));
-                /*
-                let top = raft.rope_world.add_node(0.0, 0.0);
-
-
-                raft.rope_world.nodes[top].node_type = crate::rope::NodeType::Fixed;
-
-                let mut prev = None;
-                for i in 0..6 {
-                    let node = raft.rope_world.add_node(0.0 + 2.0 * i as f32, 24.0);
-                    if (i == 0) {
-                        //raft.rope_world.nodes[node].node_type = crate::rope::NodeType::Fixed;
-                    }
-                    raft.rope_world.add_rope(top, node);
-
-                    if let Some(p) = prev {
-                        raft.rope_world.add_rope(p, node);
-                    }
-
-                    prev = Some(node);
-                }
-                */
-
-                // @Dedup
-                // @Hack
-                // Copypasted from curtain
-                let width = 6;
-                let height = 6;
-                let x_offset = V2::new(10.0, 0.0);
-                let y_offset = V2::new(0.0, 8.0);
-                for y in 0..height {
-                    //let top_left = top_corner_center + y_offset * (((y + 1) as f32) * 1.0/((height+1) as f32));
-                    let top_left = V2::new(0.0, 0.0) + y_offset * (((y) as f32) * 1.0/((height) as f32));
-
-                    let mut row = Vec::new();
-                    for x in 0..width {
-                        let mut created = false;
-                        //if (y == 0) {
-                        //    if (x == 0) {
-                        //        row.push(node_top_corner_wall);
-                        //        created = true;
-                        //    }
-                        //    if (x == width - 1) {
-                        //        row.push(node_top_corner_center);
-                        //        created = true;
-                        //    }
-                        //}
-
-                        if !created {
-                            //let p = top_left + x_offset * (((x + 1) as f32) * 1.0/((width+1) as f32));
-                            let p = top_left + x_offset * (((x) as f32) * 1.0/((width - 1) as f32));
-                            //println!("Creating {}", p);
-                            let id = raft.rope_world.add_node_p(p);
-                            row.push(id);
-                        }
-
-                        let id = *row.last().unwrap();
-
-                        if y > 0 {
-                            let above = raft.grid[y - 1][x];
-                            raft.rope_world.add_rope(above, id);
-                        }
-
-                        if x > 0 {
-                            let left = row[row.len() - 2];
-                            raft.rope_world.add_rope(left, id);
-                        }
-                    }
-
-                    raft.grid.push(row);
-                }
-
-                for row in raft.grid.iter() {
-                    raft.rope_world.nodes[row[0]].node_type = NodeType::Fixed;
-                }
+                raft.setup();
             }
 
             let raft = self.entities.raft_sails.inner.first_mut().unwrap();
-            raft.t += 1;
-
-            raft.wind_norm *= 0.9;
-            let rand = FroggyRand::new(raft.t as u64);
-            if rand.gen_unit(0) < 0.01 {
-                if rand.gen_unit(1) < 0.5 {
-                    raft.wind_norm += 1.0;
-                }
-                else {
-                    raft.wind_norm += -1.0;
-                }
-            }
-
-            let delta = (pos - raft.pos).x;
-            // Add delta to the wind norm
-
-            raft.wind_norm -= delta * 1.5;
-
-            raft.rope_world.forces.clear();
-            raft.rope_world.forces.push(Box::new(crate::rope::ConstantForce {
-                force: V2::new(raft.wind_norm * 0.03, 0.03),
-            }));
-
-
-            //raft.prev_pos = pos;
-            raft.pos = pos;
-            raft.rope_world.tick(1.0);
+            raft.tick(pos);
         }
         else {
             self.entities.raft_sails.inner.clear();
