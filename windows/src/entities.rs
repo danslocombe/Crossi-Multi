@@ -1433,8 +1433,57 @@ impl IsEntity for RaftSail {
             }
         }
 
+        let base_pos = self.pos + V2::new(18.0, 20.0);
+
+        // Shadow
+        for x in 1..self.sail_grid.last().unwrap().len() {
+            let h = self.sail_grid.len();
+            let y = h - 1;
+            let mut top_left = base_pos + self.sail_rope_world.get_node(self.sail_grid[y-1][x-1]).pos;
+            let mut top_right = base_pos + if (x < self.sail_grid[y-1].len()) {
+                self.sail_rope_world.get_node(self.sail_grid[y-1][x]).pos
+            }
+            else {
+                self.sail_rope_world.get_node(*self.sail_grid[y-1].last().unwrap()).pos
+            };
+
+            let mut bot_left = base_pos + self.sail_rope_world.get_node(self.sail_grid[y][x-1]).pos;
+            let mut bot_right = base_pos + self.sail_rope_world.get_node(self.sail_grid[y][x]).pos;
+
+            let offset = 3.0;
+            top_left.y += offset;
+            top_right.y += offset;
+            bot_left.y += offset;
+            bot_right.y += offset;
+
+            let col = crate::BLACK;
+                unsafe {
+                    raylib_sys::DrawTriangle(
+                        to_vector2(top_left),
+                        to_vector2(bot_left),
+                        to_vector2(top_right),
+                        col);
+                    raylib_sys::DrawTriangle(
+                        to_vector2(bot_right),
+                        to_vector2(top_right),
+                        to_vector2(bot_left),
+                        col);
+                }
+                unsafe {
+                    raylib_sys::DrawTriangle(
+                        to_vector2(top_left),
+                        to_vector2(top_right),
+                        to_vector2(bot_left),
+                        col);
+                    raylib_sys::DrawTriangle(
+                        to_vector2(bot_right),
+                        to_vector2(bot_left),
+                        to_vector2(top_right),
+                        col);
+                }
+        }
+
         unsafe {
-            let base_pos = self.pos + V2::new(18.0, 20.0);
             raylib_sys::DrawLineV(to_vector2(base_pos), to_vector2(base_pos + V2::new(0.0, 16.0)), brown_frame);
 
             for edge in self.sail_rope_world.ropes.iter() {
