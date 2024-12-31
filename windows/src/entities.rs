@@ -159,24 +159,26 @@ impl PropController {
                         }
                     }
                 },
-                RowType::LobbyMain => {
-                    // @Dedup with above
-                    // Copypaste
-                    for xu in 1..18 {
-                        let x = xu as i32;
-                        if rand.gen_unit((x, self.gen_to, "prop")) < 0.15 {
-                            let pos = Pos::new_coord(x as i32, self.gen_to);
-                            //println!("Pos wallwidth {} {} {:?}", *wall_width, xu, pos);
-                            let prop_id = entities.create_entity(Entity {
-                                id: 0,
-                                entity_type: EntityType::Prop,
-                                pos,
-                            });
-                            let foliage = entities.props.get_mut(prop_id).unwrap();
-                            foliage.sprite = "foliage";
-                            let image_count = sprites::get_sprite("foliage").len();
-                            foliage.image_index = (rand.gen_unit((x, self.gen_to, "ii")) * image_count as f64).floor() as i32;
-                            foliage.dynamic_depth = Some(-100.0);
+                RowType::LobbyMain | RowType::Lobby => {
+                    if row.row_id.to_y() > 0 {
+                        // @Dedup with above
+                        // Copypaste
+                        for xu in 1..18 {
+                            let x = xu as i32;
+                            if rand.gen_unit((x, self.gen_to, "prop")) < 0.15 {
+                                let pos = Pos::new_coord(x as i32, self.gen_to);
+                                //println!("Pos wallwidth {} {} {:?}", *wall_width, xu, pos);
+                                let prop_id = entities.create_entity(Entity {
+                                    id: 0,
+                                    entity_type: EntityType::Prop,
+                                    pos,
+                                });
+                                let foliage = entities.props.get_mut(prop_id).unwrap();
+                                foliage.sprite = "foliage";
+                                let image_count = sprites::get_sprite("foliage").len();
+                                foliage.image_index = (rand.gen_unit((x, self.gen_to, "ii")) * image_count as f64).floor() as i32;
+                                foliage.dynamic_depth = Some(-100.0);
+                            }
                         }
                     }
                 },
