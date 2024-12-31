@@ -11,6 +11,7 @@ mod player_local;
 mod audio;
 mod rope;
 mod title_screen;
+mod raft;
 
 use std::{mem::MaybeUninit};
 
