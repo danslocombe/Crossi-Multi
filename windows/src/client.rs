@@ -363,23 +363,14 @@ impl Client {
                         sprites::draw("tree_top", 1, i as f32 * 8.0, y as f32 * 8.0);
                         sprites::draw("tree_top", 1, (19 - i) as f32 * 8.0, y as f32 * 8.0);
                     }
-                    let hydrated = bush_descr.hydrate();
+                    //let hydrated = bush_descr.hydrate();
                 }
 
                 if let RowType::LobbyRiver = &row.row_type {
-                    if let CrossyRulesetFST::Lobby { raft_pos, time_with_all_players_in_ready_zone } = &top.rules_state.fst {
+                    if let CrossyRulesetFST::Lobby { raft_pos, .. } = &top.rules_state.fst {
                         for i in 0..4 {
                             sprites::draw("log", 0, (*raft_pos as f32 + i as f32) * 8.0, y as f32 * 8.0);
                         }
-
-                        //if (*time_with_all_players_in_ready_zone == 0) {
-                        //    unsafe {
-                        //        let text = crate::c_str_temp(&format!("{} / {}", 0, 2));
-                        //        let pos = V2::new(*raft_pos as f32 * 8.0 + 16.0, y as f32 * 8.0);
-                        //        raylib_sys::DrawTextEx(crate::FONT_m3x6.assume_init_read(), text, crate::to_vector2(pos), 12.0, 1.0, crate::WHITE);
-                        //        //raylib_sys::DrawText(text, pos.x as i32, pos.y as i32, 6, crate::WHITE);
-                        //    }
-                        //}
                     }
                 }
 
@@ -442,13 +433,9 @@ impl Client {
             }
         }
 
-        if let CrossyRulesetFST::Lobby { time_with_all_players_in_ready_zone, raft_pos } = &top.rules_state.fst {
-            // @Hack
-            //sprites::draw("raft", 0, 8.0 * 8.0, 10.0 * 8.0);
-
+        if let CrossyRulesetFST::Lobby { raft_pos, .. } = &top.rules_state.fst {
             let players_in_ready_zone = top.player_states.iter().filter(|(_, x)| crossy_multi_core::crossy_ruleset::player_in_lobby_ready_zone(x)).count();
             let total_player_count = top.player_states.count_populated();
-            //let players_in_
 
             if (total_player_count >= top.rules_state.config.minimum_players as usize)
             {
@@ -467,29 +454,6 @@ impl Client {
                 let image_index = total_player_count + 1;
                 sprites::draw("font_linsenn_m5x7_numbers", image_index, pos.x, pos.y);
             }
-
-            /*
-            let x0 = 7.0 * 8.0;
-            let y0 = 12.0 * 8.0;
-            let w_base = 6.0 * 8.0;
-            let h = 4.0 * 8.0;
-
-            unsafe {
-                let proportion = *time_with_all_players_in_ready_zone as f32 / 120.0;
-                raylib_sys::DrawRectangleRec(raylib_sys::Rectangle {
-                    x: x0,
-                    y: y0,
-                    width: w_base * proportion,
-                    height: h,
-                }, WHITE);
-                raylib_sys::DrawRectangleLinesEx(raylib_sys::Rectangle {
-                    x: x0,
-                    y: y0,
-                    width: w_base,
-                    height: h,
-                }, 1.0, BLACK);
-            }
-            */
         }
 
         self.big_text_controller.draw_lower();

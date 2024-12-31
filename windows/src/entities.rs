@@ -5,7 +5,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, RulesState}, map::{Map, RowType}, math::V2, CoordPos, PlayerId, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::StateTransition, hex_color, player_local::{PlayerLocal, PlayerSkin, Skin}, rope::{Lattice, NodeType, RopeWorld}, sprites, to_vector2};
+use crate::{client::StateTransition, hex_color, player_local::{PlayerLocal, PlayerSkin, Skin}, raft::RaftSail, rope::{Lattice, NodeType, RopeWorld}, sprites, to_vector2};
 
 pub struct PropController {
     gen_to : i32,
