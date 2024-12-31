@@ -3,6 +3,8 @@
 
 use crossy_multi_core::math::V2;
 
+use crate::to_vector2;
+
 #[derive(Default)]
 pub struct RopeWorld {
     pub nodes: Vec<RopeNode>,
@@ -12,6 +14,7 @@ pub struct RopeWorld {
 }
 
 impl RopeWorld {
+    #[inline]
     pub fn add_node_p(&mut self, p: V2) -> usize {
         self.nodes.push(RopeNode::new(p.x, p.y));
         self.nodes.len() - 1
@@ -31,10 +34,12 @@ impl RopeWorld {
         self.ropes.len() - 1
     }
 
+    #[inline]
     pub fn get_node(&self, id: usize) -> &RopeNode {
         &self.nodes[id]
     }
 
+    #[inline]
     pub fn get_node_mut(&mut self, id: usize) -> &mut RopeNode {
         &mut self.nodes[id]
     }
@@ -217,3 +222,240 @@ impl Force for SweptForce {
     }
 }
     */
+
+#[derive(Default)]
+pub struct Lattice {
+    pub grid: Vec<Vec<usize>>,
+}
+
+impl Lattice {
+    pub fn create_rectangle(rope_world: &mut RopeWorld, node_width: usize, node_height: usize, p_base: V2, world_width: f32, world_height: f32) -> Self {
+        let mut grid: Vec<Vec<usize>> = Vec::new();
+        for y in 0..node_height {
+            let p = p_base + V2::new(0.0, world_height * ((y as f32) * 1.0/(node_height as f32)));
+
+            let mut row = Vec::new();
+            for x in 0..node_width {
+                let p = p + V2::new(world_width * ((x as f32) * 1.0/((node_width - 1) as f32)), 0.0);
+                let id = rope_world.add_node_p(p);
+                row.push(id);
+
+                let id = *row.last().unwrap();
+
+                if y > 0 {
+                    let above = grid[y - 1][x];
+                    rope_world.add_rope(above, id);
+                }
+
+                if x > 0 {
+                    let left = row[row.len() - 2];
+                    rope_world.add_rope(left, id);
+                }
+            }
+
+            grid.push(row);
+        }
+
+        Self {
+            grid,
+        }
+    }
+
+    pub fn create_triangle(rope_world: &mut RopeWorld, node_width: usize, node_height: usize, p_base: V2, world_width: f32, world_height: f32) -> Self {
+        let mut grid: Vec<Vec<usize>> = Vec::new();
+
+        for y in 0..node_height {
+            let p = p_base + V2::new(0.0, world_height * ((y as f32) * 1.0/((node_height) as f32)));
+            let mut row = Vec::new();
+            for x in 0..=y {
+                let p = p + V2::new(world_width * (-(x as f32) * 1.0/((node_width - 1) as f32)), 0.0);
+                let id = rope_world.add_node_p(p);
+
+                row.push(id);
+
+                if y > 0 {
+                    if (x < grid[y - 1].len()) {
+                        let above = grid[y - 1][x];
+                        rope_world.add_rope(above, id);
+                    }
+                    else {
+                        // Triangular
+                        let above = *grid[y - 1].last().unwrap();
+                        rope_world.add_rope(above, id);
+                    }
+                }
+
+                if x > 0 {
+                    let left = row[row.len() - 2];
+                    rope_world.add_rope(left, id);
+                }
+            }
+
+            grid.push(row);
+        }
+
+        Self {
+            grid,
+        }
+    }
+
+    pub fn set_fixed(&self, rope_world: &mut RopeWorld, x: usize, y: usize) {
+        let id = self.grid[y][x];
+        rope_world.nodes[id].node_type = NodeType::Fixed;
+    }
+
+    pub fn get_quad(&self, rope_world: &RopeWorld, x: usize, y: usize) -> LatticeQuad {
+        LatticeQuad {
+            top_left: rope_world.get_node(self.grid[y-1][x-1]).pos,
+            top_right: rope_world.get_node(self.grid[y-1][x]).pos,
+            bot_left: rope_world.get_node(self.grid[y][x-1]).pos,
+            bot_right: rope_world.get_node(self.grid[y][x]).pos,
+        }
+    }
+
+    pub fn get_quad_handle_triangle(&self, rope_world: &RopeWorld, x: usize, y: usize) -> LatticeQuad {
+        LatticeQuad {
+            top_left: rope_world.get_node(self.grid[y-1][x-1]).pos,
+            top_right: if (x < self.grid[y-1].len()) {
+                rope_world.get_node(self.grid[y-1][x]).pos
+            }
+            else {
+                rope_world.get_node(*self.grid[y-1].last().unwrap()).pos
+            },
+            bot_left: rope_world.get_node(self.grid[y][x-1]).pos,
+            bot_right: rope_world.get_node(self.grid[y][x]).pos,
+        }
+    }
+
+    pub fn draw_shadow(&self, rope_world: &RopeWorld, p_base: V2) {
+        // Shadow
+        let h = self.grid.len();
+        let w = self.grid[h-1].len();
+
+        for x in 1..w {
+            let y = h - 1;
+
+            let mut quad = self.get_quad_handle_triangle(rope_world, x, y);
+            quad.offset(p_base);
+
+            quad.draw_left(crate::BLACK);
+            quad.draw_right(crate::BLACK);
+        }
+    }
+
+    pub fn draw_curtain(&self, rope_world: &RopeWorld, on_left: bool) {
+        let h = self.grid.len();
+        let w = self.grid[0].len();
+
+        for y in 1..h {
+            for x in 1..w {
+                let quad = self.get_quad(rope_world, x, y);
+
+                //const curtain_lighter: raylib_sys::Color = crate::hex_color("e94476".as_bytes());
+                const curtain_darker: raylib_sys::Color = crate::hex_color("be3d64".as_bytes());
+
+                let col = if x % 2 == 0 {
+                    curtain_darker
+                }
+                else {
+                    crate::RED
+                };
+
+                if (on_left) {
+                    quad.draw_left(col);
+                }
+                else {
+                    quad.draw_right(col);
+                }
+            }
+        }
+    }
+
+    pub fn draw_flag(&self, rope_world: &RopeWorld, base_pos: V2) {
+        let h = self.grid.len();
+        let w = self.grid[0].len();
+        for y in 1..h {
+            for x in 1..w {
+                let mut quad = self.get_quad(rope_world, x, y);
+                quad.offset(base_pos);
+
+                let col_a = if (x + y) % 2 == 0 {
+                    crate::WHITE
+                }
+                else {
+                    crate::GREEN
+                };
+
+                let col_b = if (x + y) % 2 == 0 {
+                    crate::WHITE
+                }
+                else {
+                    crate::RED
+                };
+
+                quad.draw_left(col_b);
+                quad.draw_right(col_a);
+            }
+        }
+    }
+
+    pub fn draw_sail(&self, rope_world: &RopeWorld, base_pos: V2) {
+        let h = self.grid.len();
+        for y in 1..h {
+            let w = self.grid[y].len();
+            for x in 1..w {
+                let mut quad = self.get_quad_handle_triangle(rope_world, x, y);
+                quad.offset(base_pos);
+
+                quad.draw_left(crate::WHITE);
+                quad.draw_right(crate::WHITE);
+            }
+        }
+    }
+}
+
+pub struct LatticeQuad {
+    pub top_left: V2,
+    pub top_right: V2,
+    pub bot_left: V2,
+    pub bot_right: V2,
+}
+
+impl LatticeQuad {
+    pub fn offset(&mut self, offset: V2) {
+        self.top_left += offset;
+        self.top_right += offset;
+        self.bot_left += offset;
+        self.bot_right += offset;
+    }
+
+    pub fn draw_left(&self, col: raylib_sys::Color) {
+        unsafe {
+            raylib_sys::DrawTriangle(
+                to_vector2(self.top_left),
+                to_vector2(self.bot_left),
+                to_vector2(self.top_right),
+                col);
+            raylib_sys::DrawTriangle(
+                to_vector2(self.bot_right),
+                to_vector2(self.top_right),
+                to_vector2(self.bot_left),
+                col);
+        }
+    }
+
+    pub fn draw_right(&self, col: raylib_sys::Color) {
+        unsafe {
+            raylib_sys::DrawTriangle(
+                to_vector2(self.top_left),
+                to_vector2(self.top_right),
+                to_vector2(self.bot_left),
+                col);
+            raylib_sys::DrawTriangle(
+                to_vector2(self.bot_right),
+                to_vector2(self.bot_left),
+                to_vector2(self.top_right),
+                col);
+        }
+    }
+}

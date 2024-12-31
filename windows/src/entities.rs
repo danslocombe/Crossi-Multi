@@ -5,7 +5,7 @@ use strum_macros::EnumIter;
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, RulesState}, map::{Map, RowType}, math::V2, CoordPos, PlayerId, Pos};
 use froggy_rand::FroggyRand;
 
-use crate::{client::StateTransition, hex_color, player_local::{PlayerLocal, PlayerSkin, Skin}, rope::{NodeType, RopeWorld}, sprites, to_vector2};
+use crate::{client::StateTransition, hex_color, player_local::{PlayerLocal, PlayerSkin, Skin}, rope::{Lattice, NodeType, RopeWorld}, sprites, to_vector2};
 
 pub struct PropController {
     gen_to : i32,
@@ -704,10 +704,10 @@ pub struct RaftSail {
     //pub prev_pos: V2,
     pub t: i32,
     pub flag_rope_world: RopeWorld,
-    pub flag_grid: Vec<Vec<usize>>,
+    pub flag_lattice: Lattice,
 
     pub sail_rope_world: RopeWorld,
-    pub sail_grid: Vec<Vec<usize>>,
+    pub sail_lattice: Lattice,
 
     pub wind_norm: f32,
 }
@@ -721,139 +721,31 @@ impl RaftSail {
             t: 0,
 
             flag_rope_world: Default::default(),
-            flag_grid: Default::default(),
+            flag_lattice: Default::default(),
 
             sail_rope_world: Default::default(),
-            sail_grid: Default::default(),
+            sail_lattice: Default::default(),
 
             wind_norm: 0.0,
         }
     }
 
     pub fn setup(&mut self) {
-        assert!(self.flag_grid.is_empty());
+        assert!(self.flag_lattice.grid.is_empty());
         assert!(self.flag_rope_world.nodes.is_empty());
         assert!(self.flag_rope_world.ropes.is_empty());
 
-        assert!(self.sail_grid.is_empty());
+        assert!(self.sail_lattice.grid.is_empty());
         assert!(self.sail_rope_world.nodes.is_empty());
         assert!(self.sail_rope_world.ropes.is_empty());
 
-        /*
-        let top = raft.rope_world.add_node(0.0, 0.0);
+        self.sail_lattice = Lattice::create_triangle(&mut self.sail_rope_world, 6, 6, V2::default(), 16.0, 32.0);
+        self.sail_lattice.set_fixed(&mut self.sail_rope_world, 0, 0);
+        self.sail_lattice.set_fixed(&mut self.sail_rope_world, 0, 5);
 
-
-        raft.rope_world.nodes[top].node_type = crate::rope::NodeType::Fixed;
-
-        let mut prev = None;
+        self.flag_lattice = Lattice::create_rectangle(&mut self.flag_rope_world, 6, 6, V2::default(), 10.0, 8.0);
         for i in 0..6 {
-            let node = raft.rope_world.add_node(0.0 + 2.0 * i as f32, 24.0);
-            if (i == 0) {
-                //raft.rope_world.nodes[node].node_type = crate::rope::NodeType::Fixed;
-            }
-            raft.rope_world.add_rope(top, node);
-
-            if let Some(p) = prev {
-                raft.rope_world.add_rope(p, node);
-            }
-
-            prev = Some(node);
-        }
-        */
-
-        {
-            let max_width = 6;
-            let height = 6;
-            let x_offset = V2::new(16.0, 0.0);
-            let y_offset = V2::new(0.0, 32.0);
-            for y in 0..height {
-                let p = V2::new(0.0, 0.0) + y_offset * (((y) as f32) * 1.0/((height) as f32));
-                let mut row = Vec::new();
-                for x in 0..=y {
-                    let p = p + x_offset * (-(x as f32) * 1.0/((max_width - 1) as f32));
-                    let id = self.sail_rope_world.add_node_p(p);
-
-                    if (x == 0 && (y == 0 || y == height - 1)) {
-                        self.sail_rope_world.nodes[id].node_type = NodeType::Fixed;
-                    }
-
-                    row.push(id);
-
-                    if y > 0 {
-                        if (x < self.sail_grid[y - 1].len()) {
-                            let above = self.sail_grid[y - 1][x];
-                            self.sail_rope_world.add_rope(above, id);
-                        }
-                        else {
-                            // Triangular
-                            let above = *self.sail_grid[y - 1].last().unwrap();
-                            self.sail_rope_world.add_rope(above, id);
-                        }
-                    }
-
-                    if x > 0 {
-                        let left = row[row.len() - 2];
-                        self.sail_rope_world.add_rope(left, id);
-                    }
-                }
-
-                self.sail_grid.push(row);
-            }
-        }
-
-        // @Dedup
-        // @Hack
-        // Copypasted from curtain
-        {
-            let width = 6;
-            let height = 6;
-            let x_offset = V2::new(10.0, 0.0);
-            let y_offset = V2::new(0.0, 8.0);
-            for y in 0..height {
-                //let top_left = top_corner_center + y_offset * (((y + 1) as f32) * 1.0/((height+1) as f32));
-                let top_left = V2::new(0.0, 0.0) + y_offset * (((y) as f32) * 1.0/((height) as f32));
-
-                let mut row = Vec::new();
-                for x in 0..width {
-                    let mut created = false;
-                    //if (y == 0) {
-                    //    if (x == 0) {
-                    //        row.push(node_top_corner_wall);
-                    //        created = true;
-                    //    }
-                    //    if (x == width - 1) {
-                    //        row.push(node_top_corner_center);
-                    //        created = true;
-                    //    }
-                    //}
-
-                    if !created {
-                        //let p = top_left + x_offset * (((x + 1) as f32) * 1.0/((width+1) as f32));
-                        let p = top_left + x_offset * (((x) as f32) * 1.0/((width - 1) as f32));
-                        //println!("Creating {}", p);
-                        let id = self.flag_rope_world.add_node_p(p);
-                        row.push(id);
-                    }
-
-                    let id = *row.last().unwrap();
-
-                    if y > 0 {
-                        let above = self.flag_grid[y - 1][x];
-                        self.flag_rope_world.add_rope(above, id);
-                    }
-
-                    if x > 0 {
-                        let left = row[row.len() - 2];
-                        self.flag_rope_world.add_rope(left, id);
-                    }
-                }
-
-                self.flag_grid.push(row);
-            }
-
-            for row in self.flag_grid.iter() {
-                self.flag_rope_world.nodes[row[0]].node_type = crate::rope::NodeType::Fixed;
-            }
+            self.flag_lattice.set_fixed(&mut self.flag_rope_world, 0, i);
         }
     }
 
@@ -1345,8 +1237,8 @@ impl IsEntity for RaftSail {
         self.t += 1;
         {
             //let xx = self.pos.x - 4.0;
-            let xx = self.pos.x + 2.0;
-            let yy = self.pos.y + 8.0;
+            //let xx = self.pos.x + 2.0;
+            //let yy = self.pos.y + 8.0;
             //sprites::draw("raft_sail_frame", 0, xx, yy);
             //sprites::draw("raft", 0, xx, yy);
         }
@@ -1354,13 +1246,6 @@ impl IsEntity for RaftSail {
         const brown_frame: raylib_sys::Color = crate::hex_color("8f563b".as_bytes());
 
         unsafe {
-            //raylib_sys::DrawCircleLinesV(to_vector2(self.pos), 3.0, crate::WHITE);
-            //for n in self.rope_world.nodes.iter() {
-            //    let pos = n.pos + self.pos;
-            //    println!("Drawing {}", pos);
-            //    raylib_sys::DrawCircleLinesV(to_vector2(pos), 3.0, crate::WHITE);
-            //}
-
             let base_pos = self.pos + V2::new(2.0, 16.0);
             raylib_sys::DrawLineV(to_vector2(base_pos), to_vector2(base_pos + V2::new(0.0, 16.0)), brown_frame);
 
@@ -1370,204 +1255,12 @@ impl IsEntity for RaftSail {
                 raylib_sys::DrawLineV(to_vector2(from_pos), to_vector2(to_pos), crate::WHITE);
             }
 
-            // @Dedup copypasted from curtains
-
-            let h = self.flag_grid.len();
-            let w = self.flag_grid[0].len();
-            for y in 1..h {
-                for x in 1..w {
-                    let top_left = base_pos + self.flag_rope_world.get_node(self.flag_grid[y-1][x-1]).pos;
-                    let top_right = base_pos + self.flag_rope_world.get_node(self.flag_grid[y-1][x]).pos;
-                    let bot_left = base_pos + self.flag_rope_world.get_node(self.flag_grid[y][x-1]).pos;
-                    let bot_right = base_pos + self.flag_rope_world.get_node(self.flag_grid[y][x]).pos;
-
-                    let col_a = if (x + y) % 2 == 0 {
-                        //crate::PURPLE
-                        //curtain_lighter
-                        crate::WHITE
-                        //curtain_darker
-                    }
-                    else {
-                        crate::GREEN
-                    };
-
-                    let col_b = if (x + y) % 2 == 0 {
-                        //crate::PURPLE
-                        //curtain_lighter
-                        crate::WHITE
-                        //curtain_darker
-                    }
-                    else {
-                        crate::RED
-                    };
-
-                    //if false {
-                        unsafe {
-                            raylib_sys::DrawTriangle(
-                                to_vector2(top_left),
-                                to_vector2(bot_left),
-                                to_vector2(top_right),
-                                col_b);
-                            raylib_sys::DrawTriangle(
-                                to_vector2(bot_right),
-                                to_vector2(top_right),
-                                to_vector2(bot_left),
-                                col_b);
-                        }
-                    //}
-                    //else {
-                        unsafe {
-                            raylib_sys::DrawTriangle(
-                                to_vector2(top_left),
-                                to_vector2(top_right),
-                                to_vector2(bot_left),
-                                col_a);
-                            raylib_sys::DrawTriangle(
-                                to_vector2(bot_right),
-                                to_vector2(bot_left),
-                                to_vector2(top_right),
-                                col_a);
-                        }
-                    //}
-                }
-            }
+            self.flag_lattice.draw_flag(&self.flag_rope_world, base_pos);
         }
 
         let base_pos = self.pos + V2::new(18.0, 20.0);
-
-        // Shadow
-        for x in 1..self.sail_grid.last().unwrap().len() {
-            let h = self.sail_grid.len();
-            let y = h - 1;
-            let mut top_left = base_pos + self.sail_rope_world.get_node(self.sail_grid[y-1][x-1]).pos;
-            let mut top_right = base_pos + if (x < self.sail_grid[y-1].len()) {
-                self.sail_rope_world.get_node(self.sail_grid[y-1][x]).pos
-            }
-            else {
-                self.sail_rope_world.get_node(*self.sail_grid[y-1].last().unwrap()).pos
-            };
-
-            let mut bot_left = base_pos + self.sail_rope_world.get_node(self.sail_grid[y][x-1]).pos;
-            let mut bot_right = base_pos + self.sail_rope_world.get_node(self.sail_grid[y][x]).pos;
-
-            let offset = 3.0;
-            top_left.y += offset;
-            top_right.y += offset;
-            bot_left.y += offset;
-            bot_right.y += offset;
-
-            let col = crate::BLACK;
-                unsafe {
-                    raylib_sys::DrawTriangle(
-                        to_vector2(top_left),
-                        to_vector2(bot_left),
-                        to_vector2(top_right),
-                        col);
-                    raylib_sys::DrawTriangle(
-                        to_vector2(bot_right),
-                        to_vector2(top_right),
-                        to_vector2(bot_left),
-                        col);
-                }
-                unsafe {
-                    raylib_sys::DrawTriangle(
-                        to_vector2(top_left),
-                        to_vector2(top_right),
-                        to_vector2(bot_left),
-                        col);
-                    raylib_sys::DrawTriangle(
-                        to_vector2(bot_right),
-                        to_vector2(bot_left),
-                        to_vector2(top_right),
-                        col);
-                }
-        }
-
-        unsafe {
-            raylib_sys::DrawLineV(to_vector2(base_pos), to_vector2(base_pos + V2::new(0.0, 16.0)), brown_frame);
-
-            for edge in self.sail_rope_world.ropes.iter() {
-                let from_pos = base_pos + self.sail_rope_world.nodes[edge.from].pos;
-                let to_pos = base_pos + self.sail_rope_world.nodes[edge.to].pos;
-                raylib_sys::DrawLineV(to_vector2(from_pos), to_vector2(to_pos), crate::BEIGE);
-            }
-
-            let h = self.sail_grid.len();
-            for y in 1..h {
-                let w = self.sail_grid[y].len();
-                for x in 1..w {
-                    let top_left = base_pos + self.sail_rope_world.get_node(self.sail_grid[y-1][x-1]).pos;
-
-                    let top_right = base_pos + if (x < self.sail_grid[y-1].len()) {
-                        self.sail_rope_world.get_node(self.sail_grid[y-1][x]).pos
-                    }
-                    else {
-                        self.sail_rope_world.get_node(*self.sail_grid[y-1].last().unwrap()).pos
-                    };
-
-                    //let top_right = base_pos + self.sail_rope_world.get_node(self.sail_grid[y-1][x]).pos;
-                    let bot_left = base_pos + self.sail_rope_world.get_node(self.sail_grid[y][x-1]).pos;
-                    let bot_right = base_pos + self.sail_rope_world.get_node(self.sail_grid[y][x]).pos;
-
-                    let col_a = if (x + y) % 2 == 0 {
-                        //crate::PURPLE
-                        //curtain_lighter
-                        crate::WHITE
-                        //curtain_darker
-                    }
-                    else {
-                        crate::WHITE
-                    };
-
-                    let col_b = if (x + y) % 2 == 0 {
-                        //crate::PURPLE
-                        //curtain_lighter
-                        crate::WHITE
-                        //curtain_darker
-                    }
-                    else {
-                        crate::WHITE
-                    };
-
-                    //if false {
-                        unsafe {
-                            raylib_sys::DrawTriangle(
-                                to_vector2(top_left),
-                                to_vector2(bot_left),
-                                to_vector2(top_right),
-                                col_b);
-                            raylib_sys::DrawTriangle(
-                                to_vector2(bot_right),
-                                to_vector2(top_right),
-                                to_vector2(bot_left),
-                                col_b);
-                        }
-                    //}
-                    //else {
-                        unsafe {
-                            raylib_sys::DrawTriangle(
-                                to_vector2(top_left),
-                                to_vector2(top_right),
-                                to_vector2(bot_left),
-                                col_a);
-                            raylib_sys::DrawTriangle(
-                                to_vector2(bot_right),
-                                to_vector2(bot_left),
-                                to_vector2(top_right),
-                                col_a);
-                        }
-                    //}
-                }
-            }
-        }
-
-        //unsafe {
-        //    let text = crate::c_str_temp(&format!("{} / {}", 0, 2));
-        //    //let pos = V2::new(*raft_pos as f32 * 8.0 + 16.0, y as f32 * 8.0);
-        //    let pos = self.pos + V2::new(0.0, 4.0) * 8.0;
-        //    raylib_sys::DrawTextEx(crate::FONT_m3x6.assume_init_read(), text, crate::to_vector2(pos), 16.0, 1.0, crate::WHITE);
-        //    //raylib_sys::DrawText(text, pos.x as i32, pos.y as i32, 6, crate::WHITE);
-        //}
+        self.sail_lattice.draw_shadow(&self.sail_rope_world, base_pos + V2::new(0.0, 3.0));
+        self.sail_lattice.draw_sail(&self.sail_rope_world, base_pos);
     }
 
     fn alive(&self, _camera_y_max: f32) -> bool {
