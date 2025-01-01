@@ -67,7 +67,7 @@ fn main() {
 
         raylib_sys::InitAudioDevice();
 
-        //raylib_sys::SetExitKey(raylib_sys::KeyboardKey::KEY_NULL as i32);
+        raylib_sys::SetExitKey(raylib_sys::KeyboardKey::KEY_NULL as i32);
 
         console::init_console();
         crossy_multi_core::set_debug_logger(Box::new(console::QuakeConsoleLogger{}));
@@ -106,19 +106,12 @@ fn main() {
                     console::toggle_open();
                 }
                 else {
-                    //let mut eaten = false;
-                    //if let Some(x) = client.game.editor.as_mut() {
-                    //    if let EditorMode::Dragging(s) = &x.mode {
-                    //        if s.selected_entity.is_some() || s.selected_world_id.is_some() {
-                    //            eaten = true;
-                    //            x.mode = EditorMode::Dragging(DraggingState::default());
-                    //        }
-                    //    }
-                    //}
-
-                    //if (!eaten) {
-                    //    client.exit = true;
-                    //}
+                    if client.pause.is_some() {
+                        client.pause = None;
+                    }
+                    else {
+                        client.pause = Some(Default::default());
+                    }
                 }
             }
 
@@ -137,7 +130,9 @@ fn main() {
 
 
                 if (client.screen_shader.enabled) {
-                    client.screen_shader.iTime += 1;
+                    if (!client.pause.is_some()) {
+                        client.screen_shader.iTime += 1;
+                    }
 
                     let iTime_ptr: *const i32 = std::ptr::from_ref(&client.screen_shader.iTime);
                     raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_iTime_loc, iTime_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_INT as i32);

@@ -237,7 +237,7 @@ pub trait IsEntity {
     fn get(&self) -> Entity;
     fn set_pos(&mut self, p: Pos);
     fn get_depth(&self) -> i32;
-    fn draw(&mut self);
+    fn draw(&mut self, paused: bool);
 
     fn alive(&self, _camera_y_max: f32) -> bool {
         true
@@ -289,9 +289,14 @@ impl<T: IsEntity> EntityContainer<T> {
         self.inner.iter().find(|x| x.get().id == id)
     }
 
-    pub fn draw(&mut self, e: Entity) {
+    pub fn draw_curried(&mut self, args: (Entity, bool)) {
+        let (e, paused) = args;
+        self.draw(e, paused);
+    }
+
+    pub fn draw(&mut self, e: Entity, paused: bool) {
         if let Some(entity) = self.get_mut(e.id) {
-            entity.draw();
+            entity.draw(paused);
         }
     }
 
@@ -431,8 +436,8 @@ impl EntityManager {
         }
     }
 
-    pub fn draw_entity(&mut self, e: Entity) {
-        map_over_entity!(self, e, e.entity_type, draw)
+    pub fn draw_entity(&mut self, e: Entity, paused: bool) {
+        map_over_entity!(self, (e, paused), e.entity_type, draw_curried)
     }
 
     pub fn clear_round_entities(&mut self) {
@@ -741,7 +746,7 @@ impl IsEntity for Prop {
         0
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self, paused: bool) {
         crate::sprites::draw_with_flip(
             &self.sprite,
             self.image_index as usize,
@@ -774,8 +779,10 @@ impl IsEntity for Spectator {
         return (self.dynamic_depth as f32 * self.pos.y as f32) as i32;
     }
 
-    fn draw(&mut self) {
-        self.t += 1;
+    fn draw(&mut self, paused: bool) {
+        if (!paused) {
+            self.t += 1;
+        }
         let rand = FroggyRand::from_hash((self.t, self.pos.x as i32, self.pos.y as i32));
         //if (self.jump_t <= 0 && rand.gen_unit("jump") < 0.016) {
         if (self.jump_t <= 0 && rand.gen_unit("jump") < 0.010) {
@@ -825,7 +832,7 @@ impl IsEntity for Car {
         return self.pos.y as i32 + spr_car_height / 2
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self, paused: bool) {
         let mut xx = self.pos.x - spr_car_width as f32 * 0.5;
         if self.flipped {
             xx = self.pos.x - spr_car_width as f32 * 0.5;
@@ -870,7 +877,7 @@ impl IsEntity for Lillipad {
         self.pos.y as i32 - 1000
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self, paused: bool) {
         sprites::draw("log", 0, self.pos.x, self.pos.y);
     }
 }
@@ -898,7 +905,7 @@ impl IsEntity for Corpse {
         self.pos.y as i32 - 10
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self, paused: bool) {
         sprites::draw(self.skin.dead_sprite, self.image_index as usize, self.pos.x, self.pos.y);
     }
 }
@@ -926,7 +933,7 @@ impl IsEntity for Bubble {
         self.pos.y as i32
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self, paused: bool) {
         self.scale -= 0.025;
         self.pos.y -= 0.2;
         if (self.scale > 0.0) {
@@ -965,8 +972,11 @@ impl IsEntity for Dust {
         self.pos.y as i32 - 20
     }
 
-    fn draw(&mut self) {
-        self.scale -= 0.025;
+    fn draw(&mut self, paused: bool) {
+        if (!paused) {
+            self.scale -= 0.025;
+        }
+
         if (self.scale > 0.0) {
             let size = 8.0 * self.scale;
             let x = self.pos.x - 0.5 * size;
@@ -1003,8 +1013,10 @@ impl IsEntity for Crown {
         self.pos.y as i32 + 20
     }
 
-    fn draw(&mut self) {
-        self.t += 1;
+    fn draw(&mut self, paused: bool) {
+        if (!paused) {
+            self.t += 1;
+        }
         if self.t >= self.t_visible {
             sprites::draw("crown", self.image_index as usize, self.pos.x, self.pos.y);
         }
@@ -1038,10 +1050,12 @@ impl IsEntity for Snowflake {
         self.pos.y as i32 + 20
     }
 
-    fn draw(&mut self) {
-        self.t += 1;
-        self.pos.y += 0.1;
-        self.pos.x += ((self.t as f32) * 0.01).sin() * 0.08;
+    fn draw(&mut self, paused: bool) {
+        if (!paused) {
+            self.t += 1;
+            self.pos.y += 0.1;
+            self.pos.x += ((self.t as f32) * 0.01).sin() * 0.08;
+        }
         unsafe {
             let scale = (0.01 * self.t as f32).min(0.5);
             raylib_sys::DrawCircleLinesV(crate::to_vector2(self.pos), scale, crate::WHITE);
@@ -1076,8 +1090,10 @@ impl IsEntity for OutfitSwitcher {
         self.pos.y as i32 * 8 - 10
     }
 
-    fn draw(&mut self) {
-        self.t += 1;
+    fn draw(&mut self, paused: bool) {
+        if (!paused) {
+            self.t += 1;
+        }
         {
             //let scale = 1.0 + 0.2 * (self.t as f32 / 100.0).sin();
             //let rand = FroggyRand::new(self.t as u64);

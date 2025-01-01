@@ -1,5 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
+use crate::{audio, c_str_temp, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -8,6 +8,7 @@ pub struct Client {
     pub seed: String,
 
     pub pause: Option<Pause>,
+
     pub title_screen: Option<TitleScreen>,
 
     pub timeline: Timeline,
@@ -65,7 +66,8 @@ impl Client {
     pub fn tick(&mut self) {
         self.bg_music.tick();
 
-        if (self.pause.is_some()) {
+        if let Some(pause) = self.pause.as_mut() {
+            pause.tick();
             return;
         }
 
@@ -467,14 +469,14 @@ impl Client {
             all_entities.sort_by_key(|(_, depth)| *depth);
 
             for (e, _) in all_entities {
-                self.entities.draw_entity(e);
+                self.entities.draw_entity(e, self.pause.is_some());
             }
         }
 
         raylib_sys::EndMode2D();
 
         if let Some(pause) = self.pause.as_mut() {
-            // TODO
+            pause.draw();
         }
 
         if let Some(title) = self.title_screen.as_mut() {
@@ -724,10 +726,6 @@ fn create_outfit_switchers(rand: FroggyRand, timeline: &Timeline, players: &Enti
     }
 }
 
-struct Pause {
-
-}
-
 #[derive(Debug)]
 enum BGMusicMode {
     Lowpassed,
@@ -836,5 +834,20 @@ unsafe extern "C" fn rl_low_pass(buffer_void: *mut ::std::os::raw::c_void, frame
         LP_DATA[1] += k * (r - LP_DATA[1]);
         buffer[index] = LP_DATA[0];
         buffer[index + 1] = LP_DATA[1];
+    }
+}
+
+#[derive(Default)]
+pub struct Pause {
+}
+
+impl Pause {
+    pub fn tick(&mut self) {
+    }
+
+    pub fn draw(&self) {
+        unsafe {
+            raylib_sys::DrawText(c_str_temp("Paused"), 10, 10, 16, crate::RED);
+        }
     }
 }

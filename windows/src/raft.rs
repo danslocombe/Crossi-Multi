@@ -112,14 +112,10 @@ impl IsEntity for RaftSail {
         self.pos.y as i32 + 40
     }
 
-    fn draw(&mut self) {
-        self.t += 1;
-        {
-            //let xx = self.pos.x - 4.0;
-            //let xx = self.pos.x + 2.0;
-            //let yy = self.pos.y + 8.0;
-            //sprites::draw("raft_sail_frame", 0, xx, yy);
-            //sprites::draw("raft", 0, xx, yy);
+    fn draw(&mut self, paused: bool) {
+
+        if (!paused) {
+            self.t += 1;
         }
 
         const brown_frame: raylib_sys::Color = crate::hex_color("8f563b".as_bytes());

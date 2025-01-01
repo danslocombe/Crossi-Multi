@@ -637,7 +637,7 @@ impl IsEntity for PlayerLocal {
         self.pos.y as i32 * 8
     }
 
-    fn draw(&mut self) {
+    fn draw(&mut self, paused: bool) {
         if (self.alive_state == AliveState::NotInGame) {
             return;
         }
