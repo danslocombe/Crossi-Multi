@@ -587,11 +587,11 @@ impl PlayerLocal {
                     let rand = rand.subrand(i);
                     let dust_off = rand.gen_unit("off") * 3.0;
                     let dust_dir = rand.gen_unit("dir") * 3.141 * 2.0;
-                    let pos = corpse_pos * 8.0 + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
+                    let pos = corpse_pos + V2::new(4.0, 4.0) + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
                     //let pos = self.pos * 8.0 + V2::norm_from_angle(dust_dir as f32) * dust_off as f32;
                     let bubble_part = bubbles.create(Pos::Absolute(pos));
                     bubble_part.image_index = rand.gen_usize_range("frame", 0, 3) as i32;
-                    bubble_part.scale = (0.5 + rand.gen_unit("scale") * 0.6) as f32;
+                    bubble_part.scale = (0.9 + rand.gen_unit("scale") * 0.6) as f32;
                 }
 
                 audio::play("drown");

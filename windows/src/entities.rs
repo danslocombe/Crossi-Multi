@@ -937,6 +937,7 @@ impl IsEntity for Bubble {
         self.scale -= 0.025;
         self.pos.y -= 0.2;
         if (self.scale > 0.0) {
+            //println!("Drawing bubble, pos : {}", self.pos);
             let size = 8.0 * self.scale;
             let x = self.pos.x - 0.5 * size;
             let y = self.pos.y - 0.5 * size;

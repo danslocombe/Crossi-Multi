@@ -122,7 +122,14 @@ fn main() {
                 client.draw();
                 raylib_sys::EndTextureMode();
             }
-            //let texture = raylib_sys::LoadTextureFromImage(image);
+
+            if (client.recording_gif) {
+                let image = raylib_sys::LoadImageFromTexture(framebuffer.texture);
+                assert_eq!(image.format as i32, raylib_sys::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 as i32);
+                let data_slice = std::slice::from_raw_parts_mut(image.data.cast(), image.width as usize * image.height as usize * 4);
+                client.frame_ring_buffer.push(Some(data_slice.to_vec()));
+                raylib_sys::UnloadImage(image);
+            }
 
             {
                 raylib_sys::BeginDrawing();
@@ -148,7 +155,11 @@ fn main() {
                     raylib_sys::EndShaderMode();
                 }
 
-                raylib_sys::DrawFPS(raylib_sys::GetScreenWidth() - 100, 20);
+                // @Trailer
+                if (false) {
+                    raylib_sys::DrawFPS(raylib_sys::GetScreenWidth() - 100, 20);
+                }
+
                 /*
                 if let Some(editor) = client.game.editor.as_mut() {
                     gui_editor::draw_gui(&mut client.game.local_simulation.simulation, editor);

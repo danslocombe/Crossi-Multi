@@ -113,7 +113,6 @@ impl IsEntity for RaftSail {
     }
 
     fn draw(&mut self, paused: bool) {
-
         if (!paused) {
             self.t += 1;
         }

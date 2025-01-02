@@ -1,4 +1,4 @@
-use std::{mem::MaybeUninit, str::FromStr};
+use std::{io::BufWriter, mem::MaybeUninit, str::FromStr};
 
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, EndWinnerState, WINNER_TIME_US}, ring_buffer::RingBuffer, timeline::Timeline, DebugLogger, PlayerId, Pos};
 
@@ -21,6 +21,10 @@ pub fn init_console() {
         command_set.commands.push(Command {
             name: "new".to_owned(),
             lambda: Box::new(do_new),
+        });
+        command_set.commands.push(Command {
+            name: "exit".to_owned(),
+            lambda: Box::new(do_exit),
         });
         command_set.commands.push(Command {
             name: "shader".to_owned(),
@@ -49,6 +53,18 @@ pub fn init_console() {
         command_set.commands.push(Command {
             name: "lobby".to_owned(),
             lambda: Box::new(do_lobby),
+        });
+        command_set.commands.push(Command {
+            name: "start_recording".to_owned(),
+            lambda: Box::new(do_start_recording),
+        });
+        command_set.commands.push(Command {
+            name: "stop_recording".to_owned(),
+            lambda: Box::new(do_stop_recording),
+        });
+        command_set.commands.push(Command {
+            name: "sr".to_owned(),
+            lambda: Box::new(do_stop_recording),
         });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
@@ -623,4 +639,114 @@ fn do_lobby(args: &[&str], client: &mut Client) {
     client.player_input_controller = PlayerInputController::default();
     client.entities.clear_round_entities();
     client.entities.players.inner.clear();
+}
+
+fn do_exit(args: &[&str], client: &mut Client) {
+    if (args.len() != 0) {
+        err!("Expected zero 'exit' got {}", args.len());
+        return;
+    }
+
+    big!("Shutting down..");
+
+    client.exit = true;
+}
+
+fn do_start_recording(args: &[&str], client: &mut Client) {
+    if (args.len() != 1) {
+        err!("Expected one arguments to start_recording, got {}", args.len());
+        return;
+    }
+
+    client.recording_gif_name = args[0].to_owned();
+    client.recording_gif = true;
+
+    info!("Recording to {}", args[0]);
+    info!("Use 'sr' or 'stop_recording' to stop");
+}
+
+fn do_stop_recording(args: &[&str], client: &mut Client) {
+    if (args.len() != 0) {
+        err!("Expected no arguments to stop_recording, got {}", args.len());
+        return;
+    }
+
+    std::fs::create_dir_all(&format!("gifs/{}", &client.recording_gif_name)).unwrap();
+
+    // Find first frame populated
+    let mut first_frame_index = -(client.frame_ring_buffer.size() as i32 - 1);
+    while (client.frame_ring_buffer.get(first_frame_index).is_none()) {
+        first_frame_index += 1;
+        if (first_frame_index >= 0) {
+            break;
+        }
+    }
+
+    let mut buffer = Vec::new();
+
+    let mut i : i32 = first_frame_index;
+    let mut frame_id_to_write: i32 = 0;
+    while let Some(frame) = client.frame_ring_buffer.get(i) {
+        if (i.abs() as usize >= client.frame_ring_buffer.size()) {
+            break;
+        }
+
+        let name = format!("gifs/{}/frame_{:04}.png", &client.recording_gif_name, frame_id_to_write.abs());
+
+        {
+            buffer.clear();
+            image_data_to_png(frame, 160, 160, &mut buffer);
+            info!("Writing {}", name);
+            std::fs::write(name, &buffer).unwrap();
+            //zip_maker.write_all(&buffer[..]).unwrap();
+        }
+
+        i += 1;
+        frame_id_to_write += 1;
+
+        if (i >= 0) {
+            break;
+        }
+    }
+
+    big!("Done writing {}! Clearing buffer", &client.recording_gif_name);
+    client.frame_ring_buffer = RingBuffer::new_with_value(60 * 60, None);
+    client.recording_gif = false;
+}
+
+fn image_data_to_png(raw_data: &[u8], width: u32, height: u32, data: &mut Vec<u8>) {
+    //let mut data = Vec::new();
+
+    let mut processed_data: Vec<u8> = Vec::with_capacity(raw_data.len());
+
+    // Hack around upside down data.
+    for y in 0..(height as usize) {
+        let y = height as usize - y - 1;
+        let start = y * width as usize * 4;
+        let end = (y + 1) * width as usize * 4;
+        processed_data.extend_from_slice(&raw_data[start..end]);
+    }
+
+    {
+        //let writer = BufWriter::new(&mut data);
+        let writer = BufWriter::new(data);
+        let mut encoder = png::Encoder::new(writer, width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_source_gamma(png::ScaledFloat::from_scaled(45455)); // 1.0 / 2.2, scaled by 100000
+        encoder.set_source_gamma(png::ScaledFloat::new(1.0 / 2.2));     // 1.0 / 2.2, unscaled, but rounded
+        let source_chromaticities = png::SourceChromaticities::new(     // Using unscaled instantiation here
+            (0.31270, 0.32900),
+            (0.64000, 0.33000),
+            (0.30000, 0.60000),
+            (0.15000, 0.06000)
+        );
+
+        encoder.set_source_chromaticities(source_chromaticities);
+        let mut writer = encoder.write_header().unwrap();
+
+        writer.write_image_data(&processed_data).unwrap();
+    }
+
+    //data
 }

@@ -1,4 +1,4 @@
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, ring_buffer::RingBuffer, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
 use crate::{audio, c_str_temp, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
@@ -28,6 +28,10 @@ pub struct Client {
     actor_controller: ActorController,
 
     bg_music: TitleBGMusic,
+
+    pub frame_ring_buffer: RingBuffer<Option<Vec<u8>>>,
+    pub recording_gif: bool,
+    pub recording_gif_name: String,
 }
 
 impl Client {
@@ -60,6 +64,9 @@ impl Client {
             title_screen: Some(TitleScreen::default()),
             actor_controller,
             bg_music: TitleBGMusic::new(),
+            frame_ring_buffer: RingBuffer::new_with_value(60 * 60, None),
+            recording_gif: false,
+            recording_gif_name: String::default(),
         }
     }
 
@@ -439,7 +446,8 @@ impl Client {
             let players_in_ready_zone = top.player_states.iter().filter(|(_, x)| crossy_multi_core::crossy_ruleset::player_in_lobby_ready_zone(x)).count();
             let total_player_count = top.player_states.count_populated();
 
-            if (total_player_count >= top.rules_state.config.minimum_players as usize)
+            // @Trailer
+            if (false && total_player_count >= top.rules_state.config.minimum_players as usize)
             {
                 let pos = V2::new(*raft_pos, 10.0) * 8.0 + V2::new(1.0, 6.0) * 8.0;
                 let image_index = players_in_ready_zone + 1;
