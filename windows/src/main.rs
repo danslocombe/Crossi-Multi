@@ -155,10 +155,9 @@ fn main() {
                     raylib_sys::EndShaderMode();
                 }
 
-                // @Trailer
-                if (false) {
-                    raylib_sys::DrawFPS(raylib_sys::GetScreenWidth() - 100, 20);
-                }
+                //if (!client.trailer_mode) {
+                    //raylib_sys::DrawFPS(raylib_sys::GetScreenWidth() - 100, 20);
+                //}
 
                 /*
                 if let Some(editor) = client.game.editor.as_mut() {

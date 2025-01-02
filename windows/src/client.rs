@@ -4,6 +4,10 @@ use froggy_rand::FroggyRand;
 
 pub struct Client {
     pub debug: bool,
+
+    // Disable some gui / teaching elements.
+    pub trailer_mode: bool,
+
     pub exit: bool,
     pub seed: String,
 
@@ -49,6 +53,7 @@ impl Client {
 
         Self {
             debug,
+            trailer_mode: false,
             seed: seed.to_owned(),
             exit: false,
             timeline,
@@ -446,8 +451,7 @@ impl Client {
             let players_in_ready_zone = top.player_states.iter().filter(|(_, x)| crossy_multi_core::crossy_ruleset::player_in_lobby_ready_zone(x)).count();
             let total_player_count = top.player_states.count_populated();
 
-            // @Trailer
-            if (false && total_player_count >= top.rules_state.config.minimum_players as usize)
+            if (!self.trailer_mode && total_player_count >= top.rules_state.config.minimum_players as usize)
             {
                 let pos = V2::new(*raft_pos, 10.0) * 8.0 + V2::new(1.0, 6.0) * 8.0;
                 let image_index = players_in_ready_zone + 1;

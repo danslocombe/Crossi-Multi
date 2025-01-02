@@ -70,6 +70,10 @@ pub fn init_console() {
             name: "add_player".to_owned(),
             lambda: Box::new(do_add_player),
         });
+        command_set.commands.push(Command {
+            name: "trailer_mode".to_owned(),
+            lambda: Box::new(do_toggle_trailer_mode),
+        });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
 }
@@ -773,4 +777,19 @@ fn do_add_player(args: &[&str], client: &mut Client) {
         &client.entities.outfit_switchers,
         &mut new_players,
         None);
+}
+
+fn do_toggle_trailer_mode(args: &[&str], client: &mut Client) {
+    if (args.len() != 0) {
+        err!("Expected no arguments to trailer_mode, got {}", args.len());
+        return;
+    }
+
+    client.trailer_mode = !client.trailer_mode;
+    if (client.trailer_mode) {
+        big!("Enabling trailer mode");
+    }
+    else {
+        big!("Disabling trailer mode");
+    }
 }
