@@ -172,31 +172,43 @@ impl PlayerInputController {
             }
         }
         else if input != Input::None{
-            // Create player.
+            Self::create_player(id_registration, input, player_inputs, timeline, players_local, outfit_switchers, new_players, controller_id);
+        }
+    }
+
+    pub fn create_player(
+        id_registration: &mut Option<PlayerId>,
+        input: Input,
+        player_inputs: &mut PlayerInputs,
+        timeline: &mut Timeline,
+        players_local: &mut EntityContainer<PlayerLocal>,
+        outfit_switchers: &EntityContainer<OutfitSwitcher>,
+        new_players: &mut Vec<PlayerId>,
+        controller_id: Option<i32>) {
+
+        let top = timeline.top_state();
+        if let Some(new_id) = top.player_states.next_free() {
+            *id_registration = Some(new_id);
+
+            let rand = FroggyRand::new(timeline.len() as u64);
+            let new_skin = Skin::rand_not_overlapping(rand, &players_local.inner, &outfit_switchers.inner);
+            let pos = lobby_spawn_pos_no_overlapping(rand, &players_local.inner);
+
+            timeline.add_player(new_id, Pos::Coord(pos));
+
+
             let top = timeline.top_state();
-            if let Some(new_id) = top.player_states.next_free() {
-                *id_registration = Some(new_id);
+            let player_state = top.player_states.get(new_id).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map, &top.rules_state.fst);
+            let player_local = players_local.create(Pos::Absolute(V2::default()));
+            player_local.set_from(&player_state);
+            player_local.update_inputs(&*timeline, player_inputs, input);
+            player_local.skin = new_skin;
+            player_local.controller_id = controller_id;
 
-                let rand = FroggyRand::new(timeline.len() as u64);
-                let new_skin = Skin::rand_not_overlapping(rand, &players_local.inner, &outfit_switchers.inner);
-                let pos = lobby_spawn_pos_no_overlapping(rand, &players_local.inner);
-
-                timeline.add_player(new_id, Pos::Coord(pos));
-
-
-                let top = timeline.top_state();
-                let player_state = top.player_states.get(new_id).unwrap().to_public(top.get_round_id(), top.time_us, &timeline.map, &top.rules_state.fst);
-                let player_local = players_local.create(Pos::Absolute(V2::default()));
-                player_local.set_from(&player_state);
-                player_local.update_inputs(&*timeline, player_inputs, input);
-                player_local.skin = new_skin;
-                player_local.controller_id = controller_id;
-
-                new_players.push(new_id);
-            }
-            else {
-                console::info("Unable to create another player");
-            }
+            new_players.push(new_id);
+        }
+        else {
+            console::info("Unable to create another player");
         }
     }
 }

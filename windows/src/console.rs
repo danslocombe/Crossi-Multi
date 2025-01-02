@@ -1,6 +1,6 @@
 use std::{io::BufWriter, mem::MaybeUninit, str::FromStr};
 
-use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, EndWinnerState, WINNER_TIME_US}, ring_buffer::RingBuffer, timeline::Timeline, DebugLogger, PlayerId, Pos};
+use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, EndWinnerState, WINNER_TIME_US}, ring_buffer::RingBuffer, timeline::Timeline, DebugLogger, Input, PlayerId, PlayerInputs, Pos};
 
 use crate::{player_local::{PlayerInputController, Skin}, Client};
 
@@ -65,6 +65,10 @@ pub fn init_console() {
         command_set.commands.push(Command {
             name: "sr".to_owned(),
             lambda: Box::new(do_stop_recording),
+        });
+        command_set.commands.push(Command {
+            name: "add_player".to_owned(),
+            lambda: Box::new(do_add_player),
         });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
@@ -749,4 +753,24 @@ fn image_data_to_png(raw_data: &[u8], width: u32, height: u32, data: &mut Vec<u8
     }
 
     //data
+}
+
+fn do_add_player(args: &[&str], client: &mut Client) {
+    if (args.len() != 0) {
+        err!("Expected no arguments to add_player, got {}", args.len());
+        return;
+    }
+
+    let mut registration = None;
+    let mut dummy_player_inputs = PlayerInputs::default();
+    let mut new_players = Vec::new();
+    PlayerInputController::create_player(
+        &mut registration,
+        Input::None,
+        &mut dummy_player_inputs,
+        &mut client.timeline,
+        &mut client.entities.players,
+        &client.entities.outfit_switchers,
+        &mut new_players,
+        None);
 }
