@@ -34,6 +34,8 @@ pub fn init_audio() {
         load_sfx("snd_win.wav", 1.0);
         load_sfx("snd_viper.mp3", 1.0);
 
+        load_sfx("snd_menu_move.wav", 1.0);
+        load_sfx("snd_menu_click.wav", 1.0);
         //load_music("mus_jump_at_sun_3.mp3", 1.0);
     }
 }

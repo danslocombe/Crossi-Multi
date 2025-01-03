@@ -15,8 +15,9 @@ mod raft;
 
 use std::{mem::MaybeUninit};
 
-use client::Client;
+use client::{Client, Pause};
 use crossy_multi_core::math::V2;
+use serde::{Deserialize, Serialize};
 
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
@@ -24,6 +25,8 @@ static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit
 //static mut FONT_m3x6: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
 static mut FONT_ROBOTO: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
 static mut FONT_ROBOTO_BOLD: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
+
+static mut g_settings: MaybeUninit<GlobalSettingsState> = MaybeUninit::uninit();
 
 pub fn c_str_temp(s: &str) -> *const i8 {
     unsafe {
@@ -49,6 +52,11 @@ fn main() {
         println!("Running in debug mode");
     }
 
+    let settings = GlobalSettingsState::default();
+    unsafe {
+        g_settings = MaybeUninit::new(settings);
+    }
+
     unsafe {
         c_string_temp_allocator = MaybeUninit::new(CStringAllocator {
             buffers: Vec::new(),
@@ -65,6 +73,7 @@ fn main() {
 
         if (!debug_param) {
             raylib_sys::ToggleBorderlessWindowed();
+            raylib_sys::HideCursor();
         }
 
         raylib_sys::InitAudioDevice();
@@ -81,16 +90,6 @@ fn main() {
 
         let framebuffer = raylib_sys::LoadRenderTexture(160, 160);
 
-        // @HACK
-        // Generate a random number, should really use rand crate
-        // but dont want more depedencies.
-        // Allocate something in memory then use the ptr as the seed.
-        let seed = {
-            let blah = Box::new(0);
-            let ptr = std::ptr::from_ref(&*blah);
-            std::mem::transmute::<_, usize>(ptr)
-        };
-
         //FONT_m3x6 = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/m5x7.ttf")));
         FONT_ROBOTO = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Regular.ttf")));
         //FONT_ROBOTO_BOLD = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Bold.ttf")));
@@ -101,7 +100,8 @@ fn main() {
             95, // Default in raylib, just ascii
             ));
 
-        let mut client = Client::new(debug_param, &format!("{}", seed));
+        let seed = shitty_rand_seed();
+        let mut client = Client::new(debug_param, &seed);
 
         while !raylib_sys::WindowShouldClose() && !client.exit {
             let mapping_info = FrameBufferToScreenInfo::compute(&framebuffer.texture);
@@ -117,6 +117,7 @@ fn main() {
                 }
                 else {
                     if client.pause.is_some() {
+                        audio::play("menu_click");
                         client.pause = None;
                     }
                     else {
@@ -124,7 +125,8 @@ fn main() {
                             // Dont allow pausing in title screen
                         }
                         else {
-                            client.pause = Some(Default::default());
+                            audio::play("menu_click");
+                            client.pause = Some(Pause::new());
                         }
                     }
                 }
@@ -454,4 +456,57 @@ pub fn ease_in_quad(x: f32) -> f32 {
 
 pub fn to_vector2(x: V2) -> raylib_sys::Vector2 {
     raylib_sys::Vector2 { x: x.x, y: x.y }
+}
+
+pub fn shitty_rand_seed() -> String {
+    // @HACK
+    // Generate a random number, should really use rand crate
+    // but dont want more depedencies.
+    // Allocate something in memory then use the ptr as the seed.
+
+    unsafe {
+        let seed = {
+            let blah = Box::new(0);
+            let ptr = std::ptr::from_ref(&*blah);
+            std::mem::transmute::<_, usize>(ptr)
+        };
+        format!("{}", seed)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum VisualEffectsLevel {
+    Full,
+    Reduced,
+    None,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GlobalSettingsState {
+    music_volume: f32,
+    sfx_volume: f32,
+    visual_effects: VisualEffectsLevel,
+    crt_shader: bool,
+}
+
+impl GlobalSettingsState {
+    pub fn validate(&mut self) {
+        self.music_volume = self.music_volume.clamp(0.0, 1.0);
+        self.sfx_volume = self.sfx_volume.clamp(0.0, 1.0);
+    }
+
+    pub fn sync(&self) {
+        // @TODO
+    }
+}
+
+impl Default for GlobalSettingsState {
+    fn default() -> Self {
+        Self {
+            sfx_volume: 0.8,
+            music_volume: 0.6,
+            visual_effects: VisualEffectsLevel::Full,
+            crt_shader: true,
+        }
+    }
 }

@@ -74,6 +74,14 @@ pub fn init_console() {
             name: "trailer_mode".to_owned(),
             lambda: Box::new(do_toggle_trailer_mode),
         });
+        command_set.commands.push(Command {
+            name: "game_config".to_owned(),
+            lambda: Box::new(do_game_config),
+        });
+        command_set.commands.push(Command {
+            name: "seed".to_owned(),
+            lambda: Box::new(do_seed),
+        });
         g_console = MaybeUninit::new(Console::new(command_set));
     }
 }
@@ -614,8 +622,9 @@ fn do_restart(args: &[&str], client: &mut Client) {
         return;
     }
 
-    big!("Restarting, preserving seed '{}'", client.seed);
-    client.restart();
+    let seed = client.seed.clone();
+    big!("Restarting, preserving seed '{}'", seed);
+    client.goto_loby_seed(&seed, None);
 }
 
 fn do_lobby(args: &[&str], client: &mut Client) {
@@ -629,18 +638,11 @@ fn do_lobby(args: &[&str], client: &mut Client) {
         seed = args[0].to_owned();
     }
     else {
-        seed = format!("seed_{}", 10);
+        seed = crate::shitty_rand_seed();
     }
 
     big!("Lobby with Seed '{}'", seed);
-    let mut config = client.timeline.top_state().rules_state.config.clone();
-    config.bypass_lobby = false;
-    client.timeline = Timeline::from_seed(config, &seed);
-    client.seed = seed;
-
-    client.player_input_controller = PlayerInputController::default();
-    client.entities.clear_round_entities();
-    client.entities.players.inner.clear();
+    client.goto_loby_seed(&seed, Some(false));
 }
 
 fn do_exit(args: &[&str], client: &mut Client) {
@@ -786,4 +788,24 @@ fn do_toggle_trailer_mode(args: &[&str], client: &mut Client) {
     else {
         big!("Disabling trailer mode");
     }
+}
+
+fn do_game_config(args: &[&str], client: &mut Client) {
+    if (args.len() != 0) {
+        err!("Expected no arguments to game_config, got {}", args.len());
+        return;
+    }
+
+    println!("{:#?}", client.timeline.top_state().rules_state.config);
+    info!("{:?}", client.timeline.top_state().rules_state.config);
+}
+
+fn do_seed(args: &[&str], client: &mut Client) {
+    if (args.len() != 0) {
+        err!("Expected no arguments to seed, got {}", args.len());
+        return;
+    }
+
+    println!("Seed: {}", client.seed);
+    info!("Seed: {}", client.seed);
 }

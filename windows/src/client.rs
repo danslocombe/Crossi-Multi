@@ -1,4 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, ring_buffer::RingBuffer, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
+use serde::{Deserialize, Serialize};
 use crate::{audio, c_str_temp, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, to_vector2, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
@@ -38,6 +39,15 @@ pub struct Client {
     pub recording_gif_name: String,
 }
 
+pub const grass_col_0: raylib_sys::Color = hex_color("c4e6b5".as_bytes());
+pub const grass_col_1: raylib_sys::Color = hex_color("d1bfdb".as_bytes());
+pub const river_col_0: raylib_sys::Color = hex_color("6c6ce2".as_bytes());
+pub const river_col_1: raylib_sys::Color = hex_color("5b5be7".as_bytes());
+pub const road_col_0: raylib_sys::Color = hex_color("646469".as_bytes());
+pub const road_col_1: raylib_sys::Color = hex_color("59595d".as_bytes());
+pub const icy_col_0: raylib_sys::Color = hex_color("cbdbfc".as_bytes());
+pub const icy_col_1: raylib_sys::Color = hex_color("9badb7".as_bytes());
+
 impl Client {
     pub fn new(debug: bool, seed: &str) -> Self {
         println!("Initialising, Seed {}", seed);
@@ -75,36 +85,54 @@ impl Client {
         }
     }
 
-    pub fn restart(&mut self) {
-        let config = self.timeline.top_state().rules_state.config.clone();
+    pub fn goto_loby_seed(&mut self, seed: &str, bypass_lobby: Option<bool>) {
+        let mut config = self.timeline.top_state().rules_state.config.clone();
+        if let Some(bl) =  bypass_lobby {
+            config.bypass_lobby = bl;
+        }
+
+        if (!seed.is_empty()) {
+            self.seed = seed.to_owned();
+        }
+
         self.timeline = Timeline::from_seed(config, &self.seed);
 
         self.player_input_controller = PlayerInputController::default();
         self.entities.clear_round_entities();
         self.entities.players.inner.clear();
+
+        self.pause = None;
+
+        self.visual_effects.noise();
+        self.visual_effects.whiteout();
+        self.visual_effects.screenshake();
+        audio::play("car");
     }
 
     pub fn tick(&mut self) {
         self.bg_music.tick();
+        self.visual_effects.tick();
 
         if let Some(pause) = self.pause.as_mut() {
             match pause.tick() {
+                PauseResult::Nothing => {},
+                PauseResult::Unpause => {
+                    self.pause = None;
+                },
                 PauseResult::Exit => {
                     self.exit = true;
                 }
-                PauseResult::Nothing => {},
-                PauseResult::Restart => {
-                    self.restart();
-                }
-                PauseResult::Unpause => {
+                PauseResult::Lobby => {
+                    self.goto_loby_seed(&crate::shitty_rand_seed(), Some(false));
+                },
+                PauseResult::Feedback => {
+                    // @TODO
                     self.pause = None;
-                }
+                },
             }
 
             return;
         }
-
-        self.visual_effects.tick();
 
         let mut just_left_title = false;
         if let Some(title) = self.title_screen.as_mut() {
@@ -334,15 +362,6 @@ impl Client {
         if (draw_bg_tiles)
         {
             // Draw background
-            const grass_col_0: raylib_sys::Color = hex_color("c4e6b5".as_bytes());
-            const grass_col_1: raylib_sys::Color = hex_color("d1bfdb".as_bytes());
-            const river_col_0: raylib_sys::Color = hex_color("6c6ce2".as_bytes());
-            const river_col_1: raylib_sys::Color = hex_color("5b5be7".as_bytes());
-            const road_col_0: raylib_sys::Color = hex_color("646469".as_bytes());
-            const road_col_1: raylib_sys::Color = hex_color("59595d".as_bytes());
-            const icy_col_0: raylib_sys::Color = hex_color("cbdbfc".as_bytes());
-            const icy_col_1: raylib_sys::Color = hex_color("9badb7".as_bytes());
-
             //let screen_y = top.rules_state.fst.get_screen_y();
             let screen_y = self.camera.y as i32 / 8;
             let round_id = top.get_round_id();
@@ -508,10 +527,6 @@ impl Client {
 
         raylib_sys::EndMode2D();
 
-        if let Some(pause) = self.pause.as_mut() {
-            pause.draw();
-        }
-
         if let Some(title) = self.title_screen.as_mut() {
             title.draw();
         }
@@ -522,6 +537,10 @@ impl Client {
             if (self.visual_effects.whiteout > 0) {
                 raylib_sys::DrawRectangle(0, 0, 160, 160, WHITE);
             }
+        }
+
+        if let Some(pause) = self.pause.as_mut() {
+            pause.draw();
         }
     }
 }
@@ -882,22 +901,36 @@ pub struct Pause {
 pub enum PauseResult {
     Nothing,
     Unpause,
-    Restart,
     Exit,
+    Lobby,
+    Feedback,
 }
 
 impl Pause {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn tick(&mut self) -> PauseResult {
+        if let Some(settings) = self.settings_menu.as_mut() {
+            if !settings.tick() {
+                self.settings_menu = None;
+            }
+
+            return PauseResult::Nothing;
+        }
+
         self.t += 1;
         self.t_since_move += 1;
 
         // @Fragile
-        let option_count = 6;
+        let option_count = 5;
 
         // @TODO controller input / WASD.
         if key_pressed(raylib_sys::KeyboardKey::KEY_DOWN) {
             self.highlighted = (self.highlighted + 1) % option_count;
             self.t_since_move = 0;
+            audio::play("menu_move");
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
             self.highlighted = (self.highlighted - 1);
@@ -906,34 +939,30 @@ impl Pause {
             }
 
             self.t_since_move = 0;
+            audio::play("menu_move");
         }
 
         // @TODO controller input / WASD.
         if (key_pressed(raylib_sys::KeyboardKey::KEY_SPACE)) {
+            audio::play("menu_click");
             match self.highlighted {
                 0 => {
                     // Resume
                     return PauseResult::Unpause;
                 }
                 1 => {
-                    // Restart
-                    return PauseResult::Restart;
+                    // Lobby
+                    return PauseResult::Lobby;
                 }
                 2 => {
                     // Settings
-                    return PauseResult::Restart;
+                    self.settings_menu = Some(SettingsMenu::new());
                 }
                 3 => {
                     // Feedback
-                    // @TODO
-                    return PauseResult::Unpause;
+                    return PauseResult::Feedback;
                 }
                 4 => {
-                    // Lobby
-                    // @TODO
-                    return PauseResult::Unpause;
-                }
-                5 => {
                     // Exit
                     return PauseResult::Exit;
                 }
@@ -950,16 +979,21 @@ impl Pause {
 
     pub fn draw(&self) {
         unsafe {
-            let mut col = crate::SEA;
+            //let mut col = crate::SEA;
+            let mut col = river_col_1;
             //col.a = 80;
             raylib_sys::DrawRectangle(0, 0, 160, 160, col);
         }
     }
 
     pub fn draw_gui(&self) {
+        if let Some(settings) = self.settings_menu.as_ref() {
+            settings.draw();
+            return;
+        }
+
         unsafe {
             let padding = 16.0;
-
             let width = raylib_sys::GetScreenWidth();
             let height = raylib_sys::GetScreenHeight();
             let dimensions = V2::new(width as f32, height as f32);
@@ -970,57 +1004,144 @@ impl Pause {
 
             let text_size = self.draw_text_center_aligned("Resume", p, self.highlighted == 0);
             p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Restart", p, self.highlighted == 1);
+            let text_size = self.draw_text_center_aligned("Lobby", p, self.highlighted == 1);
             p.y += text_size.y + padding;
             let text_size = self.draw_text_center_aligned("Settings", p, self.highlighted == 2);
             p.y += text_size.y + padding;
             let text_size = self.draw_text_center_aligned("Submit Feedback", p, self.highlighted == 3);
             p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Lobby", p, self.highlighted == 4);
-            p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Exit", p, self.highlighted == 5);
+            let text_size = self.draw_text_center_aligned("Exit", p, self.highlighted == 4);
         }
     }
 
-
     fn draw_text_center_aligned(&self, text: &str, pos: V2, highlighted: bool) -> V2 {
-        let text_c = c_str_temp(text);
-        let spacing = 1.0;
-        let font_size = 60.0;
-
-        let mut color = WHITE;
-        if (highlighted) {
-            // @Dedupe
-            // Copypasta from console
-            let cursor_col_lerp_t = 0.5 + 0.5 * 
-                (self.t_since_move as f32 / 30.0).cos();
-            color = crate::lerp_color_rgba(crate::WHITE, crate::ORANGE, cursor_col_lerp_t);
-        }
-
-        unsafe {
-            let font = crate::FONT_ROBOTO_BOLD.assume_init();
-            let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c, font_size, spacing);
-            let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
-            let pos = pos - text_size * 0.5;
-            raylib_sys::DrawTextEx(font, text_c, to_vector2(pos), font_size, spacing, color);
-
-
-            if (highlighted) {
-                let square_size = 16.0;
-                let hoz_padding = 8.0;
-                raylib_sys::DrawRectangleRec(raylib_sys::Rectangle {
-                    x: (pos.x - hoz_padding - square_size),
-                    y: (pos.y + text_size.y * 0.5 - square_size * 0.5),
-                    width: square_size,
-                    height: square_size,
-                }, color);
-            }
-
-            text_size
-        }
+        draw_text_center_aligned_ex(self.t_since_move, text, pos, highlighted)
     }
 }
 
 #[derive(Default)]
 pub struct SettingsMenu {
+    pub t: i32,
+    pub t_since_move: i32,
+    pub highlighted: i32,
+}
+
+impl SettingsMenu {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn tick(&mut self) -> bool {
+        self.t += 1;
+        self.t_since_move += 1;
+
+        // @Fragile
+        let option_count = 6;
+
+        // @TODO controller input / WASD.
+        // @Dedup
+        if key_pressed(raylib_sys::KeyboardKey::KEY_DOWN) {
+            self.highlighted = (self.highlighted + 1) % option_count;
+            self.t_since_move = 0;
+            audio::play("menu_move");
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
+            self.highlighted = (self.highlighted - 1);
+            if (self.highlighted < 0) {
+                self.highlighted = option_count - 1;
+            }
+
+            self.t_since_move = 0;
+            audio::play("menu_move");
+        }
+
+        // @TODO controller input / WASD.
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_SPACE)) {
+            audio::play("menu_click");
+            match self.highlighted {
+                0 => {
+                }
+                1 => {
+                }
+                2 => {
+                }
+                3 => {
+                    return false;
+                }
+                _ => {
+                    // @Unreachable
+                    debug_assert!(false);
+                }
+            }
+        }
+
+        true
+    }
+
+    pub fn draw(&self) {
+        unsafe {
+            let padding = 16.0;
+            let width = raylib_sys::GetScreenWidth();
+            let height = raylib_sys::GetScreenHeight();
+            let dimensions = V2::new(width as f32, height as f32);
+            let text_size = self.draw_text_center_aligned("Settings", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false);
+
+            let mut p = V2::new(dimensions.x * 0.5, dimensions.y * 0.4);
+            p.y += text_size.y + padding;
+
+            let text_size = self.draw_text_center_aligned("Music Volume", p, self.highlighted == 0);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Sound Effect Volume", p, self.highlighted == 1);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Fullscreen: Enabled", p, self.highlighted == 2);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Visual Effects: Full", p, self.highlighted == 3);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("CRT Shader: Enabled", p, self.highlighted == 4);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Back", p, self.highlighted == 5);
+        }
+    }
+
+    fn draw_text_center_aligned(&self, text: &str, pos: V2, highlighted: bool) -> V2 {
+        draw_text_center_aligned_ex(self.t_since_move, text, pos, highlighted)
+    }
+}
+
+
+fn draw_text_center_aligned_ex(t_since_move: i32, text: &str, pos: V2, highlighted: bool) -> V2 {
+    let text_c = c_str_temp(text);
+    let spacing = 1.0;
+    let font_size = 60.0;
+
+    let mut color = WHITE;
+    if (highlighted) {
+        // @Dedupe
+        // Copypasta from console
+        let cursor_col_lerp_t = 0.5 + 0.5 * 
+            (t_since_move as f32 / 30.0).cos();
+        color = crate::lerp_color_rgba(crate::WHITE, crate::ORANGE, cursor_col_lerp_t);
+    }
+
+    unsafe {
+        let font = crate::FONT_ROBOTO_BOLD.assume_init();
+        let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c, font_size, spacing);
+        let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
+        let pos = pos - text_size * 0.5;
+        raylib_sys::DrawTextEx(font, text_c, to_vector2(pos), font_size, spacing, color);
+
+
+        if (highlighted) {
+            let square_size = 16.0;
+            let hoz_padding = 8.0;
+            raylib_sys::DrawRectangleRec(raylib_sys::Rectangle {
+                x: (pos.x - hoz_padding - square_size),
+                y: (pos.y + text_size.y * 0.5 - square_size * 0.5),
+                width: square_size,
+                height: square_size,
+            }, color);
+        }
+
+        text_size
+    }
 }

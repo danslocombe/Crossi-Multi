@@ -35,7 +35,7 @@ impl RemoteTickState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Timeline {
     pub states: VecDeque<GameState>,
     pub map : Map,
