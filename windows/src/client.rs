@@ -1,5 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, ring_buffer::RingBuffer, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{audio, c_str_temp, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, BLACK, WHITE};
+use crate::{audio, c_str_temp, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, to_vector2, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -75,11 +75,32 @@ impl Client {
         }
     }
 
+    pub fn restart(&mut self) {
+        let config = self.timeline.top_state().rules_state.config.clone();
+        self.timeline = Timeline::from_seed(config, &self.seed);
+
+        self.player_input_controller = PlayerInputController::default();
+        self.entities.clear_round_entities();
+        self.entities.players.inner.clear();
+    }
+
     pub fn tick(&mut self) {
         self.bg_music.tick();
 
         if let Some(pause) = self.pause.as_mut() {
-            pause.tick();
+            match pause.tick() {
+                PauseResult::Exit => {
+                    self.exit = true;
+                }
+                PauseResult::Nothing => {},
+                PauseResult::Restart => {
+                    self.restart();
+                }
+                PauseResult::Unpause => {
+                    self.pause = None;
+                }
+            }
+
             return;
         }
 
@@ -851,15 +872,155 @@ unsafe extern "C" fn rl_low_pass(buffer_void: *mut ::std::os::raw::c_void, frame
 
 #[derive(Default)]
 pub struct Pause {
+    pub t: i32,
+    pub t_since_move: i32,
+    pub highlighted: i32,
+
+    pub settings_menu: Option<SettingsMenu>,
+}
+
+pub enum PauseResult {
+    Nothing,
+    Unpause,
+    Restart,
+    Exit,
 }
 
 impl Pause {
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self) -> PauseResult {
+        self.t += 1;
+        self.t_since_move += 1;
+
+        // @Fragile
+        let option_count = 6;
+
+        // @TODO controller input / WASD.
+        if key_pressed(raylib_sys::KeyboardKey::KEY_DOWN) {
+            self.highlighted = (self.highlighted + 1) % option_count;
+            self.t_since_move = 0;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
+            self.highlighted = (self.highlighted - 1);
+            if (self.highlighted < 0) {
+                self.highlighted = option_count - 1;
+            }
+
+            self.t_since_move = 0;
+        }
+
+        // @TODO controller input / WASD.
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_SPACE)) {
+            match self.highlighted {
+                0 => {
+                    // Resume
+                    return PauseResult::Unpause;
+                }
+                1 => {
+                    // Restart
+                    return PauseResult::Restart;
+                }
+                2 => {
+                    // Settings
+                    return PauseResult::Restart;
+                }
+                3 => {
+                    // Feedback
+                    // @TODO
+                    return PauseResult::Unpause;
+                }
+                4 => {
+                    // Lobby
+                    // @TODO
+                    return PauseResult::Unpause;
+                }
+                5 => {
+                    // Exit
+                    return PauseResult::Exit;
+                }
+                _ => {
+                    // @Unreachable
+                    debug_assert!(false);
+                    return PauseResult::Unpause;
+                }
+            }
+        }
+
+        PauseResult::Nothing
     }
 
     pub fn draw(&self) {
         unsafe {
-            raylib_sys::DrawText(c_str_temp("Paused"), 10, 10, 16, crate::RED);
+            let mut col = crate::SEA;
+            //col.a = 80;
+            raylib_sys::DrawRectangle(0, 0, 160, 160, col);
         }
     }
+
+    pub fn draw_gui(&self) {
+        unsafe {
+            let padding = 16.0;
+
+            let width = raylib_sys::GetScreenWidth();
+            let height = raylib_sys::GetScreenHeight();
+            let dimensions = V2::new(width as f32, height as f32);
+            let text_size = self.draw_text_center_aligned("Paused", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false);
+
+            let mut p = V2::new(dimensions.x * 0.5, dimensions.y * 0.4);
+            p.y += text_size.y + padding;
+
+            let text_size = self.draw_text_center_aligned("Resume", p, self.highlighted == 0);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Restart", p, self.highlighted == 1);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Settings", p, self.highlighted == 2);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Submit Feedback", p, self.highlighted == 3);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Lobby", p, self.highlighted == 4);
+            p.y += text_size.y + padding;
+            let text_size = self.draw_text_center_aligned("Exit", p, self.highlighted == 5);
+        }
+    }
+
+
+    fn draw_text_center_aligned(&self, text: &str, pos: V2, highlighted: bool) -> V2 {
+        let text_c = c_str_temp(text);
+        let spacing = 1.0;
+        let font_size = 60.0;
+
+        let mut color = WHITE;
+        if (highlighted) {
+            // @Dedupe
+            // Copypasta from console
+            let cursor_col_lerp_t = 0.5 + 0.5 * 
+                (self.t_since_move as f32 / 30.0).cos();
+            color = crate::lerp_color_rgba(crate::WHITE, crate::ORANGE, cursor_col_lerp_t);
+        }
+
+        unsafe {
+            let font = crate::FONT_ROBOTO_BOLD.assume_init();
+            let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c, font_size, spacing);
+            let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
+            let pos = pos - text_size * 0.5;
+            raylib_sys::DrawTextEx(font, text_c, to_vector2(pos), font_size, spacing, color);
+
+
+            if (highlighted) {
+                let square_size = 16.0;
+                let hoz_padding = 8.0;
+                raylib_sys::DrawRectangleRec(raylib_sys::Rectangle {
+                    x: (pos.x - hoz_padding - square_size),
+                    y: (pos.y + text_size.y * 0.5 - square_size * 0.5),
+                    width: square_size,
+                    height: square_size,
+                }, color);
+            }
+
+            text_size
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct SettingsMenu {
 }

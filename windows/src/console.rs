@@ -614,14 +614,8 @@ fn do_restart(args: &[&str], client: &mut Client) {
         return;
     }
 
-    let mut config = client.timeline.top_state().rules_state.config.clone();
-
     big!("Restarting, preserving seed '{}'", client.seed);
-    client.timeline = Timeline::from_seed(config, &client.seed);
-
-    client.player_input_controller = PlayerInputController::default();
-    client.entities.clear_round_entities();
-    client.entities.players.inner.clear();
+    client.restart();
 }
 
 fn do_lobby(args: &[&str], client: &mut Client) {

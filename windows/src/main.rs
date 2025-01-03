@@ -22,6 +22,8 @@ static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit:
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 
 //static mut FONT_m3x6: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
+static mut FONT_ROBOTO: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
+static mut FONT_ROBOTO_BOLD: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
 
 pub fn c_str_temp(s: &str) -> *const i8 {
     unsafe {
@@ -79,7 +81,7 @@ fn main() {
 
         let framebuffer = raylib_sys::LoadRenderTexture(160, 160);
 
-        // Hacky
+        // @HACK
         // Generate a random number, should really use rand crate
         // but dont want more depedencies.
         // Allocate something in memory then use the ptr as the seed.
@@ -90,6 +92,14 @@ fn main() {
         };
 
         //FONT_m3x6 = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/m5x7.ttf")));
+        FONT_ROBOTO = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Regular.ttf")));
+        //FONT_ROBOTO_BOLD = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Bold.ttf")));
+        FONT_ROBOTO_BOLD = MaybeUninit::new(raylib_sys::LoadFontEx(
+            c_str_leaky("../web-client/static/Roboto-Bold.ttf"),
+            60,
+            std::ptr::null_mut(),
+            95, // Default in raylib, just ascii
+            ));
 
         let mut client = Client::new(debug_param, &format!("{}", seed));
 
@@ -110,7 +120,12 @@ fn main() {
                         client.pause = None;
                     }
                     else {
-                        client.pause = Some(Default::default());
+                        if client.title_screen.is_some() {
+                            // Dont allow pausing in title screen
+                        }
+                        else {
+                            client.pause = Some(Default::default());
+                        }
                     }
                 }
             }
@@ -166,6 +181,10 @@ fn main() {
                     raylib_sys::DrawFPS(raylib_sys::GetScreenWidth() - 100, 20);
                 }
                 */
+
+                if let Some(pause) = client.pause.as_ref() {
+                    pause.draw_gui();
+                }
 
                 console::draw(&client);
 
