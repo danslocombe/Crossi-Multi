@@ -12,6 +12,7 @@ mod audio;
 mod rope;
 mod title_screen;
 mod raft;
+mod settings;
 
 use std::{mem::MaybeUninit};
 
@@ -24,9 +25,8 @@ static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit
 
 //static mut FONT_m3x6: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
 static mut FONT_ROBOTO: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
-static mut FONT_ROBOTO_BOLD: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
-
-static mut g_settings: MaybeUninit<GlobalSettingsState> = MaybeUninit::uninit();
+static mut FONT_ROBOTO_BOLD_60: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
+static mut FONT_ROBOTO_BOLD_80: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
 
 pub fn c_str_temp(s: &str) -> *const i8 {
     unsafe {
@@ -52,10 +52,7 @@ fn main() {
         println!("Running in debug mode");
     }
 
-    let settings = GlobalSettingsState::default();
-    unsafe {
-        g_settings = MaybeUninit::new(settings);
-    }
+    settings::init();
 
     unsafe {
         c_string_temp_allocator = MaybeUninit::new(CStringAllocator {
@@ -71,7 +68,7 @@ fn main() {
         raylib_sys::InitWindow(1000, 800, c_str_leaky("Road Toads"));
         raylib_sys::SetTargetFPS(60);
 
-        if (!debug_param) {
+        if (settings::get().fullscreen) {
             raylib_sys::ToggleBorderlessWindowed();
             raylib_sys::HideCursor();
         }
@@ -93,9 +90,15 @@ fn main() {
         //FONT_m3x6 = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/m5x7.ttf")));
         FONT_ROBOTO = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Regular.ttf")));
         //FONT_ROBOTO_BOLD = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Bold.ttf")));
-        FONT_ROBOTO_BOLD = MaybeUninit::new(raylib_sys::LoadFontEx(
+        FONT_ROBOTO_BOLD_60 = MaybeUninit::new(raylib_sys::LoadFontEx(
             c_str_leaky("../web-client/static/Roboto-Bold.ttf"),
             60,
+            std::ptr::null_mut(),
+            95, // Default in raylib, just ascii
+            ));
+        FONT_ROBOTO_BOLD_80 = MaybeUninit::new(raylib_sys::LoadFontEx(
+            c_str_leaky("../web-client/static/Roboto-Bold.ttf"),
+            80,
             std::ptr::null_mut(),
             95, // Default in raylib, just ascii
             ));
@@ -158,7 +161,8 @@ fn main() {
                         client.screen_shader.iTime += 1;
                     }
 
-                    let iTime_ptr: *const i32 = std::ptr::from_ref(&client.screen_shader.iTime);
+                    //let iTime_ptr: *const i32 = std::ptr::from_ref(&client.screen_shader.iTime);
+                    let iTime_ptr: *const i32 = std::ptr::from_ref(&client.visual_effects.t);
                     raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_iTime_loc, iTime_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_INT as i32);
                     let amp = client.visual_effects.noise * 2.0;// / 16.0;
                     let amp_ptr: *const f32 = std::ptr::from_ref(&amp);
@@ -471,42 +475,5 @@ pub fn shitty_rand_seed() -> String {
             std::mem::transmute::<_, usize>(ptr)
         };
         format!("{}", seed)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum VisualEffectsLevel {
-    Full,
-    Reduced,
-    None,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GlobalSettingsState {
-    music_volume: f32,
-    sfx_volume: f32,
-    visual_effects: VisualEffectsLevel,
-    crt_shader: bool,
-}
-
-impl GlobalSettingsState {
-    pub fn validate(&mut self) {
-        self.music_volume = self.music_volume.clamp(0.0, 1.0);
-        self.sfx_volume = self.sfx_volume.clamp(0.0, 1.0);
-    }
-
-    pub fn sync(&self) {
-        // @TODO
-    }
-}
-
-impl Default for GlobalSettingsState {
-    fn default() -> Self {
-        Self {
-            sfx_volume: 0.8,
-            music_volume: 0.6,
-            visual_effects: VisualEffectsLevel::Full,
-            crt_shader: true,
-        }
     }
 }

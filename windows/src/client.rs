@@ -1,6 +1,6 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, ring_buffer::RingBuffer, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
 use serde::{Deserialize, Serialize};
-use crate::{audio, c_str_temp, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, to_vector2, BLACK, WHITE};
+use crate::{audio, c_str_temp, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, gamepad_pressed, hex_color, key_pressed, lerp_color_rgba, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, to_vector2, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -114,7 +114,7 @@ impl Client {
         self.visual_effects.tick();
 
         if let Some(pause) = self.pause.as_mut() {
-            match pause.tick() {
+            match pause.tick(&mut self.visual_effects) {
                 PauseResult::Nothing => {},
                 PauseResult::Unpause => {
                     self.pause = None;
@@ -633,6 +633,7 @@ impl Camera {
 }
 
 pub struct VisualEffects {
+    pub t: i32,
     pub whiteout: i32,
     pub screenshake: f32,
     pub noise: f32,
@@ -648,6 +649,7 @@ impl Default for VisualEffects {
         }
 
         Self {
+            t: 0,
             whiteout: 0,
             screenshake: 0.0,
             noise: 0.0,
@@ -675,6 +677,7 @@ impl VisualEffects {
     }
 
     pub fn tick(&mut self) {
+        self.t += 1;
         self.whiteout = (self.whiteout - 1).max(0);
         self.screenshake *= 0.85;
         self.noise *= 0.85;
@@ -796,7 +799,7 @@ struct TitleBGMusic {
 }
 
 //const g_music_volume: f32 = 0.6;
-const g_music_volume: f32 = 0.0;
+static mut g_music_volume: f32 = 0.0;
 
 impl TitleBGMusic {
     pub fn new() -> Self {
@@ -822,6 +825,12 @@ impl TitleBGMusic {
     }
 
     pub fn tick(&mut self) {
+        unsafe {
+            // @Perf
+            // Cache
+            raylib_sys::SetMusicVolume(self.music, g_music_volume);
+        }
+
         match self.mode {
             BGMusicMode::Lowpassed => {
                 unsafe {
@@ -889,6 +898,104 @@ unsafe extern "C" fn rl_low_pass(buffer_void: *mut ::std::os::raw::c_void, frame
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum MenuInput {
+    None,
+    Up,
+    Down,
+    Left,
+    Right,
+    Enter,
+}
+
+impl MenuInput {
+    pub fn is_toggle(self) -> bool {
+        match self {
+            MenuInput::Left | MenuInput::Right | MenuInput::Enter => true,
+            _ => false
+        }
+    }
+
+    pub fn read() -> Self {
+        let mut input = MenuInput::None;
+
+        if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
+            input = MenuInput::Up;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_LEFT) {
+            input = MenuInput::Left;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_DOWN) {
+            input = MenuInput::Down;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT) {
+            input = MenuInput::Right;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_SPACE) {
+            input = MenuInput::Enter;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_ENTER) {
+            input = MenuInput::Enter;
+        }
+
+        if key_pressed(raylib_sys::KeyboardKey::KEY_W) {
+            input = MenuInput::Up;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_A) {
+            input = MenuInput::Left;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_S) {
+            input = MenuInput::Down;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_D) {
+            input = MenuInput::Right;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_Z) {
+            input = MenuInput::Enter;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_X) {
+            input = MenuInput::Enter;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_F) {
+            input = MenuInput::Enter;
+        }
+        if key_pressed(raylib_sys::KeyboardKey::KEY_G) {
+            input = MenuInput::Enter;
+        }
+
+        for i in 0..4 {
+            let gamepad_id = i as i32;
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_UP) {
+                input = MenuInput::Up;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
+                input = MenuInput::Left;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
+                input = MenuInput::Down;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
+                input = MenuInput::Right;
+            }
+
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_LEFT) {
+                input = MenuInput::Enter;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) {
+                input = MenuInput::Enter;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_UP) {
+                input = MenuInput::Enter;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
+                input = MenuInput::Enter;
+            }
+        }
+
+        input
+    }
+}
+
 #[derive(Default)]
 pub struct Pause {
     pub t: i32,
@@ -911,7 +1018,9 @@ impl Pause {
         Self::default()
     }
 
-    pub fn tick(&mut self) -> PauseResult {
+    pub fn tick(&mut self, visual_effects: &mut VisualEffects) -> PauseResult {
+        visual_effects.noise = visual_effects.noise.max(0.8);
+
         if let Some(settings) = self.settings_menu.as_mut() {
             if !settings.tick() {
                 self.settings_menu = None;
@@ -920,6 +1029,8 @@ impl Pause {
             return PauseResult::Nothing;
         }
 
+        let input = MenuInput::read();
+
         self.t += 1;
         self.t_since_move += 1;
 
@@ -927,12 +1038,14 @@ impl Pause {
         let option_count = 5;
 
         // @TODO controller input / WASD.
-        if key_pressed(raylib_sys::KeyboardKey::KEY_DOWN) {
+        if let MenuInput::Down = input {
             self.highlighted = (self.highlighted + 1) % option_count;
             self.t_since_move = 0;
             audio::play("menu_move");
+            //visual_effects.noise = visual_effects.noise.max(5.0);
+            //visual_effects.noise();
         }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
+        if let MenuInput::Up = input {
             self.highlighted = (self.highlighted - 1);
             if (self.highlighted < 0) {
                 self.highlighted = option_count - 1;
@@ -940,10 +1053,13 @@ impl Pause {
 
             self.t_since_move = 0;
             audio::play("menu_move");
+            //visual_effects.noise = visual_effects.noise.max(5.0);
+            //visual_effects.noise();
         }
 
         // @TODO controller input / WASD.
-        if (key_pressed(raylib_sys::KeyboardKey::KEY_SPACE)) {
+        if let MenuInput::Enter = input {
+            visual_effects.noise = visual_effects.noise.max(5.0);
             audio::play("menu_click");
             match self.highlighted {
                 0 => {
@@ -981,6 +1097,7 @@ impl Pause {
         unsafe {
             //let mut col = crate::SEA;
             let mut col = river_col_1;
+            col.a = 240;
             //col.a = 80;
             raylib_sys::DrawRectangle(0, 0, 160, 160, col);
         }
@@ -997,7 +1114,8 @@ impl Pause {
             let width = raylib_sys::GetScreenWidth();
             let height = raylib_sys::GetScreenHeight();
             let dimensions = V2::new(width as f32, height as f32);
-            let text_size = self.draw_text_center_aligned("Paused", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false);
+            let text_size = draw_text_center_aligned_ex(self.t_since_move, "Paused", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false, true);
+            //let text_size = self.draw_text_center_aligned("Paused", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false);
 
             let mut p = V2::new(dimensions.x * 0.5, dimensions.y * 0.4);
             p.y += text_size.y + padding;
@@ -1015,7 +1133,7 @@ impl Pause {
     }
 
     fn draw_text_center_aligned(&self, text: &str, pos: V2, highlighted: bool) -> V2 {
-        draw_text_center_aligned_ex(self.t_since_move, text, pos, highlighted)
+        draw_text_center_aligned_ex(self.t_since_move, text, pos, highlighted, false)
     }
 }
 
@@ -1035,17 +1153,19 @@ impl SettingsMenu {
         self.t += 1;
         self.t_since_move += 1;
 
+        let input = MenuInput::read();
+
         // @Fragile
         let option_count = 6;
 
         // @TODO controller input / WASD.
         // @Dedup
-        if key_pressed(raylib_sys::KeyboardKey::KEY_DOWN) {
+        if let MenuInput::Down = input {
             self.highlighted = (self.highlighted + 1) % option_count;
             self.t_since_move = 0;
             audio::play("menu_move");
         }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
+        if let MenuInput::Up = input {
             self.highlighted = (self.highlighted - 1);
             if (self.highlighted < 0) {
                 self.highlighted = option_count - 1;
@@ -1055,23 +1175,72 @@ impl SettingsMenu {
             audio::play("menu_move");
         }
 
-        // @TODO controller input / WASD.
-        if (key_pressed(raylib_sys::KeyboardKey::KEY_SPACE)) {
-            audio::play("menu_click");
-            match self.highlighted {
-                0 => {
+        match self.highlighted {
+            0 => {
+                if let MenuInput::Left = input {
+                    let mut state = crate::settings::get();
+                    state.music_volume -= 0.1;
+                    state.validate();
+                    unsafe {
+                        g_music_volume = state.music_volume;
+                    }
+                    crate::settings::set(state);
                 }
-                1 => {
+                if let MenuInput::Right = input {
+                    let mut state = crate::settings::get();
+                    state.music_volume += 0.1;
+                    state.validate();
+                    unsafe {
+                        g_music_volume = state.music_volume;
+                    }
+                    crate::settings::set(state);
                 }
-                2 => {
+            }
+            1 => {
+                if let MenuInput::Left = input {
+                    let mut state = crate::settings::get();
+                    state.sfx_volume -= 0.1;
+                    state.validate();
+                    crate::settings::set(state);
+                    audio::play("menu_click");
                 }
-                3 => {
+                if let MenuInput::Right = input {
+                    let mut state = crate::settings::get();
+                    state.sfx_volume += 0.1;
+                    state.validate();
+                    crate::settings::set(state);
+                    audio::play("menu_click");
+                }
+            }
+            2 => {
+                // Window mode
+                if input.is_toggle() {
+                    audio::play("menu_click");
+                    let mut state = crate::settings::get();
+                    state.fullscreen = !state.fullscreen;
+                    crate::settings::set(state)
+                }
+            }
+            3 => {
+            }
+            4 => {
+                // CRT
+                if input.is_toggle() {
+                    audio::play("menu_click");
+                    let mut state = crate::settings::get();
+                    state.crt_shader = !state.crt_shader;
+                    crate::settings::set(state)
+                }
+            }
+            5 => {
+                if let MenuInput::Enter = input {
+                    audio::play("menu_click");
                     return false;
                 }
-                _ => {
-                    // @Unreachable
-                    debug_assert!(false);
-                }
+            }
+            _ => {
+                // @Unreachable
+                debug_assert!(false);
             }
         }
 
@@ -1084,35 +1253,48 @@ impl SettingsMenu {
             let width = raylib_sys::GetScreenWidth();
             let height = raylib_sys::GetScreenHeight();
             let dimensions = V2::new(width as f32, height as f32);
-            let text_size = self.draw_text_center_aligned("Settings", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false);
+            //let text_size = self.draw_text_center_aligned("Settings", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false);
+            let text_size = draw_text_center_aligned_ex(self.t_since_move, "Settings", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false, true);
+
+            let left = width as f32 * 0.35;
+            let right = width as f32 * 0.65;
 
             let mut p = V2::new(dimensions.x * 0.5, dimensions.y * 0.4);
             p.y += text_size.y + padding;
 
-            let text_size = self.draw_text_center_aligned("Music Volume", p, self.highlighted == 0);
+            let settings = crate::settings::get();
+
+            let music_percentage = format!("{}%", (settings.music_volume * 100.0).round());
+            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "Music Volume:", &music_percentage, left, right, p, self.highlighted == 0, true);
             p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Sound Effect Volume", p, self.highlighted == 1);
+
+            let sfx_percentage = format!("{}%", (settings.sfx_volume * 100.0).round());
+            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "Sound Effects Volume:", &sfx_percentage, left, right, p, self.highlighted == 1, true);
             p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Fullscreen: Enabled", p, self.highlighted == 2);
+            //let fullscreen_text = format!("Window Mode: {}", if settings.fullscreen { "Fullscreen" } else { "Windowed"} );
+            //let text_size = self.draw_text_center_aligned(&fullscreen_text, p, self.highlighted == 2);
+            let window_mode = if settings.fullscreen { "Fullscreen" } else { "Windowed" };
+            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "Window Mode:", window_mode, left, right, p, self.highlighted == 2, false);
             p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Visual Effects: Full", p, self.highlighted == 3);
+            //let text_size = self.draw_text_center_aligned("Visual Effects: Full", p, self.highlighted == 3);
+            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "Visual Effects:", "Full", left, right, p, self.highlighted == 3, false);
             p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("CRT Shader: Enabled", p, self.highlighted == 4);
+            //let text_size = self.draw_text_center_aligned("CRT Shader: Enabled", p, self.highlighted == 4);
+            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "CRT Effect:", "Enabled", left, right, p, self.highlighted == 4, false);
             p.y += text_size.y + padding;
             let text_size = self.draw_text_center_aligned("Back", p, self.highlighted == 5);
         }
     }
 
     fn draw_text_center_aligned(&self, text: &str, pos: V2, highlighted: bool) -> V2 {
-        draw_text_center_aligned_ex(self.t_since_move, text, pos, highlighted)
+        draw_text_center_aligned_ex(self.t_since_move, text, pos, highlighted, false)
     }
 }
 
 
-fn draw_text_center_aligned_ex(t_since_move: i32, text: &str, pos: V2, highlighted: bool) -> V2 {
+fn draw_text_center_aligned_ex(t_since_move: i32, text: &str, pos: V2, highlighted: bool, big: bool) -> V2 {
     let text_c = c_str_temp(text);
     let spacing = 1.0;
-    let font_size = 60.0;
 
     let mut color = WHITE;
     if (highlighted) {
@@ -1120,26 +1302,92 @@ fn draw_text_center_aligned_ex(t_since_move: i32, text: &str, pos: V2, highlight
         // Copypasta from console
         let cursor_col_lerp_t = 0.5 + 0.5 * 
             (t_since_move as f32 / 30.0).cos();
-        color = crate::lerp_color_rgba(crate::WHITE, crate::ORANGE, cursor_col_lerp_t);
+        color = crate::lerp_color_rgba(crate::PINK, crate::ORANGE, cursor_col_lerp_t);
     }
 
     unsafe {
-        let font = crate::FONT_ROBOTO_BOLD.assume_init();
+        let (font, font_size) = if big {
+            (crate::FONT_ROBOTO_BOLD_80.assume_init(), 80.0)
+        }
+        else {
+            (crate::FONT_ROBOTO_BOLD_60.assume_init(), 60.0)
+        };
         let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c, font_size, spacing);
         let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
         let pos = pos - text_size * 0.5;
         raylib_sys::DrawTextEx(font, text_c, to_vector2(pos), font_size, spacing, color);
 
 
+        /*
         if (highlighted) {
             let square_size = 16.0;
-            let hoz_padding = 8.0;
+            let hoz_padding = 32.0;
             raylib_sys::DrawRectangleRec(raylib_sys::Rectangle {
                 x: (pos.x - hoz_padding - square_size),
                 y: (pos.y + text_size.y * 0.5 - square_size * 0.5),
                 width: square_size,
                 height: square_size,
             }, color);
+        }
+        */
+
+        text_size
+    }
+}
+
+fn draw_text_left_right_aligned_ex(t_since_move: i32, text_left: &str, text_right: &str, left: f32, right: f32, pos: V2, highlighted: bool, arrows: bool) -> V2 {
+    let text_c_left = c_str_temp(text_left);
+    let text_c_right = c_str_temp(text_right);
+    let spacing = 1.0;
+
+    let mut color = WHITE;
+    if (highlighted) {
+        // @Dedupe
+        // Copypasta from console
+        let cursor_col_lerp_t = 0.5 + 0.5 * 
+            (t_since_move as f32 / 30.0).cos();
+        color = crate::lerp_color_rgba(crate::PINK, crate::ORANGE, cursor_col_lerp_t);
+    }
+
+    unsafe {
+        let (font, font_size) =
+            (crate::FONT_ROBOTO_BOLD_60.assume_init(), 60.0);
+
+        let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c_left, font_size, spacing);
+        let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
+        //let pos = pos - text_size * 0.5;
+        let pos = V2::new(left, pos.y);
+        raylib_sys::DrawTextEx(font, text_c_left, to_vector2(pos), font_size, spacing, color);
+
+        let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c_right, font_size, spacing);
+        let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
+        let pos = V2::new(right - text_size.x, pos.y);
+        raylib_sys::DrawTextEx(font, text_c_right, to_vector2(pos), font_size, spacing, color);
+
+        //if (arrows && highlighted) {
+        if (highlighted) {
+            let hoz_padding = 12.0;
+            let triangle_mid = pos + V2::new(-hoz_padding, text_size.y * 0.5);
+            let p0 = triangle_mid - V2::new(0.0, text_size.y * 0.2);
+            let p1 = triangle_mid + V2::new(0.0, text_size.y * 0.2);
+            let p2 = triangle_mid - V2::new(text_size.y * 0.3, 0.0);
+            raylib_sys::DrawTriangle(
+                to_vector2(p0),
+                to_vector2(p2),
+                to_vector2(p1),
+                color,
+            );
+
+            let triangle_mid = pos + V2::new(text_size.x + hoz_padding, text_size.y * 0.5);
+            let p0 = triangle_mid - V2::new(0.0, text_size.y * 0.2);
+            let p1 = triangle_mid + V2::new(0.0, text_size.y * 0.2);
+            let p2 = triangle_mid + V2::new(text_size.y * 0.3, 0.0);
+            raylib_sys::DrawTriangle(
+                to_vector2(p0),
+                to_vector2(p1),
+                to_vector2(p2),
+                color,
+            );
         }
 
         text_size
