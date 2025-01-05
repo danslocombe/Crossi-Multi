@@ -13,12 +13,13 @@ mod rope;
 mod title_screen;
 mod raft;
 mod settings;
+mod pause;
 
-use std::{mem::MaybeUninit};
+use std::mem::MaybeUninit;
 
-use client::{Client, Pause};
+use client::Client;
+use pause::Pause;
 use crossy_multi_core::math::V2;
-use serde::{Deserialize, Serialize};
 
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
