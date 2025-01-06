@@ -406,10 +406,26 @@ impl PauseDrawInfo {
             let height = raylib_sys::GetScreenHeight();
             let dimensions = V2::new(width as f32, height as f32);
 
+            let index_base = if height < 500 {
+                0
+            }
+            else if width < 800 {
+                0
+            }
+            else if width < 1200 {
+                1
+            }
+            else if width < 1500 {
+                2
+            }
+            else {
+                3
+            };
+
             Self {
                 dimensions,
-                title_font: (g_font_roboto[5].1.assume_init(), g_font_roboto[5].0 as f32),
-                main_font: (g_font_roboto[4].1.assume_init(), g_font_roboto[4].0 as f32),
+                title_font: (g_font_roboto[index_base + 1].1.assume_init(), g_font_roboto[index_base + 1].0 as f32),
+                main_font: (g_font_roboto[index_base].1.assume_init(), g_font_roboto[index_base].0 as f32),
                 t_for_fade,
                 pos: V2::default(),
             }

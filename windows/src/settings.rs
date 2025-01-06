@@ -38,7 +38,8 @@ impl Default for GlobalSettingsState {
             music_volume: 0.6,
             visual_effects: VisualEffectsLevel::Full,
             crt_shader: true,
-            fullscreen: true,
+            //fullscreen: true,
+            fullscreen: false,
         }
     }
 }
@@ -47,7 +48,7 @@ impl Default for GlobalSettingsState {
 impl GlobalSettingsState {
     fn load() -> Self {
         let appdata = std::env::var("APPDATA").unwrap();
-        let path = format!("{}\\crunda\\save_state.json", appdata);
+        let path = format!("{}\\crossy\\save_state.json", appdata);
 
         println!("Loading settings state from {}", path);
         if let Ok(contents) = std::fs::read_to_string(&path) {
@@ -64,14 +65,16 @@ impl GlobalSettingsState {
 
         println!("Creating new settings state");
         let state = GlobalSettingsState::default();
-        state.save();
+        if let Err(e) = state.save() {
+            println!("Failed to save state {}", e)
+        }
         state
     }
 
     fn save(&self) -> std::io::Result<()> {
         let appdata = std::env::var("APPDATA").unwrap();
-        let crunda_path = format!("{}\\crunda", appdata);
-        let path = format!("{}\\crunda\\save_state.json", appdata);
+        let crunda_path = format!("{}\\crossy", appdata);
+        let path = format!("{}\\crossy\\save_state.json", appdata);
         println!("Saving settings state to {}", path);
 
         std::fs::create_dir_all(&crunda_path)?;
