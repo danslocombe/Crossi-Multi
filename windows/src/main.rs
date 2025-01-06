@@ -24,11 +24,6 @@ use crossy_multi_core::math::V2;
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 
-//static mut FONT_m3x6: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
-static mut FONT_ROBOTO: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
-static mut FONT_ROBOTO_BOLD_60: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
-static mut FONT_ROBOTO_BOLD_80: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
-
 pub fn c_str_temp(s: &str) -> *const i8 {
     unsafe {
         c_string_temp_allocator.assume_init_mut().alloc(s)
@@ -86,23 +81,9 @@ fn main() {
 
         raylib_sys::GuiLoadStyle(c_str_leaky("style_dark.rgs"));
 
-        let framebuffer = raylib_sys::LoadRenderTexture(160, 160);
+        pause::init_pause_fonts();
 
-        //FONT_m3x6 = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/m5x7.ttf")));
-        FONT_ROBOTO = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Regular.ttf")));
-        //FONT_ROBOTO_BOLD = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Bold.ttf")));
-        FONT_ROBOTO_BOLD_60 = MaybeUninit::new(raylib_sys::LoadFontEx(
-            c_str_leaky("../web-client/static/Roboto-Bold.ttf"),
-            60,
-            std::ptr::null_mut(),
-            95, // Default in raylib, just ascii
-            ));
-        FONT_ROBOTO_BOLD_80 = MaybeUninit::new(raylib_sys::LoadFontEx(
-            c_str_leaky("../web-client/static/Roboto-Bold.ttf"),
-            80,
-            std::ptr::null_mut(),
-            95, // Default in raylib, just ascii
-            ));
+        let framebuffer = raylib_sys::LoadRenderTexture(160, 160);
 
         let seed = shitty_rand_seed();
         let mut client = Client::new(debug_param, &seed);

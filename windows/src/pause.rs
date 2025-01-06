@@ -1,5 +1,31 @@
+use std::mem::MaybeUninit;
+
 use crossy_multi_core::math::V2;
-use crate::{audio, c_str_temp, client::{g_music_volume, river_col_1, VisualEffects}, gamepad_pressed, key_pressed, lerp_color_rgba, to_vector2, WHITE};
+use crate::{audio, c_str_leaky, c_str_temp, client::{g_music_volume, river_col_1, VisualEffects}, gamepad_pressed, key_pressed, lerp_color_rgba, to_vector2, WHITE};
+
+//static mut g_font_roboto: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
+static mut g_font_roboto: [(i32, MaybeUninit<raylib_sys::Font>); 6] = [
+    (18, MaybeUninit::uninit()),
+    (24, MaybeUninit::uninit()),
+    (36, MaybeUninit::uninit()),
+    (48, MaybeUninit::uninit()),
+    (60, MaybeUninit::uninit()),
+    (72, MaybeUninit::uninit()),
+];
+
+pub fn init_pause_fonts() {
+    unsafe {
+        //g_font_roboto = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Regular.ttf")));
+        for (size, data) in g_font_roboto.iter_mut() {
+            *data = MaybeUninit::new(raylib_sys::LoadFontEx(
+                c_str_leaky("../web-client/static/Roboto-Bold.ttf"),
+                *size,
+                std::ptr::null_mut(), // Default characters
+                95, // Default character count in raylib, just ascii
+                ));
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct Pause {
@@ -114,31 +140,19 @@ impl Pause {
             return;
         }
 
-        unsafe {
-            let padding = 16.0;
-            let width = raylib_sys::GetScreenWidth();
-            let height = raylib_sys::GetScreenHeight();
-            let dimensions = V2::new(width as f32, height as f32);
-            let text_size = draw_text_center_aligned_ex(self.t_since_move, "Paused", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false, true);
-            //let text_size = self.draw_text_center_aligned("Paused", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false);
+        let padding = 16.0;
 
-            let mut p = V2::new(dimensions.x * 0.5, dimensions.y * 0.4);
-            p.y += text_size.y + padding;
+        let mut draw_info = PauseDrawInfo::create(self.t_since_move);
+        let text_size = draw_info.title("Paused");
 
-            let text_size = self.draw_text_center_aligned("Resume", p, self.highlighted == 0);
-            p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Lobby", p, self.highlighted == 1);
-            p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Settings", p, self.highlighted == 2);
-            p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Submit Feedback", p, self.highlighted == 3);
-            p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Exit", p, self.highlighted == 4);
-        }
-    }
+        draw_info.pos = V2::new(draw_info.dimensions.x * 0.5, draw_info.dimensions.y * 0.4);
+        draw_info.pos.y += text_size.y + padding;
 
-    fn draw_text_center_aligned(&self, text: &str, pos: V2, highlighted: bool) -> V2 {
-        draw_text_center_aligned_ex(self.t_since_move, text, pos, highlighted, false)
+        draw_info.text_center_incr_padding("Resume", padding, self.highlighted == 0);
+        draw_info.text_center_incr_padding("Lobby", padding, self.highlighted == 1);
+        draw_info.text_center_incr_padding("Settings", padding, self.highlighted == 2);
+        draw_info.text_center_incr_padding("Submit Feedback", padding, self.highlighted == 3);
+        draw_info.text_center_incr_padding("Exit", padding, self.highlighted == 4);
     }
 }
 
@@ -253,149 +267,28 @@ impl SettingsMenu {
     }
 
     pub fn draw(&self) {
-        unsafe {
-            let padding = 16.0;
-            let width = raylib_sys::GetScreenWidth();
-            let height = raylib_sys::GetScreenHeight();
-            let dimensions = V2::new(width as f32, height as f32);
-            //let text_size = self.draw_text_center_aligned("Settings", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false);
-            let text_size = draw_text_center_aligned_ex(self.t_since_move, "Settings", V2::new(dimensions.x * 0.5, dimensions.y * 0.3), false, true);
+        let padding = 16.0;
 
-            let left = width as f32 * 0.35;
-            let right = width as f32 * 0.65;
+        let mut draw_info = PauseDrawInfo::create(self.t_since_move);
+        let text_size = draw_info.title("Paused");
 
-            let mut p = V2::new(dimensions.x * 0.5, dimensions.y * 0.4);
-            p.y += text_size.y + padding;
+        draw_info.pos = V2::new(draw_info.dimensions.x * 0.5, draw_info.dimensions.y * 0.4);
+        draw_info.pos.y += text_size.y + padding;
 
-            let settings = crate::settings::get();
+        let settings = crate::settings::get();
 
-            let music_percentage = format!("{}%", (settings.music_volume * 100.0).round());
-            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "Music Volume:", &music_percentage, left, right, p, self.highlighted == 0, true);
-            p.y += text_size.y + padding;
+        let music_percentage = format!("{}%", (settings.music_volume * 100.0).round());
+        draw_info.text_left_right_incr_padding("Music Volume:", &music_percentage, padding, self.highlighted == 0);
 
-            let sfx_percentage = format!("{}%", (settings.sfx_volume * 100.0).round());
-            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "Sound Effects Volume:", &sfx_percentage, left, right, p, self.highlighted == 1, true);
-            p.y += text_size.y + padding;
-            //let fullscreen_text = format!("Window Mode: {}", if settings.fullscreen { "Fullscreen" } else { "Windowed"} );
-            //let text_size = self.draw_text_center_aligned(&fullscreen_text, p, self.highlighted == 2);
-            let window_mode = if settings.fullscreen { "Fullscreen" } else { "Windowed" };
-            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "Window Mode:", window_mode, left, right, p, self.highlighted == 2, false);
-            p.y += text_size.y + padding;
-            //let text_size = self.draw_text_center_aligned("Visual Effects: Full", p, self.highlighted == 3);
-            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "Visual Effects:", "Full", left, right, p, self.highlighted == 3, false);
-            p.y += text_size.y + padding;
-            //let text_size = self.draw_text_center_aligned("CRT Shader: Enabled", p, self.highlighted == 4);
-            let text_size = draw_text_left_right_aligned_ex(self.t_since_move, "CRT Effect:", "Enabled", left, right, p, self.highlighted == 4, false);
-            p.y += text_size.y + padding;
-            let text_size = self.draw_text_center_aligned("Back", p, self.highlighted == 5);
-        }
-    }
+        let sfx_percentage = format!("{}%", (settings.sfx_volume * 100.0).round());
+        draw_info.text_left_right_incr_padding("Sound Effects Volume:", &sfx_percentage, padding, self.highlighted == 1);
 
-    fn draw_text_center_aligned(&self, text: &str, pos: V2, highlighted: bool) -> V2 {
-        draw_text_center_aligned_ex(self.t_since_move, text, pos, highlighted, false)
-    }
-}
+        let window_mode = if settings.fullscreen { "Fullscreen" } else { "Windowed" };
+        draw_info.text_left_right_incr_padding("Window Mode:", &window_mode, padding, self.highlighted == 2);
 
+        draw_info.text_left_right_incr_padding("Visual Effects:", "Full", padding, self.highlighted == 3);
 
-fn draw_text_center_aligned_ex(t_since_move: i32, text: &str, pos: V2, highlighted: bool, big: bool) -> V2 {
-    let text_c = c_str_temp(text);
-    let spacing = 1.0;
-
-    let mut color = WHITE;
-    if (highlighted) {
-        // @Dedupe
-        // Copypasta from console
-        let cursor_col_lerp_t = 0.5 + 0.5 * 
-            (t_since_move as f32 / 30.0).cos();
-        color = crate::lerp_color_rgba(crate::PINK, crate::ORANGE, cursor_col_lerp_t);
-    }
-
-    unsafe {
-        let (font, font_size) = if big {
-            (crate::FONT_ROBOTO_BOLD_80.assume_init(), 80.0)
-        }
-        else {
-            (crate::FONT_ROBOTO_BOLD_60.assume_init(), 60.0)
-        };
-        let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c, font_size, spacing);
-        let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
-        let pos = pos - text_size * 0.5;
-        raylib_sys::DrawTextEx(font, text_c, to_vector2(pos), font_size, spacing, color);
-
-
-        /*
-        if (highlighted) {
-            let square_size = 16.0;
-            let hoz_padding = 32.0;
-            raylib_sys::DrawRectangleRec(raylib_sys::Rectangle {
-                x: (pos.x - hoz_padding - square_size),
-                y: (pos.y + text_size.y * 0.5 - square_size * 0.5),
-                width: square_size,
-                height: square_size,
-            }, color);
-        }
-        */
-
-        text_size
-    }
-}
-
-fn draw_text_left_right_aligned_ex(t_since_move: i32, text_left: &str, text_right: &str, left: f32, right: f32, pos: V2, highlighted: bool, arrows: bool) -> V2 {
-    let text_c_left = c_str_temp(text_left);
-    let text_c_right = c_str_temp(text_right);
-    let spacing = 1.0;
-
-    let mut color = WHITE;
-    if (highlighted) {
-        // @Dedupe
-        // Copypasta from console
-        let cursor_col_lerp_t = 0.5 + 0.5 * 
-            (t_since_move as f32 / 30.0).cos();
-        color = crate::lerp_color_rgba(crate::PINK, crate::ORANGE, cursor_col_lerp_t);
-    }
-
-    unsafe {
-        let (font, font_size) =
-            (crate::FONT_ROBOTO_BOLD_60.assume_init(), 60.0);
-
-        let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c_left, font_size, spacing);
-        let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
-        //let pos = pos - text_size * 0.5;
-        let pos = V2::new(left, pos.y);
-        raylib_sys::DrawTextEx(font, text_c_left, to_vector2(pos), font_size, spacing, color);
-
-        let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c_right, font_size, spacing);
-        let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
-        let pos = V2::new(right - text_size.x, pos.y);
-        raylib_sys::DrawTextEx(font, text_c_right, to_vector2(pos), font_size, spacing, color);
-
-        //if (arrows && highlighted) {
-        if (highlighted) {
-            let hoz_padding = 12.0;
-            let triangle_mid = pos + V2::new(-hoz_padding, text_size.y * 0.5);
-            let p0 = triangle_mid - V2::new(0.0, text_size.y * 0.2);
-            let p1 = triangle_mid + V2::new(0.0, text_size.y * 0.2);
-            let p2 = triangle_mid - V2::new(text_size.y * 0.3, 0.0);
-            raylib_sys::DrawTriangle(
-                to_vector2(p0),
-                to_vector2(p2),
-                to_vector2(p1),
-                color,
-            );
-
-            let triangle_mid = pos + V2::new(text_size.x + hoz_padding, text_size.y * 0.5);
-            let p0 = triangle_mid - V2::new(0.0, text_size.y * 0.2);
-            let p1 = triangle_mid + V2::new(0.0, text_size.y * 0.2);
-            let p2 = triangle_mid + V2::new(text_size.y * 0.3, 0.0);
-            raylib_sys::DrawTriangle(
-                to_vector2(p0),
-                to_vector2(p1),
-                to_vector2(p2),
-                color,
-            );
-        }
-
-        text_size
+        draw_info.text_left_right_incr_padding("CRT Effect:", "Enabled", padding, self.highlighted == 4);
     }
 }
 
@@ -494,5 +387,143 @@ impl MenuInput {
         }
 
         input
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PauseDrawInfo {
+    dimensions: V2,
+    title_font: (raylib_sys::Font, f32),
+    main_font: (raylib_sys::Font, f32),
+    t_for_fade: i32,
+    pos: V2,
+}
+
+impl PauseDrawInfo {
+    pub fn create(t_for_fade: i32) -> Self {
+        unsafe {
+            let width = raylib_sys::GetScreenWidth();
+            let height = raylib_sys::GetScreenHeight();
+            let dimensions = V2::new(width as f32, height as f32);
+
+            Self {
+                dimensions,
+                title_font: (g_font_roboto[5].1.assume_init(), g_font_roboto[5].0 as f32),
+                main_font: (g_font_roboto[4].1.assume_init(), g_font_roboto[4].0 as f32),
+                t_for_fade,
+                pos: V2::default(),
+            }
+        }
+    }
+
+    pub fn title(&self, text: &str) -> V2 {
+        let pos = V2::new(self.dimensions.x * 0.5, self.dimensions.y * 0.3);
+        let text_c = c_str_temp(text);
+        let spacing = 1.0;
+        let color = WHITE;
+
+        unsafe {
+            let text_size_vector2 = raylib_sys::MeasureTextEx(self.title_font.0, text_c, self.title_font.1, spacing);
+            let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
+            let pos = pos - text_size * 0.5;
+            raylib_sys::DrawTextEx(self.title_font.0, text_c, to_vector2(pos), self.title_font.1, spacing, color);
+
+            text_size
+        }
+    }
+
+    pub fn text_center(&self, text: &str, highlighted: bool) -> V2 {
+        let text_c = c_str_temp(text);
+        let spacing = 1.0;
+
+        let mut color = WHITE;
+        if (highlighted) {
+            // @Dedupe
+            // Copypasta from console
+            let cursor_col_lerp_t = 0.5 + 0.5 * 
+                (self.t_for_fade as f32 / 30.0).cos();
+            color = crate::lerp_color_rgba(crate::PINK, crate::ORANGE, cursor_col_lerp_t);
+        }
+
+        unsafe {
+            let text_size_vector2 = raylib_sys::MeasureTextEx(self.main_font.0, text_c, self.main_font.1, spacing);
+            let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
+            let pos = self.pos - text_size * 0.5;
+            raylib_sys::DrawTextEx(self.main_font.0, text_c, to_vector2(pos), self.main_font.1, spacing, color);
+
+            text_size
+        }
+    }
+
+    pub fn text_center_incr_padding(&mut self, text: &str, padding: f32, highlighted: bool) {
+        self.pos.y += self.text_center(text, highlighted).y;
+        self.pos.y += padding;
+    }
+
+    pub fn text_left_right(&self, text_left: &str, text_right: &str, highlighted: bool) -> V2 {
+        let text_c_left = c_str_temp(text_left);
+        let text_c_right = c_str_temp(text_right);
+
+        let left = self.dimensions.x * 0.35;
+        let right = self.dimensions.x * 0.65;
+
+        let font = self.main_font.0;
+        let font_size = self.main_font.1;
+
+        let spacing = 1.0;
+
+        let mut color = WHITE;
+        if (highlighted) {
+            // @Dedupe
+            // Copypasta from console
+            let cursor_col_lerp_t = 0.5 + 0.5 * 
+                (self.t_for_fade as f32 / 30.0).cos();
+            color = crate::lerp_color_rgba(crate::PINK, crate::ORANGE, cursor_col_lerp_t);
+        }
+
+        unsafe {
+            let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c_left, font_size, spacing);
+            let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
+            //let pos = pos - text_size * 0.5;
+            let pos = V2::new(left, self.pos.y);
+            raylib_sys::DrawTextEx(font, text_c_left, to_vector2(pos), font_size, spacing, color);
+
+            let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c_right, font_size, spacing);
+            let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
+            let pos = V2::new(right - text_size.x, pos.y);
+            raylib_sys::DrawTextEx(font, text_c_right, to_vector2(pos), font_size, spacing, color);
+
+            if (highlighted) {
+                let hoz_padding = 12.0;
+                let triangle_mid = pos + V2::new(-hoz_padding, text_size.y * 0.5);
+                let p0 = triangle_mid - V2::new(0.0, text_size.y * 0.2);
+                let p1 = triangle_mid + V2::new(0.0, text_size.y * 0.2);
+                let p2 = triangle_mid - V2::new(text_size.y * 0.3, 0.0);
+                raylib_sys::DrawTriangle(
+                    to_vector2(p0),
+                    to_vector2(p2),
+                    to_vector2(p1),
+                    color,
+                );
+
+                let triangle_mid = pos + V2::new(text_size.x + hoz_padding, text_size.y * 0.5);
+                let p0 = triangle_mid - V2::new(0.0, text_size.y * 0.2);
+                let p1 = triangle_mid + V2::new(0.0, text_size.y * 0.2);
+                let p2 = triangle_mid + V2::new(text_size.y * 0.3, 0.0);
+                raylib_sys::DrawTriangle(
+                    to_vector2(p0),
+                    to_vector2(p1),
+                    to_vector2(p2),
+                    color,
+                );
+            }
+
+            text_size
+        }
+    }
+
+    pub fn text_left_right_incr_padding(&mut self, text_left: &str, text_right: &str, padding: f32, highlighted: bool) {
+        self.pos.y += self.text_left_right(text_left, text_right, highlighted).y;
+        self.pos.y += padding;
     }
 }
