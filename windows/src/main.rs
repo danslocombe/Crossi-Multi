@@ -137,8 +137,9 @@ fn main() {
                 raylib_sys::BeginDrawing();
                 raylib_sys::ClearBackground(BLACK);
 
+                let settings = crate::settings::get();
 
-                if (client.screen_shader.enabled) {
+                if (settings.crt_shader) {
                     if (!client.pause.is_some()) {
                         client.screen_shader.iTime += 1;
                     }
@@ -146,7 +147,11 @@ fn main() {
                     //let iTime_ptr: *const i32 = std::ptr::from_ref(&client.screen_shader.iTime);
                     let iTime_ptr: *const i32 = std::ptr::from_ref(&client.visual_effects.t);
                     raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_iTime_loc, iTime_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_INT as i32);
-                    let amp = client.visual_effects.noise * 2.0;// / 16.0;
+
+                    let mut amp = client.visual_effects.noise * 2.0;// / 16.0;
+                    if (!settings.flashing) {
+                        amp = 0.0;
+                    }
                     let amp_ptr: *const f32 = std::ptr::from_ref(&amp);
                     raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_amp_loc, amp_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_FLOAT as i32);
                     raylib_sys::BeginShaderMode(client.screen_shader.shader);
@@ -154,7 +159,7 @@ fn main() {
 
                 raylib_sys::DrawTexturePro(framebuffer.texture, mapping_info.source, mapping_info.destination, raylib_sys::Vector2{ x: 0.0, y: 0.0 }, 0.0, WHITE);
 
-                if (client.screen_shader.enabled) {
+                if (settings.crt_shader) {
                     raylib_sys::EndShaderMode();
                 }
 
@@ -279,7 +284,6 @@ impl FrameBufferToScreenInfo {
 }
 
 struct ScreenShader {
-    enabled: bool,
     shader: raylib_sys::Shader,
     iTime: i32,
     shader_iTime_loc: i32,
@@ -293,7 +297,6 @@ impl ScreenShader {
             let shader_iTime_loc = raylib_sys::GetShaderLocation(shader, c_str_leaky("iTime"));
             let shader_amp_loc = raylib_sys::GetShaderLocation(shader, c_str_leaky("amp"));
             Self {
-                enabled: true,
                 shader,
                 iTime: 0,
                 shader_iTime_loc,

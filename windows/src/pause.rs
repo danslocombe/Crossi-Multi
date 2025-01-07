@@ -54,7 +54,7 @@ impl Pause {
         visual_effects.noise = visual_effects.noise.max(0.8);
 
         if let Some(settings) = self.settings_menu.as_mut() {
-            if !settings.tick() {
+            if !settings.tick(visual_effects) {
                 self.settings_menu = None;
             }
 
@@ -169,14 +169,14 @@ impl SettingsMenu {
         Self::default()
     }
 
-    pub fn tick(&mut self) -> bool {
+    pub fn tick(&mut self, visual_effects: &mut VisualEffects) -> bool {
         self.t += 1;
         self.t_since_move += 1;
 
         let input = MenuInput::read();
 
         // @Fragile
-        let option_count = 6;
+        let option_count = 8;
 
         // @TODO controller input / WASD.
         // @Dedup
@@ -232,8 +232,42 @@ impl SettingsMenu {
                 }
             }
             3 => {
+                if input.is_toggle() {
+                    audio::play("menu_click");
+                    let mut state = crate::settings::get();
+                    state.screenshake = !state.screenshake;
+                    if (state.screenshake) {
+                        visual_effects.screenshake = visual_effects.screenshake.max(15.0);
+                    }
+                    crate::settings::set_save(state)
+                }
             }
             4 => {
+                if input.is_toggle() {
+                    audio::play("menu_click");
+                    let mut state = crate::settings::get();
+                    state.vibration = !state.vibration;
+                    if (state.vibration) {
+                        for i in 0..4 {
+                            visual_effects.set_gamepad_vibration(i);
+                        }
+                    }
+                    crate::settings::set_save(state)
+                }
+            }
+            5 => {
+                if input.is_toggle() {
+                    audio::play("menu_click");
+                    let mut state = crate::settings::get();
+                    state.flashing = !state.flashing;
+                    if (state.flashing) {
+                        visual_effects.screenshake();
+                        visual_effects.whiteout();
+                    }
+                    crate::settings::set_save(state)
+                }
+            }
+            6 => {
                 // CRT
                 if input.is_toggle() {
                     audio::play("menu_click");
@@ -241,13 +275,13 @@ impl SettingsMenu {
                     state.crt_shader = !state.crt_shader;
                     crate::settings::set_save(state)
                 }
-            }
-            5 => {
+            },
+            7 => {
                 if let MenuInput::Enter = input {
                     audio::play("menu_click");
                     return false;
                 }
-            }
+            },
             _ => {
                 // @Unreachable
                 debug_assert!(false);
@@ -277,9 +311,15 @@ impl SettingsMenu {
         let window_mode = if settings.fullscreen { "Fullscreen" } else { "Windowed" };
         draw_info.text_left_right_incr_padding("Window Mode:", &window_mode, padding, self.highlighted == 2);
 
-        draw_info.text_left_right_incr_padding("Visual Effects:", "Full", padding, self.highlighted == 3);
-
-        draw_info.text_left_right_incr_padding("CRT Effect:", "Enabled", padding, self.highlighted == 4);
+        let screenshake_mode = if settings.screenshake { "On" } else { "Off" };
+        draw_info.text_left_right_incr_padding("Screenshake:", screenshake_mode, padding, self.highlighted == 3);
+        let vibration_mode = if settings.vibration { "On" } else { "Off" };
+        draw_info.text_left_right_incr_padding("Vibration:", vibration_mode, padding, self.highlighted == 4);
+        let flashing_mode = if settings.flashing { "On" } else { "Off" };
+        draw_info.text_left_right_incr_padding("Flashing:", flashing_mode, padding, self.highlighted == 5);
+        let crt_mode = if settings.crt_shader { "On" } else { "Off" };
+        draw_info.text_left_right_incr_padding("CRT Effect:", crt_mode, padding, self.highlighted == 6);
+        draw_info.text_center("Back", self.highlighted == 7);
     }
 }
 

@@ -533,7 +533,8 @@ impl Client {
         self.big_text_controller.draw();
 
         {
-            if (self.visual_effects.whiteout > 0) {
+            let settings = crate::settings::get();
+            if (settings.flashing && self.visual_effects.whiteout > 0) {
                 raylib_sys::DrawRectangle(0, 0, 160, 160, WHITE);
             }
         }
@@ -607,7 +608,8 @@ impl Camera {
         self.x_mod = self.x;
         self.y_mod = self.y;
 
-        if (visual_effects.screenshake > 0.01) {
+        let settings = crate::settings::get();
+        if (settings.screenshake && visual_effects.screenshake > 0.01) {
             //self.screen_shake_t -= 1.0;
             //let dir = *FroggyRand::new(self.t as u64).choose((), &[-1.0, 1.0]) as f32;
             //self.x = 1.0 / (visual_effects.screenshake + 1.0) * dir;
@@ -677,32 +679,36 @@ impl VisualEffects {
 
     pub fn tick(&mut self) {
         self.t += 1;
+
         self.whiteout = (self.whiteout - 1).max(0);
         self.screenshake *= 0.85;
         self.noise *= 0.85;
 
-        for (i, x) in self.controller_vibrations.iter_mut().enumerate() {
-            *x *= 0.65;
+        let settings = crate::settings::get();
+        if (settings.vibration) {
+            for (i, x) in self.controller_vibrations.iter_mut().enumerate() {
+                *x *= 0.65;
 
-            let id = i as i32;
-            unsafe {
-                if raylib_sys::IsGamepadAvailable(id) {
-                    let value = 
-                    if *x > 0.01 {
-                        (*x * u16::MAX as f32).floor() as u16
+                let id = i as i32;
+                unsafe {
+                    if raylib_sys::IsGamepadAvailable(id) {
+                        let value = 
+                        if *x > 0.01 {
+                            (*x * u16::MAX as f32).floor() as u16
+                        }
+                        else {
+                            0 as u16
+                        };
+
+                        // Lifted from
+                        //https://github.com/machlibs/rumble/blob/main/src/up_rumble.h
+                        // Call win32 directly
+                        let x = windows_sys::Win32::UI::Input::XboxController::XINPUT_VIBRATION {
+                            wLeftMotorSpeed: value,
+                            wRightMotorSpeed: value,
+                        };
+                        windows_sys::Win32::UI::Input::XboxController::XInputSetState(id as u32, std::ptr::from_ref(&x));
                     }
-                    else {
-                        0 as u16
-                    };
-
-                    // Lifted from
-                    //https://github.com/machlibs/rumble/blob/main/src/up_rumble.h
-                    // Call win32 directly
-                    let x = windows_sys::Win32::UI::Input::XboxController::XINPUT_VIBRATION {
-                        wLeftMotorSpeed: value,
-                        wRightMotorSpeed: value,
-                    };
-                    windows_sys::Win32::UI::Input::XboxController::XInputSetState(id as u32, std::ptr::from_ref(&x));
                 }
             }
         }

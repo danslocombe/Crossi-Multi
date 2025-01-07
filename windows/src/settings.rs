@@ -7,17 +7,12 @@ use crate::{audio::{g_sfx_volume, g_music_volume}};
 pub static mut g_settings: MaybeUninit<GlobalSettingsState> = MaybeUninit::uninit();
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub enum VisualEffectsLevel {
-    Full,
-    Reduced,
-    None,
-}
-
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct GlobalSettingsState {
     pub music_volume: f32,
     pub sfx_volume: f32,
-    pub visual_effects: VisualEffectsLevel,
+    pub screenshake: bool,
+    pub flashing: bool,
+    pub vibration: bool,
     pub crt_shader: bool,
     pub fullscreen: bool,
 }
@@ -64,10 +59,11 @@ impl Default for GlobalSettingsState {
         Self {
             sfx_volume: 0.8,
             music_volume: 0.6,
-            visual_effects: VisualEffectsLevel::Full,
+            flashing: true,
+            screenshake: true,
+            vibration: true,
             crt_shader: true,
-            //fullscreen: true,
-            fullscreen: false,
+            fullscreen: true,
         }
     }
 }

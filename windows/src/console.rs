@@ -27,10 +27,6 @@ pub fn init_console() {
             lambda: Box::new(do_exit),
         });
         command_set.commands.push(Command {
-            name: "shader".to_owned(),
-            lambda: Box::new(do_toggle_shader),
-        });
-        command_set.commands.push(Command {
             name: "debug".to_owned(),
             lambda: Box::new(do_toggle_debug),
         });
@@ -529,15 +525,6 @@ fn do_toggle_debug(args: &[&str], client: &mut Client) {
     else {
         big("Disabling debug mode");
     }
-}
-
-fn do_toggle_shader(args: &[&str], client: &mut Client) {
-    if (args.len() > 0) {
-        err!("Expected no arguments to 'shader' got {}", args.len());
-        return;
-    }
-
-    client.screen_shader.enabled = !client.screen_shader.enabled;
 }
 
 fn do_set_skin(args: &[&str], client: &mut Client) {
