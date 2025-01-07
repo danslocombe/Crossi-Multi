@@ -414,7 +414,7 @@ impl PauseDrawInfo {
                 0
             }
             else if width < 800 {
-                0
+                1
             }
             else if width < 1200 {
                 1
