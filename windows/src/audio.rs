@@ -1,13 +1,17 @@
 use std::{collections::BTreeMap, mem::{MaybeUninit}};
 
-static mut g_muted: bool = false;
-static mut g_sfx_volume: f32 = 0.2;
-static mut g_music_volume: f32 = 0.6;
+pub static mut g_muted: bool = false;
+pub static mut g_sfx_volume: f32 = 0.2;
+pub static mut g_music_volume: f32 = 0.6;
 
 static mut SFX: MaybeUninit<BTreeMap<String, Sound>> = MaybeUninit::uninit();
 
 pub fn init_audio() {
     unsafe {
+        let settings = crate::settings::get();
+        g_sfx_volume = settings.sfx_volume;
+        g_music_volume = settings.music_volume;
+
         let map = BTreeMap::new();
         SFX = MaybeUninit::new(map);
 
@@ -40,7 +44,6 @@ pub fn init_audio() {
     }
 }
 
-
 fn load_sfx(filename: &str, base_volume: f32) {
     let path_base = "../web-client/static/sounds";
     let path = format!("{}/{}", path_base, filename);
@@ -65,7 +68,16 @@ fn load_sfx(filename: &str, base_volume: f32) {
     }
 }
 
+pub fn update_volumes() {
+    unsafe {
+        for (k, v) in SFX.assume_init_ref() {
+            raylib_sys::SetSoundVolume(v.sound, v.base_volume * g_sfx_volume * 0.5);
+        }
+    }
+}
+
 // @Dedup with above
+// @UNUSED
 fn load_music(filename: &str, base_volume: f32) {
     let path_base = "../web-client/static/sounds";
     let path = format!("{}/{}", path_base, filename);

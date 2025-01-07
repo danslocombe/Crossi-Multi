@@ -1,7 +1,7 @@
 use std::mem::MaybeUninit;
 
 use crossy_multi_core::math::V2;
-use crate::{audio, c_str_leaky, c_str_temp, client::{g_music_volume, river_col_1, VisualEffects}, gamepad_pressed, key_pressed, lerp_color_rgba, to_vector2, WHITE};
+use crate::{audio::{self, g_music_volume}, c_str_leaky, c_str_temp, client::{river_col_1, VisualEffects}, gamepad_pressed, key_pressed, lerp_color_rgba, to_vector2, WHITE};
 
 //static mut g_font_roboto: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
 static mut g_font_roboto: [(i32, MaybeUninit<raylib_sys::Font>); 7] = [
@@ -199,37 +199,27 @@ impl SettingsMenu {
             0 => {
                 if let MenuInput::Left = input {
                     let mut state = crate::settings::get();
-                    state.music_volume -= 0.1;
-                    state.validate();
-                    unsafe {
-                        g_music_volume = state.music_volume;
-                    }
-                    crate::settings::set(state);
+                    state.set_music_volume(state.music_volume - 0.1);
+                    crate::settings::set_save(state);
                 }
                 if let MenuInput::Right = input {
                     let mut state = crate::settings::get();
-                    state.music_volume += 0.1;
-                    state.validate();
-                    unsafe {
-                        g_music_volume = state.music_volume;
-                    }
-                    crate::settings::set(state);
+                    state.set_music_volume(state.music_volume + 0.1);
+                    crate::settings::set_save(state);
                 }
             }
             1 => {
                 if let MenuInput::Left = input {
                     let mut state = crate::settings::get();
-                    state.sfx_volume -= 0.1;
-                    state.validate();
-                    crate::settings::set(state);
+                    state.set_sfx_volume(state.sfx_volume - 0.1);
                     audio::play("menu_click");
+                    crate::settings::set_save(state);
                 }
                 if let MenuInput::Right = input {
                     let mut state = crate::settings::get();
-                    state.sfx_volume += 0.1;
-                    state.validate();
-                    crate::settings::set(state);
+                    state.set_sfx_volume(state.sfx_volume + 0.1);
                     audio::play("menu_click");
+                    crate::settings::set_save(state);
                 }
             }
             2 => {
@@ -237,8 +227,8 @@ impl SettingsMenu {
                 if input.is_toggle() {
                     audio::play("menu_click");
                     let mut state = crate::settings::get();
-                    state.fullscreen = !state.fullscreen;
-                    crate::settings::set(state)
+                    state.toggle_fullscreen();
+                    crate::settings::set_save(state);
                 }
             }
             3 => {
@@ -249,7 +239,7 @@ impl SettingsMenu {
                     audio::play("menu_click");
                     let mut state = crate::settings::get();
                     state.crt_shader = !state.crt_shader;
-                    crate::settings::set(state)
+                    crate::settings::set_save(state)
                 }
             }
             5 => {

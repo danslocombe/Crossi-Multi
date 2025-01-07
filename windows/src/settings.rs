@@ -2,6 +2,8 @@ use std::{io::Write, mem::MaybeUninit};
 
 use serde::{Deserialize, Serialize};
 
+use crate::{audio::{g_sfx_volume, g_music_volume}};
+
 pub static mut g_settings: MaybeUninit<GlobalSettingsState> = MaybeUninit::uninit();
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
@@ -28,6 +30,32 @@ impl GlobalSettingsState {
 
     pub fn sync(&self) {
         // @TODO
+    }
+
+    pub fn set_music_volume(&mut self, music_volume: f32) {
+        self.music_volume = music_volume;
+        self.validate();
+        unsafe {
+            g_music_volume = self.music_volume;
+        }
+    }
+
+    pub fn set_sfx_volume(&mut self, sfx_volume: f32) {
+        self.sfx_volume = sfx_volume;
+        self.validate();
+        unsafe {
+            g_sfx_volume = self.sfx_volume;
+        }
+
+        crate::audio::update_volumes();
+    }
+
+    pub fn toggle_fullscreen(&mut self) {
+        self.fullscreen = !self.fullscreen;
+
+        unsafe {
+            raylib_sys::ToggleBorderlessWindowed();
+        }
     }
 }
 
@@ -99,10 +127,12 @@ pub fn get() -> GlobalSettingsState {
     }
 }
 
-pub fn set(new : GlobalSettingsState) {
+pub fn set_save(new : GlobalSettingsState) {
     unsafe {
         g_settings = MaybeUninit::new(new);
     }
+
+    save();
 }
 
 pub fn save() {

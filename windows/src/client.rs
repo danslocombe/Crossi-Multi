@@ -1,5 +1,5 @@
 use crossy_multi_core::{crossy_ruleset::{CrossyRulesetFST, GameConfig, RulesState}, map::RowType, math::V2, ring_buffer::RingBuffer, timeline::{Timeline, TICK_INTERVAL_US}, CoordPos, Input, PlayerId, PlayerInputs, Pos};
-use crate::{audio, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, gamepad_pressed, hex_color, key_pressed, lerp_color_rgba, pause::{Pause, PauseResult}, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, to_vector2, BLACK, WHITE};
+use crate::{audio::{self, g_music_volume}, dan_lerp, entities::{self, create_dust, Entity, EntityContainer, EntityManager, OutfitSwitcher, PropController}, gamepad_pressed, hex_color, key_pressed, lerp_color_rgba, pause::{Pause, PauseResult}, player_local::{PlayerInputController, PlayerLocal, Skin}, rope::NodeType, sprites, title_screen::{self, ActorController, TitleScreen}, to_vector2, BLACK, WHITE};
 use froggy_rand::FroggyRand;
 
 pub struct Client {
@@ -797,14 +797,11 @@ struct TitleBGMusic {
     pub playing_unsynced: bool,
 }
 
-//const g_music_volume: f32 = 0.6;
-pub static mut g_music_volume: f32 = 0.0;
-
 impl TitleBGMusic {
     pub fn new() -> Self {
         let music = unsafe {
             let mut music = raylib_sys::LoadMusicStream(crate::c_str_leaky("../web-client/static/sounds/mus_jump_at_sun_3.mp3"));
-            raylib_sys::SetMusicVolume(music, g_music_volume);
+            raylib_sys::SetMusicVolume(music, { g_music_volume });
             music.looping = true;
             raylib_sys::AttachAudioStreamProcessor(music.stream, Some(rl_low_pass));
             music
