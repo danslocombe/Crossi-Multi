@@ -4,7 +4,8 @@ use crossy_multi_core::math::V2;
 use crate::{audio, c_str_leaky, c_str_temp, client::{g_music_volume, river_col_1, VisualEffects}, gamepad_pressed, key_pressed, lerp_color_rgba, to_vector2, WHITE};
 
 //static mut g_font_roboto: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
-static mut g_font_roboto: [(i32, MaybeUninit<raylib_sys::Font>); 6] = [
+static mut g_font_roboto: [(i32, MaybeUninit<raylib_sys::Font>); 7] = [
+    (12, MaybeUninit::uninit()),
     (18, MaybeUninit::uninit()),
     (24, MaybeUninit::uninit()),
     (36, MaybeUninit::uninit()),
@@ -397,6 +398,9 @@ struct PauseDrawInfo {
     main_font: (raylib_sys::Font, f32),
     t_for_fade: i32,
     pos: V2,
+
+    left: f32,
+    right: f32,
 }
 
 impl PauseDrawInfo {
@@ -422,12 +426,22 @@ impl PauseDrawInfo {
                 3
             };
 
+            let title_font = (g_font_roboto[index_base + 1].1.assume_init(), g_font_roboto[index_base + 1].0 as f32);
+            let main_font = (g_font_roboto[index_base].1.assume_init(), g_font_roboto[index_base].0 as f32);
+
+            let test = raylib_sys::MeasureTextEx(main_font.0, c_str_leaky("a"), main_font.1, 1.0);
+            let left = dimensions.x * 0.5 - test.x * 22.0;
+            let right = dimensions.x * 0.5 + test.x * 22.0;
+
             Self {
                 dimensions,
-                title_font: (g_font_roboto[index_base + 1].1.assume_init(), g_font_roboto[index_base + 1].0 as f32),
-                main_font: (g_font_roboto[index_base].1.assume_init(), g_font_roboto[index_base].0 as f32),
+                title_font,
+                main_font,
                 t_for_fade,
                 pos: V2::default(),
+
+                left,
+                right,
             }
         }
     }
@@ -480,9 +494,6 @@ impl PauseDrawInfo {
         let text_c_left = c_str_temp(text_left);
         let text_c_right = c_str_temp(text_right);
 
-        let left = self.dimensions.x * 0.35;
-        let right = self.dimensions.x * 0.65;
-
         let font = self.main_font.0;
         let font_size = self.main_font.1;
 
@@ -501,12 +512,12 @@ impl PauseDrawInfo {
             let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c_left, font_size, spacing);
             let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
             //let pos = pos - text_size * 0.5;
-            let pos = V2::new(left, self.pos.y);
+            let pos = V2::new(self.left, self.pos.y);
             raylib_sys::DrawTextEx(font, text_c_left, to_vector2(pos), font_size, spacing, color);
 
             let text_size_vector2 = raylib_sys::MeasureTextEx(font, text_c_right, font_size, spacing);
             let text_size = V2::new(text_size_vector2.x, text_size_vector2.y);
-            let pos = V2::new(right - text_size.x, pos.y);
+            let pos = V2::new(self.right - text_size.x, pos.y);
             raylib_sys::DrawTextEx(font, text_c_right, to_vector2(pos), font_size, spacing, color);
 
             if (highlighted) {
