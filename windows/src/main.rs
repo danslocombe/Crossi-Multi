@@ -14,6 +14,8 @@ mod title_screen;
 mod raft;
 mod settings;
 mod pause;
+mod input;
+mod steam;
 
 use std::mem::MaybeUninit;
 
@@ -35,7 +37,6 @@ pub fn c_str_leaky(s: &str) -> *const i8 {
         c_string_leaky_allocator.assume_init_mut().alloc(s)
     }
 }
-
 
 const screen_width_f: f32 = 160.0;
 const screen_height_f: f32 = 160.0;
@@ -83,12 +84,17 @@ fn main() {
 
         pause::init_pause_fonts();
 
+        steam::init();
+        input::init();
+
         let framebuffer = raylib_sys::LoadRenderTexture(160, 160);
 
         let seed = shitty_rand_seed();
         let mut client = Client::new(debug_param, &seed);
 
         while !raylib_sys::WindowShouldClose() && !client.exit {
+            steam::tick();
+
             let mapping_info = FrameBufferToScreenInfo::compute(&framebuffer.texture);
             client.tick();
 
