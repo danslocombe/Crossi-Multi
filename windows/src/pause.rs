@@ -176,7 +176,7 @@ impl SettingsMenu {
         let input = MenuInput::read();
 
         // @Fragile
-        let option_count = 8;
+        let option_count = 9;
 
         // @TODO controller input / WASD.
         // @Dedup
@@ -272,11 +272,19 @@ impl SettingsMenu {
                 if input.is_toggle() {
                     audio::play("menu_click");
                     let mut state = crate::settings::get();
-                    state.crt_shader = !state.crt_shader;
+                    state.crt = !state.crt;
                     crate::settings::set_save(state)
                 }
             },
             7 => {
+                if input.is_toggle() {
+                    audio::play("menu_click");
+                    let mut state = crate::settings::get();
+                    state.vignette = !state.vignette;
+                    crate::settings::set_save(state)
+                }
+            },
+            8 => {
                 if let MenuInput::Enter = input {
                     audio::play("menu_click");
                     return false;
@@ -317,9 +325,11 @@ impl SettingsMenu {
         draw_info.text_left_right_incr_padding("Vibration:", vibration_mode, padding, self.highlighted == 4);
         let flashing_mode = if settings.flashing { "On" } else { "Off" };
         draw_info.text_left_right_incr_padding("Flashing:", flashing_mode, padding, self.highlighted == 5);
-        let crt_mode = if settings.crt_shader { "On" } else { "Off" };
+        let crt_mode = if settings.crt { "On" } else { "Off" };
         draw_info.text_left_right_incr_padding("CRT Effect:", crt_mode, padding, self.highlighted == 6);
-        draw_info.text_center("Back", self.highlighted == 7);
+        let vignette_mode = if settings.vignette { "On" } else { "Off" };
+        draw_info.text_left_right_incr_padding("Vignette:", vignette_mode, padding, self.highlighted == 7);
+        draw_info.text_center("Back", self.highlighted == 8);
     }
 }
 

@@ -13,7 +13,8 @@ pub struct GlobalSettingsState {
     pub screenshake: bool,
     pub flashing: bool,
     pub vibration: bool,
-    pub crt_shader: bool,
+    pub crt: bool,
+    pub vignette: bool,
     pub fullscreen: bool,
 }
 
@@ -62,7 +63,8 @@ impl Default for GlobalSettingsState {
             flashing: true,
             screenshake: true,
             vibration: true,
-            crt_shader: true,
+            crt: true,
+            vignette: true,
             fullscreen: true,
         }
     }

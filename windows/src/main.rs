@@ -139,14 +139,19 @@ fn main() {
 
                 let settings = crate::settings::get();
 
-                if (settings.crt_shader) {
-                    if (!client.pause.is_some()) {
-                        client.screen_shader.iTime += 1;
-                    }
-
+                //if (settings.crt_shader) {
+                {
                     //let iTime_ptr: *const i32 = std::ptr::from_ref(&client.screen_shader.iTime);
                     let iTime_ptr: *const i32 = std::ptr::from_ref(&client.visual_effects.t);
                     raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_iTime_loc, iTime_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_INT as i32);
+
+                    let crt: i32 = if settings.crt {1} else {0};
+                    let crt_ptr: *const i32 = std::ptr::from_ref(&crt);
+                    raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_crt_loc, crt_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_INT as i32);
+
+                    let vignette: i32 = if settings.vignette {1} else {0};
+                    let vignette_ptr: *const i32 = std::ptr::from_ref(&vignette);
+                    raylib_sys::SetShaderValue(client.screen_shader.shader, client.screen_shader.shader_vignette_loc, vignette_ptr.cast(), raylib_sys::ShaderUniformDataType::SHADER_UNIFORM_INT as i32);
 
                     let mut amp = client.visual_effects.noise * 2.0;// / 16.0;
                     if (!settings.flashing) {
@@ -159,7 +164,8 @@ fn main() {
 
                 raylib_sys::DrawTexturePro(framebuffer.texture, mapping_info.source, mapping_info.destination, raylib_sys::Vector2{ x: 0.0, y: 0.0 }, 0.0, WHITE);
 
-                if (settings.crt_shader) {
+                //if (settings.crt_shader) {
+                {
                     raylib_sys::EndShaderMode();
                 }
 
@@ -285,8 +291,9 @@ impl FrameBufferToScreenInfo {
 
 struct ScreenShader {
     shader: raylib_sys::Shader,
-    iTime: i32,
     shader_iTime_loc: i32,
+    shader_crt_loc: i32,
+    shader_vignette_loc: i32,
     shader_amp_loc: i32,
 }
 
@@ -295,11 +302,14 @@ impl ScreenShader {
         unsafe {
             let shader = raylib_sys::LoadShader(std::ptr::null(), c_str_leaky("shaders/pause.fs"));
             let shader_iTime_loc = raylib_sys::GetShaderLocation(shader, c_str_leaky("iTime"));
+            let shader_crt_loc = raylib_sys::GetShaderLocation(shader, c_str_leaky("crt"));
+            let shader_vignette_loc = raylib_sys::GetShaderLocation(shader, c_str_leaky("vignette"));
             let shader_amp_loc = raylib_sys::GetShaderLocation(shader, c_str_leaky("amp"));
             Self {
                 shader,
-                iTime: 0,
                 shader_iTime_loc,
+                shader_crt_loc,
+                shader_vignette_loc,
                 shader_amp_loc,
             }
         }

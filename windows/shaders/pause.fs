@@ -11,6 +11,8 @@ uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 uniform int iTime;
 uniform float amp;
+uniform int vignette;
+uniform int crt;
 
 // Output fragment color
 out vec4 finalColor;
@@ -88,41 +90,49 @@ void main()
 
     vec2 sampleCoord = pos;
 
-    // Jitter each line left and right
-    sampleCoord.x += rand(vec2(iTime, pos.y) - 0.5) * (jitter_amplitude / 64.0);
+    if (crt != 0) {
+        // Jitter each line left and right
+        sampleCoord.x += rand(vec2(iTime, pos.y) - 0.5) * (jitter_amplitude / 64.0);
 
-    // Jitter the whole picture up and down
-    sampleCoord.y += (rand(vec2(iTime))-0.5) * (jitter_amplitude/32.0);
+        // Jitter the whole picture up and down
+        sampleCoord.y += (rand(vec2(iTime))-0.5) * (jitter_amplitude/32.0);
 
-    // Slightly add color noise to each line
-    texColor += color_amplitude * (vec4(-0.5)+vec4(rand(vec2(pos.y,iTime)),rand(vec2(pos.y,iTime+1.0)),rand(vec2(pos.y,iTime+2.0)),0))*0.1;
-    //texColor += color_amplitude * (vec4(-0.5)+vec4(rand(vec2(pos.x,iTime)),rand(vec2(pos.x,iTime+1.0)),rand(vec2(pos.x,iTime+2.0)),0))*0.1;
+        // Slightly add color noise to each line
+        texColor += color_amplitude * (vec4(-0.5)+vec4(rand(vec2(pos.y,iTime)),rand(vec2(pos.y,iTime+1.0)),rand(vec2(pos.y,iTime+2.0)),0))*0.1;
+        //texColor += color_amplitude * (vec4(-0.5)+vec4(rand(vec2(pos.x,iTime)),rand(vec2(pos.x,iTime+1.0)),rand(vec2(pos.x,iTime+2.0)),0))*0.1;
 
-    float bar_center = 0.14;
-    float bar_width_base = 0.04 * amp * 0.01;
-    float bar_dropoff_top  = 0.03;
-    float bar_dropoff_bot  = 0.01;
+        float bar_center = 0.14;
+        float bar_width_base = 0.04 * amp * 0.01;
+        float bar_dropoff_top  = 0.03;
+        float bar_dropoff_bot  = 0.01;
 
-    // Either sample the texture, or just make the pixel white (to get the staticy-bit at the bottom)
-    float whiteNoise = rand(vec2(floor(sampleCoord.y*80.0),floor(sampleCoord.x*50.0))+vec2(iTime,0));
-    if (
-            ((sampleCoord.y < bar_center +  bar_width_base - bar_dropoff_top * whiteNoise) 
-            && 
-            (sampleCoord.y > bar_center  - bar_width_base -bar_dropoff_bot * whiteNoise))
-        ||
-            ((sampleCoord.y < (1.0-bar_center) +  bar_width_base - bar_dropoff_top * whiteNoise) 
-            && 
-            (sampleCoord.y > (1.0-bar_center)  - bar_width_base -bar_dropoff_bot * whiteNoise))
-    )
+        // Either sample the texture, or just make the pixel white (to get the staticy-bit at the bottom)
+        float whiteNoise = rand(vec2(floor(sampleCoord.y*80.0),floor(sampleCoord.x*50.0))+vec2(iTime,0));
+        if (
+                ((sampleCoord.y < bar_center +  bar_width_base - bar_dropoff_top * whiteNoise) 
+                && 
+                (sampleCoord.y > bar_center  - bar_width_base -bar_dropoff_bot * whiteNoise))
+            ||
+                ((sampleCoord.y < (1.0-bar_center) +  bar_width_base - bar_dropoff_top * whiteNoise) 
+                && 
+                (sampleCoord.y > (1.0-bar_center)  - bar_width_base -bar_dropoff_bot * whiteNoise))
+        )
+        {
+            // Use white. (I'm adding here so the color noise still applies)
+            texColor += vec4(1);
+        } else {
+            // Sample the texture.
+            texColor += texture(texture0, sampleCoord);
+        }
+    }
+    else
     {
-        // Use white. (I'm adding here so the color noise still applies)
-        texColor += vec4(1);
-    } else {
-        // Sample the texture.
-    	texColor += texture(texture0, sampleCoord);
+        texColor = texture(texture0, sampleCoord);
     }
 
     finalColor = texColor;
     //finalColor = vec4(finalColor.rgb * discardCorners(pos), 1.0);
-    finalColor = Televisionfy(texColor, pos);
+    if (vignette != 0) {
+        finalColor = Televisionfy(texColor, pos);
+    }
 }
