@@ -43,26 +43,6 @@ vec2 curveScreen( vec2 uv ) {
 
 const float SCREEN_CORNER_RADIUS = 0.1;
 
-float discardCorners( vec2 pos ) {
-    return 1.0;
-    //pos -= vec2(0.5);
-    //pos = abs(pos);
-    //pos *= 2.0;
-    ////pos.x = pos.x*1.333-0.333;											// 4:3 aspect ratio correction
-    ////if( min(pos.x, pos.y) < 1.0-SCREEN_CORNER_RADIUS ) return 1.0;		// not near corner -- break early
-    //float d = distance( pos, vec2(0.8-SCREEN_CORNER_RADIUS) );
-    //return float( d<SCREEN_CORNER_RADIUS );
-
-    // pos = abs(pos);
-    //pos -= vec2(0.5);
-    //pos  = abs(pos);
-    //pos *= 20.0;
-    //pos.x = pos.x*1.333-0.333;											// 4:3 aspect ratio correction
-    //if( min(pos.x, pos.y) < 1.0-SCREEN_CORNER_RADIUS ) return 1.0;		// not near corner -- break early
-    //float d = distance( pos, vec2(1.0-SCREEN_CORNER_RADIUS) );
-    //return float( d<SCREEN_CORNER_RADIUS );
-}
-
 // From https://www.shadertoy.com/view/sltBWM
 vec4 Televisionfy(in vec4 pixel, const in vec2 uv)
 {
@@ -131,7 +111,6 @@ void main()
     }
 
     finalColor = texColor;
-    //finalColor = vec4(finalColor.rgb * discardCorners(pos), 1.0);
     if (vignette != 0) {
         finalColor = Televisionfy(texColor, pos);
     }
