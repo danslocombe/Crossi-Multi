@@ -42,11 +42,7 @@ impl TitleScreen {
         }
 
         self.t += 1;
-
-        // @TODO add controller press.
-        let press = unsafe {
-            raylib_sys::GetKeyPressed() != 0
-        };
+        let press = crate::input::goto_next_title();
 
         if (self.goto_next_t.is_none() && press) {
             audio::play("car");

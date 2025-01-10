@@ -2,8 +2,8 @@ use crossy_multi_core::game;
 
 use crate::{gamepad_pressed, key_pressed, steam::g_steam_client_single};
 
-//static mut g_steam_input: bool = true;
-static mut g_steam_input: bool = false;
+static mut g_steam_input: bool = true;
+//static mut g_steam_input: bool = false;
 
 pub fn using_steam_input() -> bool {
     unsafe { g_steam_input }
@@ -246,4 +246,55 @@ pub fn game_input_controller_raylib(gamepad_id: i32) -> game::Input {
         }
     }
     */
+}
+
+static mut g_hack_last_steam_input_toggle_t: i32 = 0;
+
+pub fn toggle_pause() -> bool {
+    if key_pressed(raylib_sys::KeyboardKey::KEY_ESCAPE) {
+        return true;
+    }
+
+    if using_steam_input() {
+        // @Hack, when we go to the pause menu we change actionstates
+        // This means that we will immediately trigger this again. 
+        // Hack around by using a timer.
+
+        unsafe {
+            if (crate::steam::g_t - g_hack_last_steam_input_toggle_t > 5) {
+                if crate::steam::read_menu_input() == MenuInput::ReturnToGame {
+                    g_hack_last_steam_input_toggle_t = crate::steam::g_t;
+                    return true;
+                }
+
+                if (crate::steam::game_pause_pressed()) {
+                    g_hack_last_steam_input_toggle_t = crate::steam::g_t;
+                    return true;
+                }
+            }
+        }
+    }
+    else {
+        // @TODO
+    }
+
+
+    false
+}
+
+pub fn goto_next_title() -> bool {
+    unsafe {
+        if raylib_sys::GetKeyPressed() != 0 {
+            return true;
+        }
+    }
+
+    if using_steam_input() {
+        return crate::steam::read_menu_input() != MenuInput::None;
+    }
+    else {
+        // @TODO
+    }
+
+    false
 }

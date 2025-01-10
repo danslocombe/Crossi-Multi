@@ -93,7 +93,16 @@ fn main() {
         let mut client = Client::new(debug_param, &seed);
 
         while !raylib_sys::WindowShouldClose() && !client.exit {
-            steam::tick();
+            {
+                // Tick steam input, run callbacks.
+                let current_actionset = if client.pause.is_some() || client.title_screen.is_some() {
+                    steam::ActionSet::InMenu
+                }
+                else {
+                    steam::ActionSet::InGame
+                };
+                steam::tick(current_actionset);
+            }
 
             let mapping_info = FrameBufferToScreenInfo::compute(&framebuffer.texture);
             client.tick();
@@ -102,7 +111,7 @@ fn main() {
                 console::toggle_open();
             };
 
-            if key_pressed(raylib_sys::KeyboardKey::KEY_ESCAPE) {
+            if input::toggle_pause() {
                 if (console::eating_input()) {
                     console::toggle_open();
                 }

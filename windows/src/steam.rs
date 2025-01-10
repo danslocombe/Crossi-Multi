@@ -13,6 +13,13 @@ pub static mut g_controller_input_states: Vec<InputState> = Vec::new();
 
 pub static mut g_t: i32 = 0;
 
+pub enum ActionSet {
+    InGame,
+    InMenu,
+}
+
+//pub static mut g_current_actionset: ActionSet = ActionSet::InGame;
+
 const STEAM_INPUT_HANDLE_ALL_CONTROLLERS: u64 = u64::MAX; 
 
 pub fn init() -> bool {
@@ -34,7 +41,7 @@ pub fn init() -> bool {
     }
 }
 
-pub fn tick() {
+pub fn tick(current_actionset : ActionSet) {
     unsafe {
         g_t += 1;
 
@@ -91,9 +98,16 @@ pub fn tick() {
             }
 
             if let Some(handles) = g_input_handles.as_ref() {
-                // @Nocheckin
-                //input.activate_action_set_handle(STEAM_INPUT_HANDLE_ALL_CONTROLLERS, handles.actionset_menucontrols);
-                input.activate_action_set_handle(STEAM_INPUT_HANDLE_ALL_CONTROLLERS, handles.actionset_ingame);
+                let actionset_handle = match current_actionset {
+                    ActionSet::InGame => {
+                        handles.actionset_ingame
+                    },
+                    ActionSet::InMenu => {
+                        handles.actionset_menucontrols
+                    },
+                };
+
+                input.activate_action_set_handle(STEAM_INPUT_HANDLE_ALL_CONTROLLERS, actionset_handle);
 
                 for i in 0..g_controller_count {
                     let controller_id = g_connected_controllers[i];
@@ -243,6 +257,23 @@ pub fn read_game_input(controller_id: u64) -> game::Input {
     }
 
     game::Input::None
+}
+
+
+pub fn game_pause_pressed() -> bool {
+    unsafe {
+        for state in g_controller_input_states.iter() {
+            if (state.last_update != g_t) {
+                continue;
+            }
+
+            if (state.current.game_pause_menu && !state.prev.game_pause_menu) {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 //pub fn game_input_controller_steam(controller_id: i32) -> game::Input {
