@@ -31,6 +31,8 @@ pub struct PlayerInputController {
     wasd_player: Option<PlayerId>,
     controller_a_players: [Option<PlayerId>;4],
     controller_b_players: [Option<PlayerId>;4],
+
+    steam_input_players: [(u64, Option<PlayerId>);16]
 }
 
 impl PlayerInputController {
@@ -70,87 +72,51 @@ impl PlayerInputController {
         let mut new_players = Vec::new();
 
         {
-            // Arrows
-            let mut input = Input::None;
-            if (!console::eating_input()) {
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
-                    input = game::Input::Left;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
-                    input = game::Input::Right;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
-                    input = game::Input::Up;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
-                    input = game::Input::Down;
-                }
-            }
-
-            Self::process_input(&mut self.arrow_key_player, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None);
+            let arrow_input = crate::input::arrow_game_input();
+            Self::process_input(&mut self.arrow_key_player, arrow_input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None, None);
         }
 
         {
-            // WASD
-            let mut input = Input::None;
-            if (!console::eating_input()) {
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_A)) {
-                    input = game::Input::Left;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_D)) {
-                    input = game::Input::Right;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_W)) {
-                    input = game::Input::Up;
-                }
-                if (key_pressed(raylib_sys::KeyboardKey::KEY_S)) {
-                    input = game::Input::Down;
-                }
-            }
-
-            Self::process_input(&mut self.wasd_player, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None);
+            let wasd_input = crate::input::wasd_game_input();
+            Self::process_input(&mut self.arrow_key_player, wasd_input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None, None);
         }
 
-        for gamepad_id in 0..4
-        {
-            if (unsafe { raylib_sys::IsGamepadAvailable(gamepad_id) })
+        if (crate::input::using_steam_input()) {
+            unsafe {
+                for i in 0..crate::steam::g_controller_count {
+                    let controller_id = crate::steam::g_connected_controllers[i];
+                    let input = crate::steam::read_game_input(controller_id);
+
+                    println!("Controller input: {:?} id: {}", input, controller_id);
+
+                    // @Hack for now
+                    if self.steam_input_players[0].0 == 0 &&
+                        self.steam_input_players[0].1.is_none() {
+                        // Register
+                        if input != Input::None{
+                            let mut registration = None;
+                            if let Some(pid) = Self::create_player(&mut registration, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None, Some(controller_id)) {
+                                self.steam_input_players[0] = (controller_id, Some(pid));
+                            }
+                        }
+                    }
+                    else {
+                        // @Hack for now
+                        assert!(self.steam_input_players[0].0 == controller_id);
+                        assert!(self.steam_input_players[0].1.is_some());
+                        let pid = self.steam_input_players[0].1.unwrap();
+                        if let Some(player) = players_local.inner.iter_mut().find(|x| x.player_id == pid) {
+                            player.update_inputs(&*timeline, &mut player_inputs, input);
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            for gamepad_id in 0..4
             {
-                {
-                    let mut input = Input::None;
-                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
-                        input = Input::Left;
-                    }
-                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
-                        input = Input::Right;
-                    }
-                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_UP) {
-                        input = Input::Up;
-                    }
-                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
-                        input = Input::Down;
-                    }
-                    Self::process_input(&mut self.controller_a_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id));
-                }
-
-                if (false) {
-                    // Need to rethink this
-                    // I want this to be possible but will probably need some interaction setup
-
-                    let mut input = Input::None;
-                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_LEFT) {
-                        input = Input::Left;
-                    }
-                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) {
-                        input = Input::Right;
-                    }
-                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_UP) {
-                        input = Input::Up;
-                    }
-                    if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
-                        input = Input::Down;
-                    }
-                    Self::process_input(&mut self.controller_b_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id));
-                }
+                let gamepad_input = crate::input::game_input_controller_raylib(gamepad_id);
+                Self::process_input(&mut self.controller_a_players[gamepad_id as usize], gamepad_input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id), None);
             }
         }
 
@@ -165,14 +131,15 @@ impl PlayerInputController {
         players_local: &mut EntityContainer<PlayerLocal>,
         outfit_switchers: &EntityContainer<OutfitSwitcher>,
         new_players: &mut Vec<PlayerId>,
-        controller_id: Option<i32>) {
+        controller_id: Option<i32>,
+        steam_controller_id: Option<u64>) {
         if let Some(pid) = *id_registration {
             if let Some(player) = players_local.inner.iter_mut().find(|x| x.player_id == pid) {
                 player.update_inputs(&*timeline, player_inputs, input);
             }
         }
         else if input != Input::None{
-            Self::create_player(id_registration, input, player_inputs, timeline, players_local, outfit_switchers, new_players, controller_id);
+            Self::create_player(id_registration, input, player_inputs, timeline, players_local, outfit_switchers, new_players, controller_id, steam_controller_id);
         }
     }
 
@@ -184,7 +151,8 @@ impl PlayerInputController {
         players_local: &mut EntityContainer<PlayerLocal>,
         outfit_switchers: &EntityContainer<OutfitSwitcher>,
         new_players: &mut Vec<PlayerId>,
-        controller_id: Option<i32>) {
+        controller_id: Option<i32>,
+        steam_controller_id: Option<u64>) -> Option<PlayerId> {
 
         let top = timeline.top_state();
         if let Some(new_id) = top.player_states.next_free() {
@@ -206,9 +174,12 @@ impl PlayerInputController {
             player_local.controller_id = controller_id;
 
             new_players.push(new_id);
+
+            Some(player_local.player_id)
         }
         else {
             console::info("Unable to create another player");
+            None
         }
     }
 }

@@ -759,6 +759,7 @@ fn do_add_player(args: &[&str], client: &mut Client) {
         &mut client.entities.players,
         &client.entities.outfit_switchers,
         &mut new_players,
+        None,
         None);
 }
 

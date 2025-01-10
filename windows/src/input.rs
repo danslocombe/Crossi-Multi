@@ -1,6 +1,9 @@
+use crossy_multi_core::game;
+
 use crate::{gamepad_pressed, key_pressed, steam::g_steam_client_single};
 
-static mut g_steam_input: bool = true;
+//static mut g_steam_input: bool = true;
+static mut g_steam_input: bool = false;
 
 pub fn using_steam_input() -> bool {
     unsafe { g_steam_input }
@@ -143,4 +146,104 @@ impl MenuInput {
 
         Self::None
     }
+}
+
+pub fn arrow_game_input() -> game::Input {
+    if (!crate::console::eating_input()) {
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
+            return game::Input::Left;
+        }
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
+            return game::Input::Right;
+        }
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
+            return game::Input::Up;
+        }
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
+            return game::Input::Down;
+        }
+    }
+
+    game::Input::None
+}
+
+pub fn wasd_game_input() -> game::Input {
+    if (!crate::console::eating_input()) {
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
+            return game::Input::Left;
+        }
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
+            return game::Input::Right;
+        }
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
+            return game::Input::Up;
+        }
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
+            return game::Input::Down;
+        }
+    }
+
+    game::Input::None
+}
+
+
+pub fn game_input_controller_raylib(gamepad_id: i32) -> game::Input {
+    if (unsafe { raylib_sys::IsGamepadAvailable(gamepad_id) })
+    {
+        if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
+            return game::Input::Left;
+        }
+        if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
+            return game::Input::Right;
+        }
+        if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_UP) {
+            return game::Input::Up;
+        }
+        if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
+            return game::Input::Down;
+        }
+    }
+
+    game::Input::None
+    /*
+    if (unsafe { raylib_sys::IsGamepadAvailable(gamepad_id) })
+    {
+        {
+            let mut input = Input::None;
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
+                input = Input::Left;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
+                input = Input::Right;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_UP) {
+                input = Input::Up;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
+                input = Input::Down;
+            }
+            Self::process_input(&mut self.controller_a_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id));
+        }
+
+        if (false) {
+            // Need to rethink this
+            // I want this to be possible but will probably need some interaction setup
+
+            let mut input = Input::None;
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_LEFT) {
+                input = Input::Left;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) {
+                input = Input::Right;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_UP) {
+                input = Input::Up;
+            }
+            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
+                input = Input::Down;
+            }
+            Self::process_input(&mut self.controller_b_players[gamepad_id as usize], input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, Some(gamepad_id));
+        }
+    }
+    */
 }

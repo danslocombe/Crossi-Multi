@@ -1,3 +1,5 @@
+use crossy_multi_core::game;
+
 use crate::input::MenuInput;
 
 pub static mut g_steam_client: Option<steamworks::Client> = None;
@@ -90,7 +92,8 @@ pub fn tick() {
 
             if let Some(handles) = g_input_handles.as_ref() {
                 // @Nocheckin
-                input.activate_action_set_handle(STEAM_INPUT_HANDLE_ALL_CONTROLLERS, handles.actionset_menucontrols);
+                //input.activate_action_set_handle(STEAM_INPUT_HANDLE_ALL_CONTROLLERS, handles.actionset_menucontrols);
+                input.activate_action_set_handle(STEAM_INPUT_HANDLE_ALL_CONTROLLERS, handles.actionset_ingame);
 
                 for i in 0..g_controller_count {
                     let controller_id = g_connected_controllers[i];
@@ -173,6 +176,12 @@ impl InputState {
         self.current.menu_right = steam_input.get_digital_action_data(self.controller_id, handles.menu_right).bState;
         self.current.menu_select = steam_input.get_digital_action_data(self.controller_id, handles.menu_select).bState;
         self.current.menu_return_to_game = steam_input.get_digital_action_data(self.controller_id, handles.menu_return_to_game).bState;
+
+        self.current.game_up = steam_input.get_digital_action_data(self.controller_id, handles.game_up).bState;
+        self.current.game_down = steam_input.get_digital_action_data(self.controller_id, handles.game_down).bState;
+        self.current.game_left = steam_input.get_digital_action_data(self.controller_id, handles.game_left).bState;
+        self.current.game_right = steam_input.get_digital_action_data(self.controller_id, handles.game_right).bState;
+        self.current.game_pause_menu = steam_input.get_digital_action_data(self.controller_id, handles.game_pause_menu).bState;
     }
 }
 
@@ -206,3 +215,34 @@ pub fn read_menu_input() -> MenuInput {
 
     MenuInput::None
 }
+
+pub fn read_game_input(controller_id: u64) -> game::Input {
+    unsafe {
+        for state in g_controller_input_states.iter() {
+            if (state.controller_id != controller_id) {
+                continue;
+            }
+
+            if (state.last_update != g_t) {
+                continue;
+            }
+
+            if (state.current.game_up && !state.prev.game_up) {
+                return game::Input::Up;
+            }
+            if (state.current.game_down && !state.prev.game_down) {
+                return game::Input::Down;
+            }
+            if (state.current.game_left && !state.prev.game_left) {
+                return game::Input::Left;
+            }
+            if (state.current.game_right && !state.prev.game_right) {
+                return game::Input::Right;
+            }
+        }
+    }
+
+    game::Input::None
+}
+
+//pub fn game_input_controller_steam(controller_id: i32) -> game::Input {
