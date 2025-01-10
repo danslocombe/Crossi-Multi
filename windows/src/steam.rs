@@ -276,4 +276,72 @@ pub fn game_pause_pressed() -> bool {
     false
 }
 
-//pub fn game_input_controller_steam(controller_id: i32) -> game::Input {
+pub fn set_vibration(controller_id: u64, value: u16) {
+    unsafe {
+        // Ensure we are still initialised even though we use the apis directly.
+        if let Some(_client) = g_steam_client.as_ref() {
+            let input = steamworks::sys::SteamAPI_SteamInput_v006();
+            steamworks::sys::SteamAPI_ISteamInput_TriggerVibration(input, controller_id, value, value);
+        }
+    }
+}
+
+pub struct SteamControllerMap<T> {
+    pub inner: [(u64, Option<T>); 16],
+}
+
+impl<T> Default for SteamControllerMap<T> where T: Copy {
+    fn default() -> Self {
+        Self {
+            inner: [(0, None); 16],
+        }
+    }
+}
+
+impl<T> SteamControllerMap<T> {
+    pub fn find(&self, target_controller_id: u64) -> Option<usize> {
+        debug_assert!(target_controller_id != 0);
+        for i in 0..16 {
+            if target_controller_id == self.inner[i].0 {
+                return Some(i);
+            }
+        }
+
+        None
+    }
+
+    pub fn find_next_free(&self) -> Option<usize> {
+        for i in 0..16 {
+            if self.inner[i].0 == 0 {
+                // We expect the entries to be either of the form:
+                // (0, None)
+                // (nonzero, Some(pid))
+                //
+                // Check we are of the first form.
+                debug_assert!(self.inner[i].1.is_none());
+                return Some(i);
+            }
+        }
+
+        None
+    }
+
+    pub fn remove(&mut self, i : usize) {
+        assert!(i >= 0 && i < 16);
+        self.inner[i] = (0, None);
+    }
+}
+
+impl<T> SteamControllerMap<T> where T: Eq + Copy {
+    pub fn find_value(&self, value: T) -> Option<usize> {
+        for i in 0..16 {
+            if let Some(x) = self.inner[i].1 {
+                if x == value {
+                    return Some(i);
+                }
+            }
+        }
+
+        None
+    }
+}

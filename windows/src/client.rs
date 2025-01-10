@@ -202,9 +202,7 @@ impl Client {
 
             for new in new_players.iter() {
                 if let Some(local) = self.entities.players.inner.iter().find(|x| x.player_id == *new) {
-                    if let Some(cid) = local.controller_id {
-                        self.visual_effects.set_gamepad_vibration(cid);
-                    }
+                    self.visual_effects.set_gamepad_vibration(local.controller_id, local.steam_controller_id);
                 }
             }
         }
@@ -640,6 +638,7 @@ pub struct VisualEffects {
     pub noise: f32,
 
     pub controller_vibrations: Vec<f32>,
+    pub steam_controller_vibrations: crate::steam::SteamControllerMap<f32>,
 }
 
 impl Default for VisualEffects {
@@ -655,6 +654,7 @@ impl Default for VisualEffects {
             screenshake: 0.0,
             noise: 0.0,
             controller_vibrations: vibration,
+            steam_controller_vibrations: Default::default(),
         }
     }
 }
@@ -673,8 +673,26 @@ impl VisualEffects {
         self.noise = self.noise.max(15.0);
     }
 
-    pub fn set_gamepad_vibration(&mut self, id: i32) {
-        self.controller_vibrations[id as usize] = 15.0;
+    pub fn set_gamepad_vibration(&mut self, m_controller_id: Option<i32>, m_steam_controller_id: Option<u64>)
+    {
+        if let Some(controller_id) = m_controller_id {
+            self.controller_vibrations[controller_id as usize] = 15.0;
+        }
+
+        if let Some(steam_controller_id) = m_steam_controller_id {
+            if let Some(i) = self.steam_controller_vibrations.find(steam_controller_id) {
+                self.steam_controller_vibrations.inner[i].1 = Some(15.0);
+            }
+            else {
+                if let Some(i) = self.steam_controller_vibrations.find_next_free() {
+                    self.steam_controller_vibrations.inner[i] = (steam_controller_id, Some(15.0));
+                }
+                else {
+                    // Will we ever hit this?
+                    debug_assert!(false);
+                }
+            }
+        }
     }
 
     pub fn tick(&mut self) {
@@ -686,19 +704,15 @@ impl VisualEffects {
 
         let settings = crate::settings::get();
         if (settings.vibration) {
+            const MULT: f32 = 0.65;
+
             for (i, x) in self.controller_vibrations.iter_mut().enumerate() {
-                *x *= 0.65;
+                *x *= MULT;
 
                 let id = i as i32;
                 unsafe {
                     if raylib_sys::IsGamepadAvailable(id) {
-                        let value = 
-                        if *x > 0.01 {
-                            (*x * u16::MAX as f32).floor() as u16
-                        }
-                        else {
-                            0 as u16
-                        };
+                        let value = get_vibration_speed(*x);
 
                         // Lifted from
                         //https://github.com/machlibs/rumble/blob/main/src/up_rumble.h
@@ -711,8 +725,26 @@ impl VisualEffects {
                     }
                 }
             }
+
+            for ((steam_controller_id, m_vibration)) in self.steam_controller_vibrations.inner.iter_mut() {
+                if let Some(x) = m_vibration {
+                    *x *= MULT;
+                    let value = get_vibration_speed(*x);
+                    crate::steam::set_vibration(*steam_controller_id, value);
+                }
+            }
         }
     }
+}
+
+fn get_vibration_speed(x: f32) -> u16 {
+    let clamped = x.clamp(0.0, 1.0);
+
+    if clamped < 0.01 {
+        return 0;
+    }
+
+    (clamped * u16::MAX as f32).floor() as u16
 }
 
 #[derive(Default)]

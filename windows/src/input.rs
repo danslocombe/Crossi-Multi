@@ -169,16 +169,16 @@ pub fn arrow_game_input() -> game::Input {
 
 pub fn wasd_game_input() -> game::Input {
     if (!crate::console::eating_input()) {
-        if (key_pressed(raylib_sys::KeyboardKey::KEY_LEFT)) {
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_A)) {
             return game::Input::Left;
         }
-        if (key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT)) {
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_D)) {
             return game::Input::Right;
         }
-        if (key_pressed(raylib_sys::KeyboardKey::KEY_UP)) {
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_W)) {
             return game::Input::Up;
         }
-        if (key_pressed(raylib_sys::KeyboardKey::KEY_DOWN)) {
+        if (key_pressed(raylib_sys::KeyboardKey::KEY_S)) {
             return game::Input::Down;
         }
     }

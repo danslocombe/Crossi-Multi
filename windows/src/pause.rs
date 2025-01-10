@@ -249,7 +249,14 @@ impl SettingsMenu {
                     state.vibration = !state.vibration;
                     if (state.vibration) {
                         for i in 0..4 {
-                            visual_effects.set_gamepad_vibration(i);
+                            visual_effects.set_gamepad_vibration(Some(i), None);
+                        }
+
+                        unsafe {
+                            for i in 0..crate::steam::g_controller_count {
+                                let controller_id = crate::steam::g_connected_controllers[i];
+                                visual_effects.set_gamepad_vibration(None, Some(controller_id));
+                            }
                         }
                     }
                     crate::settings::set_save(state)

@@ -19,6 +19,7 @@ pub struct PlayerLocal {
     pub skin: Skin,
     pub visible: bool,
     pub controller_id: Option<i32>,
+    pub steam_controller_id: Option<u64>,
     pub alive_state: AliveState,
 }
 
@@ -32,7 +33,7 @@ pub struct PlayerInputController {
     controller_a_players: [Option<PlayerId>;4],
     controller_b_players: [Option<PlayerId>;4],
 
-    steam_input_players: [(u64, Option<PlayerId>);16]
+    steam_input_players: crate::steam::SteamControllerMap<PlayerId>,
 }
 
 impl PlayerInputController {
@@ -62,12 +63,17 @@ impl PlayerInputController {
                 }
             }
         }
+
+        if let Some(i) = self.steam_input_players.find_value(remove_player_id) {
+            self.steam_input_players.remove(i);
+        }
     }
 
     pub fn tick(&mut self,
             timeline: &mut Timeline,
             players_local: &mut EntityContainer<PlayerLocal>,
-            outfit_switchers: &EntityContainer<OutfitSwitcher>) -> (PlayerInputs, Vec<PlayerId>) {
+            outfit_switchers: &EntityContainer<OutfitSwitcher>) -> (PlayerInputs, Vec<PlayerId>)
+    {
         let mut player_inputs = PlayerInputs::default();
         let mut new_players = Vec::new();
 
@@ -78,7 +84,7 @@ impl PlayerInputController {
 
         {
             let wasd_input = crate::input::wasd_game_input();
-            Self::process_input(&mut self.arrow_key_player, wasd_input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None, None);
+            Self::process_input(&mut self.wasd_player, wasd_input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None, None);
         }
 
         if (crate::input::using_steam_input()) {
@@ -87,26 +93,24 @@ impl PlayerInputController {
                     let controller_id = crate::steam::g_connected_controllers[i];
                     let input = crate::steam::read_game_input(controller_id);
 
-                    println!("Controller input: {:?} id: {}", input, controller_id);
-
-                    // @Hack for now
-                    if self.steam_input_players[0].0 == 0 &&
-                        self.steam_input_players[0].1.is_none() {
-                        // Register
-                        if input != Input::None{
-                            let mut registration = None;
-                            if let Some(pid) = Self::create_player(&mut registration, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None, Some(controller_id)) {
-                                self.steam_input_players[0] = (controller_id, Some(pid));
-                            }
+                    if let Some(i) = self.steam_input_players.find(controller_id) {
+                        let pid = self.steam_input_players.inner[i].1.unwrap();
+                        if let Some(player) = players_local.inner.iter_mut().find(|x| x.player_id == pid) {
+                            player.update_inputs(&*timeline, &mut player_inputs, input);
                         }
                     }
                     else {
-                        // @Hack for now
-                        assert!(self.steam_input_players[0].0 == controller_id);
-                        assert!(self.steam_input_players[0].1.is_some());
-                        let pid = self.steam_input_players[0].1.unwrap();
-                        if let Some(player) = players_local.inner.iter_mut().find(|x| x.player_id == pid) {
-                            player.update_inputs(&*timeline, &mut player_inputs, input);
+                        if input != Input::None{
+                            if let Some(i) = self.steam_input_players.find_next_free() {
+                                let mut registration = None;
+                                if let Some(pid) = Self::create_player(&mut registration, input, &mut player_inputs, timeline, players_local, outfit_switchers, &mut new_players, None, Some(controller_id)) {
+                                    self.steam_input_players.inner[i] = (controller_id, Some(pid));
+                                }
+                            }
+                            else {
+                                crate::console::err("Too many steam controllers, could not register");
+                                debug_assert!(false);
+                            }
                         }
                     }
                 }
@@ -172,6 +176,7 @@ impl PlayerInputController {
             player_local.update_inputs(&*timeline, player_inputs, input);
             player_local.skin = new_skin;
             player_local.controller_id = controller_id;
+            player_local.steam_controller_id = steam_controller_id;
 
             new_players.push(new_id);
 
@@ -355,6 +360,7 @@ impl PlayerLocal {
             skin: Skin::default(),
             visible: true,
             controller_id: None,
+            steam_controller_id: None,
             alive_state: AliveState::NotInGame,
         }
     }
@@ -486,16 +492,11 @@ impl PlayerLocal {
 
             if (player_state.pushing >= 0) {
                 audio::play("push");
-
-                if let Some(id) = self.controller_id {
-                    visual_effects.set_gamepad_vibration(id);
-                }
+                visual_effects.set_gamepad_vibration(self.controller_id, self.steam_controller_id);
             }
 
             if (player_state.pushed_by >= 0) {
-                if let Some(id) = self.controller_id {
-                    visual_effects.set_gamepad_vibration(id);
-                }
+                visual_effects.set_gamepad_vibration(self.controller_id, self.steam_controller_id);
             }
 
             // Started moving, do effects.
@@ -590,10 +591,7 @@ impl PlayerLocal {
 
         visual_effects.screenshake();
         visual_effects.whiteout();
-
-        if let Some(id) = self.controller_id {
-            visual_effects.set_gamepad_vibration(id);
-        }
+        visual_effects.set_gamepad_vibration(self.controller_id, self.steam_controller_id);
     }
 }
 

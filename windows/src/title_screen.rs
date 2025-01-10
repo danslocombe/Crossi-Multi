@@ -47,6 +47,20 @@ impl TitleScreen {
         if (self.goto_next_t.is_none() && press) {
             audio::play("car");
             visual_effects.screenshake();
+
+
+            // @Dedup, copypasted from pause settings.
+            for i in 0..4 {
+                visual_effects.set_gamepad_vibration(Some(i), None);
+            }
+
+            unsafe {
+                for i in 0..crate::steam::g_controller_count {
+                    let controller_id = crate::steam::g_connected_controllers[i];
+                    visual_effects.set_gamepad_vibration(None, Some(controller_id));
+                }
+            }
+
             self.goto_next_t = Some(self.t);
         }
 
