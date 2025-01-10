@@ -2,12 +2,6 @@ use crate::{gamepad_pressed, key_pressed};
 
 static mut g_steam_input: bool = true;
 
-const INVALID_HANDLE: u64 = 0;
-static mut g_steam_up_handle: u64 = INVALID_HANDLE;
-static mut g_steam_down_handle: u64 = INVALID_HANDLE;
-static mut g_steam_left_handle: u64 = INVALID_HANDLE;
-static mut g_steam_right_handle: u64 = INVALID_HANDLE;
-
 pub fn using_steam_input() -> bool {
     unsafe { g_steam_input }
 }
@@ -17,11 +11,20 @@ pub fn init()
     if (using_steam_input()) {
         unsafe {
             if let Some(x) = crate::steam::g_steam_client.as_ref() {
-                let input = x.input();
-                g_steam_up_handle = input.get_digital_action_handle("menu_up");
-                g_steam_down_handle = input.get_digital_action_handle("menu_down");
-                g_steam_left_handle = input.get_digital_action_handle("menu_left");
-                g_steam_right_handle = input.get_digital_action_handle("menu_right");
+                //let input = x.input();
+                //let connected_controllers = input.get_connected_controllers();
+                //println!("connected controllers {:?}", connected_controllers);
+                ////let xx = input.get_digital_action_handle("MenuControls");
+                //let actionset = input.get_action_set_handle("MenuControls");
+                //println!("actionset {}", actionset);
+                //let actionset = input.get_action_set_handle("InGameControls");
+                //println!("actionset {}", actionset);
+
+                //g_steam_up_handle = input.get_digital_action_handle("menu_up");
+                ////println!("up handle {}", g_steam_up_handle);
+                //g_steam_down_handle = input.get_digital_action_handle("menu_down");
+                //g_steam_left_handle = input.get_digital_action_handle("menu_left");
+                //g_steam_right_handle = input.get_digital_action_handle("menu_right");
             }
         }
     }
@@ -46,6 +49,19 @@ impl MenuInput {
     }
 
     pub fn read() -> Self {
+        if (using_steam_input()) {
+            Self::read_steam()
+        }
+        else {
+            Self::read_raylib()
+        }
+    }
+
+    pub fn read_steam() -> Self {
+        unimplemented!()
+    }
+
+    pub fn read_raylib() -> Self {
         let mut input = MenuInput::None;
 
         if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
