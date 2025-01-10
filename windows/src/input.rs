@@ -1,4 +1,4 @@
-use crate::{gamepad_pressed, key_pressed};
+use crate::{gamepad_pressed, key_pressed, steam::g_steam_client_single};
 
 static mut g_steam_input: bool = true;
 
@@ -30,113 +30,117 @@ pub fn init()
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum MenuInput {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuInput {
     None,
     Up,
     Down,
     Left,
     Right,
-    Enter,
+    Select,
+    ReturnToGame,
 }
 
 impl MenuInput {
     pub fn is_toggle(self) -> bool {
         match self {
-            MenuInput::Left | MenuInput::Right | MenuInput::Enter => true,
+            MenuInput::Left | MenuInput::Right | MenuInput::Select => true,
             _ => false
         }
     }
 
     pub fn read() -> Self {
+        let input = Self::read_raylib_keyboard();
+        if (input != Self::None) {
+            return input;
+        }
+
         if (using_steam_input()) {
-            Self::read_steam()
+            crate::steam::read_menu_input()
         }
         else {
-            Self::read_raylib()
+            Self::read_raylib_controllers()
         }
     }
 
-    pub fn read_steam() -> Self {
-        unimplemented!()
-    }
-
-    pub fn read_raylib() -> Self {
-        let mut input = MenuInput::None;
-
+    pub fn read_raylib_keyboard() -> Self {
         if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
-            input = MenuInput::Up;
+            return MenuInput::Up;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_LEFT) {
-            input = MenuInput::Left;
+            return MenuInput::Left;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_DOWN) {
-            input = MenuInput::Down;
+            return MenuInput::Down;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT) {
-            input = MenuInput::Right;
+            return MenuInput::Right;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_SPACE) {
-            input = MenuInput::Enter;
+            return MenuInput::Select;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_ENTER) {
-            input = MenuInput::Enter;
+            return MenuInput::Select;
         }
 
         if key_pressed(raylib_sys::KeyboardKey::KEY_W) {
-            input = MenuInput::Up;
+            return MenuInput::Up;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_A) {
-            input = MenuInput::Left;
+            return MenuInput::Left;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_S) {
-            input = MenuInput::Down;
+            return MenuInput::Down;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_D) {
-            input = MenuInput::Right;
+            return MenuInput::Right;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_Z) {
-            input = MenuInput::Enter;
+            return MenuInput::Select;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_X) {
-            input = MenuInput::Enter;
+            return MenuInput::Select;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_F) {
-            input = MenuInput::Enter;
+            return MenuInput::Select;
         }
         if key_pressed(raylib_sys::KeyboardKey::KEY_G) {
-            input = MenuInput::Enter;
+            return MenuInput::Select;
         }
 
+        Self::None
+    }
+
+    pub fn read_raylib_controllers() -> Self {
         for i in 0..4 {
             let gamepad_id = i as i32;
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_UP) {
-                input = MenuInput::Up;
+                return MenuInput::Up;
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
-                input = MenuInput::Left;
+                return MenuInput::Left;
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
-                input = MenuInput::Down;
+                return MenuInput::Down;
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
-                input = MenuInput::Right;
+                return MenuInput::Right;
             }
 
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_LEFT) {
-                input = MenuInput::Enter;
+                return MenuInput::Select;
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) {
-                input = MenuInput::Enter;
+                return MenuInput::Select;
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_UP) {
-                input = MenuInput::Enter;
+                return MenuInput::Select;
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
-                input = MenuInput::Enter;
+                return MenuInput::Select;
             }
         }
 
-        input
+        Self::None
     }
 }

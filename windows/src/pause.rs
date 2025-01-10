@@ -1,7 +1,7 @@
 use std::mem::MaybeUninit;
 
 use crossy_multi_core::math::V2;
-use crate::{audio::{self, g_music_volume}, c_str_leaky, c_str_temp, client::{river_col_1, VisualEffects}, gamepad_pressed, key_pressed, lerp_color_rgba, to_vector2, WHITE};
+use crate::{audio::{self, g_music_volume}, c_str_leaky, c_str_temp, client::{river_col_1, VisualEffects}, gamepad_pressed, input::MenuInput, key_pressed, lerp_color_rgba, to_vector2, WHITE};
 
 //static mut g_font_roboto: MaybeUninit<raylib_sys::Font> = MaybeUninit::uninit();
 static mut g_font_roboto: [(i32, MaybeUninit<raylib_sys::Font>); 7] = [
@@ -90,7 +90,7 @@ impl Pause {
         }
 
         // @TODO controller input / WASD.
-        if let MenuInput::Enter = input {
+        if let MenuInput::Select = input {
             visual_effects.noise = visual_effects.noise.max(5.0);
             audio::play("menu_click");
             match self.highlighted {
@@ -285,7 +285,7 @@ impl SettingsMenu {
                 }
             },
             8 => {
-                if let MenuInput::Enter = input {
+                if let MenuInput::Select = input {
                     audio::play("menu_click");
                     return false;
                 }
@@ -330,104 +330,6 @@ impl SettingsMenu {
         let vignette_mode = if settings.vignette { "On" } else { "Off" };
         draw_info.text_left_right_incr_padding("Vignette:", vignette_mode, padding, self.highlighted == 7);
         draw_info.text_center("Back", self.highlighted == 8);
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum MenuInput {
-    None,
-    Up,
-    Down,
-    Left,
-    Right,
-    Enter,
-}
-
-impl MenuInput {
-    pub fn is_toggle(self) -> bool {
-        match self {
-            MenuInput::Left | MenuInput::Right | MenuInput::Enter => true,
-            _ => false
-        }
-    }
-
-    pub fn read() -> Self {
-        let mut input = MenuInput::None;
-
-        if key_pressed(raylib_sys::KeyboardKey::KEY_UP) {
-            input = MenuInput::Up;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_LEFT) {
-            input = MenuInput::Left;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_DOWN) {
-            input = MenuInput::Down;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_RIGHT) {
-            input = MenuInput::Right;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_SPACE) {
-            input = MenuInput::Enter;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_ENTER) {
-            input = MenuInput::Enter;
-        }
-
-        if key_pressed(raylib_sys::KeyboardKey::KEY_W) {
-            input = MenuInput::Up;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_A) {
-            input = MenuInput::Left;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_S) {
-            input = MenuInput::Down;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_D) {
-            input = MenuInput::Right;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_Z) {
-            input = MenuInput::Enter;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_X) {
-            input = MenuInput::Enter;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_F) {
-            input = MenuInput::Enter;
-        }
-        if key_pressed(raylib_sys::KeyboardKey::KEY_G) {
-            input = MenuInput::Enter;
-        }
-
-        for i in 0..4 {
-            let gamepad_id = i as i32;
-            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_UP) {
-                input = MenuInput::Up;
-            }
-            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
-                input = MenuInput::Left;
-            }
-            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
-                input = MenuInput::Down;
-            }
-            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
-                input = MenuInput::Right;
-            }
-
-            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_LEFT) {
-                input = MenuInput::Enter;
-            }
-            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) {
-                input = MenuInput::Enter;
-            }
-            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_UP) {
-                input = MenuInput::Enter;
-            }
-            if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
-                input = MenuInput::Enter;
-            }
-        }
-
-        input
     }
 }
 
