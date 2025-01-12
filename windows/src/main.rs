@@ -2,7 +2,10 @@
 #![allow(unused_parens)]
 #![allow(non_upper_case_globals)]
 
-#![windows_subsystem = "windows"]
+pub const DEMO: bool = true;
+
+// Detaches us from the cmd
+//#![windows_subsystem = "windows"]
 
 macro_rules! info {
     ( $( $t:tt )* ) => {

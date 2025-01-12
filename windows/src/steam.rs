@@ -22,9 +22,13 @@ pub enum ActionSet {
 
 const STEAM_INPUT_HANDLE_ALL_CONTROLLERS: u64 = u64::MAX; 
 
+const DEMO_APPID: u32 = 3459630;
+const GAME_APPID: u32 = 3429480;
+
 pub fn init() -> bool {
     unsafe {
-        match steamworks::Client::init_app(3429480) {
+        let appid = if crate::DEMO { DEMO_APPID } else { GAME_APPID };
+        match steamworks::Client::init_app(appid) {
             Ok((client, single_client)) => {
                 client.input().init(false);
 
