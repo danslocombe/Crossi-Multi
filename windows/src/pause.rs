@@ -18,8 +18,9 @@ pub fn init_pause_fonts() {
     unsafe {
         //g_font_roboto = MaybeUninit::new(raylib_sys::LoadFont(c_str_leaky("../web-client/static/Roboto-Regular.ttf")));
         for (size, data) in g_font_roboto.iter_mut() {
+            let path = format!("{}/Roboto-Bold.ttf", crate::resource_dir());
             *data = MaybeUninit::new(raylib_sys::LoadFontEx(
-                c_str_leaky("../web-client/static/Roboto-Bold.ttf"),
+                c_str_leaky(&path),
                 *size,
                 std::ptr::null_mut(), // Default characters
                 95, // Default character count in raylib, just ascii

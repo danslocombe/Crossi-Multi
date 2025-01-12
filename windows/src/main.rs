@@ -2,6 +2,8 @@
 #![allow(unused_parens)]
 #![allow(non_upper_case_globals)]
 
+#![windows_subsystem = "windows"]
+
 macro_rules! info {
     ( $( $t:tt )* ) => {
         crate::console::info(&format!( $( $t )* ));
@@ -44,6 +46,13 @@ use crossy_multi_core::math::V2;
 static mut c_string_temp_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 static mut c_string_leaky_allocator: MaybeUninit<CStringAllocator> = MaybeUninit::uninit();
 
+static mut g_resource_dir: MaybeUninit<String> = MaybeUninit::uninit();
+pub fn resource_dir() -> &'static str {
+    unsafe {
+        &g_resource_dir.assume_init_ref()
+    }
+}
+
 pub fn c_str_temp(s: &str) -> *const i8 {
     unsafe {
         c_string_temp_allocator.assume_init_mut().alloc(s)
@@ -65,6 +74,10 @@ fn main() {
     let debug_param = args.iter().any(|x| x.eq_ignore_ascii_case("--debug"));
     if (debug_param) {
         println!("Running in debug mode");
+    }
+
+    unsafe {
+        g_resource_dir = MaybeUninit::new("./resources/".to_owned());
     }
 
     settings::init();

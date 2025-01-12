@@ -45,8 +45,7 @@ pub fn init_audio() {
 }
 
 fn load_sfx(filename: &str, base_volume: f32) {
-    let path_base = "../web-client/static/sounds";
-    let path = format!("{}/{}", path_base, filename);
+    let path = format!("{}/sounds/{}", crate::resource_dir(), filename);
     println!("Loading {}", path);
 
     unsafe {
@@ -73,32 +72,6 @@ pub fn update_volumes() {
         for (k, v) in SFX.assume_init_ref() {
             raylib_sys::SetSoundVolume(v.sound, v.base_volume * g_sfx_volume * 0.5);
         }
-    }
-}
-
-// @Dedup with above
-// @UNUSED
-fn load_music(filename: &str, base_volume: f32) {
-    let path_base = "../web-client/static/sounds";
-    let path = format!("{}/{}", path_base, filename);
-    println!("Loading {}", path);
-
-    unsafe {
-        let filename_c = crate::c_str_temp(&path);
-        let sound = raylib_sys::LoadSound(filename_c);
-
-        raylib_sys::SetSoundVolume(sound, base_volume * g_music_volume);
-
-        let path = std::path::Path::new(&path);
-        let mut name = path.file_stem().unwrap().to_str().unwrap();
-        if name.starts_with("snd_") {
-            name = &name["snd_".len()..];
-        }
-
-        SFX.assume_init_mut().insert(name.to_owned(), Sound {
-            sound,
-            base_volume,
-        });
     }
 }
 
