@@ -78,6 +78,10 @@ pub fn init_console() {
             name: "seed".to_owned(),
             lambda: Box::new(do_seed),
         });
+        command_set.commands.push(Command::new(
+            "dump_controllers",
+            Box::new(do_dump_controllers),
+        ));
         g_console = MaybeUninit::new(Console::new(command_set));
     }
 }
@@ -191,6 +195,7 @@ impl Console {
     }
 
     pub fn write_with_type(&mut self, line: String, line_type: LineType) {
+        println!("{}", line);
         self.lines.push(ConsoleLine {
             t: self.t,
             line_type,
@@ -482,6 +487,15 @@ impl CommandSet {
 struct Command {
     name: String,
     lambda: Box<dyn Fn(&[&str], &mut Client)>,
+}
+
+impl Command {
+    pub fn new(name: &str, lambda: Box<dyn Fn(&[&str], &mut Client)>) -> Self {
+        Self {
+            name: name.to_owned(),
+            lambda,
+        }
+    }
 }
 
 fn do_new(args: &[&str], client: &mut Client) {
@@ -796,4 +810,23 @@ fn do_seed(args: &[&str], client: &mut Client) {
 
     println!("Seed: {}", client.seed);
     info!("Seed: {}", client.seed);
+}
+
+fn do_dump_controllers(args: &[&str], _client: &mut Client) {
+    if (args.len() != 0) {
+        err!("Expected no arguments to dump_controllers, got {}", args.len());
+    }
+
+    if (crate::input::using_steam_input()) {
+        info!("Using Steam Input. Listing Connected Controllers:");
+        unsafe {
+            for i in 0..crate::steam::g_controller_count {
+                let controller_id = crate::steam::g_connected_controllers[i];
+                let input = steamworks::sys::SteamAPI_SteamInput_v006();
+                let input_type = steamworks::sys::SteamAPI_ISteamInput_GetInputTypeForHandle(input, controller_id);
+                info!("Controller Id {} - {:?}", controller_id, input_type);
+            }
+        }
+    }
+
 }
