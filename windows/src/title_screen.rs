@@ -99,7 +99,10 @@ impl TitleScreen {
 
         self.actor_controller.draw();
 
-        sprites::draw("roadtoads", 0, self.text_pos.x, self.text_pos.y);
+        sprites::draw("roadtoads_2", 0, self.text_pos.x, self.text_pos.y);
+        if (crate::DEMO) {
+            sprites::draw("demo_text", 0, self.text_pos.x + 50.0, self.text_pos.y + 30.0);
+        }
     }
 }
 

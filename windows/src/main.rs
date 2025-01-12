@@ -2,10 +2,17 @@
 #![allow(unused_parens)]
 #![allow(non_upper_case_globals)]
 
+// Detaches us from the cmd
+#![cfg_attr(feature = "publish", windows_subsystem = "windows")]
+
+#[cfg(feature = "demo")]
 pub const DEMO: bool = true;
 
-// Detaches us from the cmd
-//#![windows_subsystem = "windows"]
+#[cfg(not(feature = "demo"))]
+pub const DEMO: bool = false;
+
+
+//#[cfg_attr(not(feature = "publish"), windows_subsystem = "console")]
 
 macro_rules! info {
     ( $( $t:tt )* ) => {

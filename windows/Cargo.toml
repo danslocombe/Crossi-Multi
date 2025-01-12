@@ -3,6 +3,13 @@ name = "roadtoads"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+# For now
+default = ["demo"]
+
+publish = []
+demo = []
+
 [dependencies]
 raylib-sys = { path = "../../raylib-rs/raylib-sys" }
 crossy_multi_core = { path = "../core" }

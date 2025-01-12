@@ -1,4 +1,4 @@
-cargo build --release
+cargo build --release -F publish,demo
 
 rmdir builds\resources /S /Q
 rmdir builds\shaders /S /Q

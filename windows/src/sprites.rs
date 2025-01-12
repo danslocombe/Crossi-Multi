@@ -73,6 +73,7 @@ pub fn init_sprites() {
         load_frames("spr_no_winner.png", Some(1));
         load_frames("spr_champion.png", Some(1));
         load_frames("spr_roadtoads.png", Some(1));
+        load_frames("spr_roadtoads_2.png", Some(1));
 
         load_frames("spr_wizard_hat.png", Some(1));
 
@@ -80,6 +81,10 @@ pub fn init_sprites() {
         load_frames("spr_raft_sail_frame.png", Some(1));
 
         load_frames("spr_font_linsenn_m5x7_numbers.png", Some(10));
+
+        if (crate::DEMO) {
+            load_frames("spr_demo_text.png", Some(1));
+        }
     }
 }
 
