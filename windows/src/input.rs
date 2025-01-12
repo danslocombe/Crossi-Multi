@@ -52,17 +52,19 @@ impl MenuInput {
         }
     }
 
-    pub fn read() -> Self {
+    pub fn read() -> (Self, Option<i32>, Option<u64>) {
         let input = Self::read_raylib_keyboard();
         if (input != Self::None) {
-            return input;
+            return (input, None, None);
         }
 
         if (using_steam_input()) {
-            crate::steam::read_menu_input()
+            let (input, controller_id) = crate::steam::read_menu_input();
+            (input, None, if controller_id != 0 { Some(controller_id) } else { None })
         }
         else {
-            Self::read_raylib_controllers()
+            let (input, controller_id) = Self::read_raylib_controllers();
+            (input, controller_id, None)
         }
     }
 
@@ -114,37 +116,37 @@ impl MenuInput {
         Self::None
     }
 
-    pub fn read_raylib_controllers() -> Self {
+    pub fn read_raylib_controllers() -> (Self, Option<i32>) {
         for i in 0..4 {
             let gamepad_id = i as i32;
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_UP) {
-                return MenuInput::Up;
+                return (MenuInput::Up, Some(gamepad_id));
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
-                return MenuInput::Left;
+                return (MenuInput::Left, Some(gamepad_id));
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
-                return MenuInput::Down;
+                return (MenuInput::Down, Some(gamepad_id));
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
-                return MenuInput::Right;
+                return (MenuInput::Right, Some(gamepad_id));
             }
 
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_LEFT) {
-                return MenuInput::Select;
+                return (MenuInput::Select, Some(gamepad_id));
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) {
-                return MenuInput::Select;
+                return (MenuInput::Select, Some(gamepad_id));
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_UP) {
-                return MenuInput::Select;
+                return (MenuInput::Select, Some(gamepad_id));
             }
             if gamepad_pressed(gamepad_id, raylib_sys::GamepadButton::GAMEPAD_BUTTON_RIGHT_FACE_DOWN) {
-                return MenuInput::Select;
+                return (MenuInput::Select, Some(gamepad_id));
             }
         }
 
-        Self::None
+        (Self::None, None)
     }
 }
 
@@ -262,7 +264,7 @@ pub fn toggle_pause() -> bool {
 
         unsafe {
             if (crate::steam::g_t - g_hack_last_steam_input_toggle_t > 5) {
-                if crate::steam::read_menu_input() == MenuInput::ReturnToGame {
+                if crate::steam::read_menu_input().0 == MenuInput::ReturnToGame {
                     g_hack_last_steam_input_toggle_t = crate::steam::g_t;
                     return true;
                 }
@@ -290,7 +292,7 @@ pub fn goto_next_title() -> bool {
     }
 
     if using_steam_input() {
-        return crate::steam::read_menu_input() != MenuInput::None;
+        return crate::steam::read_menu_input().0 != MenuInput::None;
     }
     else {
         // @TODO

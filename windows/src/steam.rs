@@ -199,7 +199,7 @@ impl InputState {
     }
 }
 
-pub fn read_menu_input() -> MenuInput {
+pub fn read_menu_input() -> (MenuInput, u64) {
     unsafe {
         for state in g_controller_input_states.iter() {
             if (state.last_update != g_t) {
@@ -207,27 +207,27 @@ pub fn read_menu_input() -> MenuInput {
             }
 
             if state.current.menu_up && !state.prev.menu_up {
-                return MenuInput::Up;
+                return (MenuInput::Up, state.controller_id);
             }
             if state.current.menu_down && !state.prev.menu_down {
-                return MenuInput::Down;
+                return (MenuInput::Down, state.controller_id);
             }
             if state.current.menu_left && !state.prev.menu_left {
-                return MenuInput::Left;
+                return (MenuInput::Left, state.controller_id);
             }
             if state.current.menu_right && !state.prev.menu_right {
-                return MenuInput::Right;
+                return (MenuInput::Right, state.controller_id);
             }
             if state.current.menu_select && !state.prev.menu_select {
-                return MenuInput::Select;
+                return (MenuInput::Select, state.controller_id);
             }
             if state.current.menu_return_to_game && !state.prev.menu_return_to_game {
-                return MenuInput::ReturnToGame;
+                return (MenuInput::ReturnToGame, state.controller_id);
             }
         }
     }
 
-    MenuInput::None
+    (MenuInput::None, 0)
 }
 
 pub fn read_game_input(controller_id: u64) -> game::Input {
@@ -343,5 +343,26 @@ impl<T> SteamControllerMap<T> where T: Eq + Copy {
         }
 
         None
+    }
+}
+
+pub fn get_first_controller() -> Option<u64> {
+    unsafe {
+        if g_controller_count > 0 {
+            Some(g_connected_controllers[0])
+        }
+        else {
+            None
+        }
+    }
+}
+
+pub fn trigger_controller_rebinding(steam_controller_id: u64) {
+    unsafe {
+        // Ensure we are still initialised even though we use the apis directly.
+        if let Some(_client) = g_steam_client.as_ref() {
+            let input = steamworks::sys::SteamAPI_SteamInput_v006();
+            steamworks::sys::SteamAPI_ISteamInput_ShowBindingPanel(input, steam_controller_id);
+        }
     }
 }

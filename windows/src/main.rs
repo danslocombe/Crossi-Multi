@@ -2,6 +2,24 @@
 #![allow(unused_parens)]
 #![allow(non_upper_case_globals)]
 
+macro_rules! info {
+    ( $( $t:tt )* ) => {
+        crate::console::info(&format!( $( $t )* ));
+    }
+}
+
+macro_rules! big {
+    ( $( $t:tt )* ) => {
+        crate::console::big(&format!( $( $t )* ));
+    }
+}
+
+macro_rules! err {
+    ( $( $t:tt )* ) => {
+        crate::console::err(&format!( $( $t )* ));
+    }
+}
+
 mod sprites;
 mod console;
 mod entities;

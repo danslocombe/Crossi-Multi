@@ -42,6 +42,8 @@ pub enum PauseResult {
     Unpause,
     Exit,
     Lobby,
+
+    // Unused
     Feedback,
 }
 
@@ -61,7 +63,7 @@ impl Pause {
             return PauseResult::Nothing;
         }
 
-        let input = MenuInput::read();
+        let (input, _controller_id, steam_controller_id) = MenuInput::read();
 
         self.t += 1;
         self.t_since_move += 1;
@@ -107,8 +109,30 @@ impl Pause {
                     self.settings_menu = Some(SettingsMenu::new());
                 }
                 3 => {
+                    if (crate::input::using_steam_input()) {
+                        if let Some(steam_controller_id) = steam_controller_id {
+                            // Need to make this more obvious which controller is doing the rebinding
+                            crate::steam::trigger_controller_rebinding(steam_controller_id);
+                        }
+                        else {
+                            // Fallback to trying to get the first controller attached.
+                            if let Some(steam_controller_id) = crate::steam::get_first_controller() {
+                                crate::steam::trigger_controller_rebinding(steam_controller_id);
+                            }
+                            else {
+                                // Otherwise do nothing
+                                // This feels like bad ux?
+                                info!("No controllers attached!");
+                            }
+                        }
+                    }
+                    else {
+                        // @TODO @HACK
+                        err!("Steam input is not enabled, this button should not be shown in this case.");
+                    }
+
                     // Feedback
-                    return PauseResult::Feedback;
+                    //return PauseResult::Feedback;
                 }
                 4 => {
                     // Exit
@@ -152,7 +176,8 @@ impl Pause {
         draw_info.text_center_incr_padding("Resume", padding, self.highlighted == 0);
         draw_info.text_center_incr_padding("Lobby", padding, self.highlighted == 1);
         draw_info.text_center_incr_padding("Settings", padding, self.highlighted == 2);
-        draw_info.text_center_incr_padding("Submit Feedback", padding, self.highlighted == 3);
+        draw_info.text_center_incr_padding("Rebind Controllers", padding, self.highlighted == 3);
+        //draw_info.text_center_incr_padding("Submit Feedback", padding, self.highlighted == 3);
         draw_info.text_center_incr_padding("Exit", padding, self.highlighted == 4);
     }
 }
@@ -173,7 +198,7 @@ impl SettingsMenu {
         self.t += 1;
         self.t_since_move += 1;
 
-        let input = MenuInput::read();
+        let (input, _, _) = MenuInput::read();
 
         // @Fragile
         let option_count = 9;

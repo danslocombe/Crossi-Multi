@@ -15,6 +15,24 @@ impl DebugLogger for QuakeConsoleLogger {
     }
 }
 
+pub fn info(s: &str) {
+    unsafe {
+        g_console.assume_init_mut().write_with_type(s.to_owned(), LineType::Info);
+    }
+}
+
+pub fn big(s: &str) {
+    unsafe {
+        g_console.assume_init_mut().write_with_type(s.to_owned(), LineType::Big);
+    }
+}
+
+pub fn err(s: &str) {
+    unsafe {
+        g_console.assume_init_mut().write_with_type(format!("Error: {}", s), LineType::Error);
+    }
+}
+
 pub fn init_console() {
     unsafe {
         let mut command_set = CommandSet::create();
@@ -83,42 +101,6 @@ pub fn init_console() {
             Box::new(do_dump_controllers),
         ));
         g_console = MaybeUninit::new(Console::new(command_set));
-    }
-}
-
-pub fn info(s: &str) {
-    unsafe {
-        g_console.assume_init_mut().write_with_type(s.to_owned(), LineType::Info);
-    }
-}
-
-macro_rules! info {
-    ( $( $t:tt )* ) => {
-        info(&format!( $( $t )* ));
-    }
-}
-
-pub fn big(s: &str) {
-    unsafe {
-        g_console.assume_init_mut().write_with_type(s.to_owned(), LineType::Big);
-    }
-}
-
-macro_rules! big {
-    ( $( $t:tt )* ) => {
-        big(&format!( $( $t )* ));
-    }
-}
-
-pub fn err(s: &str) {
-    unsafe {
-        g_console.assume_init_mut().write_with_type(format!("Error: {}", s), LineType::Error);
-    }
-}
-
-macro_rules! err {
-    ( $( $t:tt )* ) => {
-        err(&format!( $( $t )* ));
     }
 }
 
