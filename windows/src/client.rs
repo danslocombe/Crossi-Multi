@@ -638,6 +638,8 @@ pub struct VisualEffects {
     pub noise: f32,
 
     pub controller_vibrations: Vec<f32>,
+
+    #[cfg(feature = "steam")]
     pub steam_controller_vibrations: crate::steam::SteamControllerMap<f32>,
 }
 
@@ -654,6 +656,8 @@ impl Default for VisualEffects {
             screenshake: 0.0,
             noise: 0.0,
             controller_vibrations: vibration,
+
+            #[cfg(feature = "steam")]
             steam_controller_vibrations: Default::default(),
         }
     }
@@ -679,6 +683,7 @@ impl VisualEffects {
             self.controller_vibrations[controller_id as usize] = 15.0;
         }
 
+        #[cfg(feature = "steam")]
         if let Some(steam_controller_id) = m_steam_controller_id {
             if let Some(i) = self.steam_controller_vibrations.find(steam_controller_id) {
                 self.steam_controller_vibrations.inner[i].1 = Some(15.0);
@@ -726,6 +731,7 @@ impl VisualEffects {
                 }
             }
 
+            #[cfg(feature = "steam")]
             for ((steam_controller_id, m_vibration)) in self.steam_controller_vibrations.inner.iter_mut() {
                 if let Some(x) = m_vibration {
                     *x *= MULT;

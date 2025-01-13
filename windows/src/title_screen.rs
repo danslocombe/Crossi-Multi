@@ -54,6 +54,7 @@ impl TitleScreen {
                 visual_effects.set_gamepad_vibration(Some(i), None);
             }
 
+            #[cfg(feature = "steam")]
             unsafe {
                 for i in 0..crate::steam::g_controller_count {
                     let controller_id = crate::steam::g_connected_controllers[i];

@@ -7,9 +7,13 @@
 
 #[cfg(feature = "demo")]
 pub const DEMO: bool = true;
-
 #[cfg(not(feature = "demo"))]
 pub const DEMO: bool = false;
+
+#[cfg(feature = "steam")]
+pub const STEAM: bool = true;
+#[cfg(not(feature = "steam"))]
+pub const STEAM: bool = false;
 
 
 //#[cfg_attr(not(feature = "publish"), windows_subsystem = "console")]
@@ -45,6 +49,8 @@ mod raft;
 mod settings;
 mod pause;
 mod input;
+
+#[cfg(feature = "steam")]
 mod steam;
 
 use std::mem::MaybeUninit;
@@ -125,8 +131,8 @@ fn main() {
 
         pause::init_pause_fonts();
 
+        #[cfg(feature = "steam")]
         steam::init();
-        input::init();
 
         let framebuffer = raylib_sys::LoadRenderTexture(160, 160);
 
@@ -134,6 +140,8 @@ fn main() {
         let mut client = Client::new(debug_param, &seed);
 
         while !raylib_sys::WindowShouldClose() && !client.exit {
+
+            #[cfg(feature = "steam")]
             {
                 // Tick steam input, run callbacks.
                 let current_actionset = if client.pause.is_some() || client.title_screen.is_some() {

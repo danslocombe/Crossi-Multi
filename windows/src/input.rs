@@ -1,36 +1,12 @@
 use crossy_multi_core::game;
 
-use crate::{gamepad_pressed, key_pressed, steam::g_steam_client_single};
+use crate::{gamepad_pressed, key_pressed};
 
-static mut g_steam_input: bool = true;
-//static mut g_steam_input: bool = false;
+// For now this is just if we are running in steam mode.
+static mut g_steam_input: bool = crate::STEAM;
 
 pub fn using_steam_input() -> bool {
     unsafe { g_steam_input }
-}
-
-pub fn init()
-{
-    if (using_steam_input()) {
-        unsafe {
-            if let Some(x) = crate::steam::g_steam_client.as_ref() {
-                //let input = x.input();
-                //let connected_controllers = input.get_connected_controllers();
-                //println!("connected controllers {:?}", connected_controllers);
-                ////let xx = input.get_digital_action_handle("MenuControls");
-                //let actionset = input.get_action_set_handle("MenuControls");
-                //println!("actionset {}", actionset);
-                //let actionset = input.get_action_set_handle("InGameControls");
-                //println!("actionset {}", actionset);
-
-                //g_steam_up_handle = input.get_digital_action_handle("menu_up");
-                ////println!("up handle {}", g_steam_up_handle);
-                //g_steam_down_handle = input.get_digital_action_handle("menu_down");
-                //g_steam_left_handle = input.get_digital_action_handle("menu_left");
-                //g_steam_right_handle = input.get_digital_action_handle("menu_right");
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,14 +34,16 @@ impl MenuInput {
             return (input, None, None);
         }
 
-        if (using_steam_input()) {
-            let (input, controller_id) = crate::steam::read_menu_input();
-            (input, None, if controller_id != 0 { Some(controller_id) } else { None })
+        #[cfg(feature = "steam")]
+        {
+            if (using_steam_input()) {
+                let (input, controller_id) = crate::steam::read_menu_input();
+                return (input, None, if controller_id != 0 { Some(controller_id) } else { None });
+            }
         }
-        else {
-            let (input, controller_id) = Self::read_raylib_controllers();
-            (input, controller_id, None)
-        }
+
+        let (input, controller_id) = Self::read_raylib_controllers();
+        (input, controller_id, None)
     }
 
     pub fn read_raylib_keyboard() -> Self {
@@ -257,29 +235,30 @@ pub fn toggle_pause() -> bool {
         return true;
     }
 
-    if using_steam_input() {
-        // @Hack, when we go to the pause menu we change actionstates
-        // This means that we will immediately trigger this again. 
-        // Hack around by using a timer.
+    #[cfg(feature = "steam")]
+    {
+        if using_steam_input() {
+            // @Hack, when we go to the pause menu we change actionstates
+            // This means that we will immediately trigger this again. 
+            // Hack around by using a timer.
 
-        unsafe {
-            if (crate::steam::g_t - g_hack_last_steam_input_toggle_t > 5) {
-                if crate::steam::read_menu_input().0 == MenuInput::ReturnToGame {
-                    g_hack_last_steam_input_toggle_t = crate::steam::g_t;
-                    return true;
-                }
+            unsafe {
+                if (crate::steam::g_t - g_hack_last_steam_input_toggle_t > 5) {
+                    if crate::steam::read_menu_input().0 == MenuInput::ReturnToGame {
+                        g_hack_last_steam_input_toggle_t = crate::steam::g_t;
+                        return true;
+                    }
 
-                if (crate::steam::game_pause_pressed()) {
-                    g_hack_last_steam_input_toggle_t = crate::steam::g_t;
-                    return true;
+                    if (crate::steam::game_pause_pressed()) {
+                        g_hack_last_steam_input_toggle_t = crate::steam::g_t;
+                        return true;
+                    }
                 }
             }
         }
     }
-    else {
-        // @TODO
-    }
 
+    // @TODO @incomplete handle non-steam input for pause.
 
     false
 }
@@ -291,12 +270,14 @@ pub fn goto_next_title() -> bool {
         }
     }
 
-    if using_steam_input() {
-        return crate::steam::read_menu_input().0 != MenuInput::None;
+    #[cfg(feature = "steam")]
+    {
+        if using_steam_input() {
+            return crate::steam::read_menu_input().0 != MenuInput::None;
+        }
     }
-    else {
-        // @TODO
-    }
+
+    // @TODO @incomplete handle non-steam input for pause.
 
     false
 }

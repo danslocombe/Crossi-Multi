@@ -799,16 +799,22 @@ fn do_dump_controllers(args: &[&str], _client: &mut Client) {
         err!("Expected no arguments to dump_controllers, got {}", args.len());
     }
 
-    if (crate::input::using_steam_input()) {
-        info!("Using Steam Input. Listing Connected Controllers:");
-        unsafe {
-            for i in 0..crate::steam::g_controller_count {
-                let controller_id = crate::steam::g_connected_controllers[i];
-                let input = steamworks::sys::SteamAPI_SteamInput_v006();
-                let input_type = steamworks::sys::SteamAPI_ISteamInput_GetInputTypeForHandle(input, controller_id);
-                info!("Controller Id {} - {:?}", controller_id, input_type);
+    #[cfg(feature = "steam")]
+    {
+        if (crate::input::using_steam_input()) {
+            info!("Using Steam Input. Listing Connected Controllers:");
+            unsafe {
+                for i in 0..crate::steam::g_controller_count {
+                    let controller_id = crate::steam::g_connected_controllers[i];
+                    let input = steamworks::sys::SteamAPI_SteamInput_v006();
+                    let input_type = steamworks::sys::SteamAPI_ISteamInput_GetInputTypeForHandle(input, controller_id);
+                    info!("Controller Id {} - {:?}", controller_id, input_type);
+                }
             }
+
+            return;
         }
     }
 
+    err!("Dump controllers is not implemented for non-steam input");
 }

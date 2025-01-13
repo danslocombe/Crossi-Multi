@@ -110,6 +110,7 @@ impl Pause {
                     self.settings_menu = Some(SettingsMenu::new());
                 }
                 3 => {
+                    #[cfg(feature = "steam")]
                     if (crate::input::using_steam_input()) {
                         if let Some(steam_controller_id) = steam_controller_id {
                             // Need to make this more obvious which controller is doing the rebinding
@@ -126,8 +127,11 @@ impl Pause {
                                 info!("No controllers attached!");
                             }
                         }
+
+                        return PauseResult::Nothing;
                     }
-                    else {
+
+                    {
                         // @TODO @HACK
                         err!("Steam input is not enabled, this button should not be shown in this case.");
                     }
@@ -278,6 +282,7 @@ impl SettingsMenu {
                             visual_effects.set_gamepad_vibration(Some(i), None);
                         }
 
+                        #[cfg(feature = "steam")]
                         unsafe {
                             for i in 0..crate::steam::g_controller_count {
                                 let controller_id = crate::steam::g_connected_controllers[i];

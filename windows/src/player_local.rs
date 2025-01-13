@@ -33,6 +33,7 @@ pub struct PlayerInputController {
     controller_a_players: [Option<PlayerId>;4],
     controller_b_players: [Option<PlayerId>;4],
 
+    #[cfg(feature = "steam")]
     steam_input_players: crate::steam::SteamControllerMap<PlayerId>,
 }
 
@@ -64,6 +65,7 @@ impl PlayerInputController {
             }
         }
 
+        #[cfg(feature = "steam")]
         if let Some(i) = self.steam_input_players.find_value(remove_player_id) {
             self.steam_input_players.remove(i);
         }
@@ -88,6 +90,7 @@ impl PlayerInputController {
         }
 
         if (crate::input::using_steam_input()) {
+            #[cfg(feature = "steam")]
             unsafe {
                 for i in 0..crate::steam::g_controller_count {
                     let controller_id = crate::steam::g_connected_controllers[i];
