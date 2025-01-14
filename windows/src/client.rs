@@ -3,6 +3,8 @@ use crate::{audio::{self, g_music_volume}, dan_lerp, entities::{self, create_dus
 use froggy_rand::FroggyRand;
 
 pub struct Client {
+    t: i32,
+
     pub debug: bool,
 
     // Disable some gui / teaching elements.
@@ -61,6 +63,7 @@ impl Client {
         actor_controller.spawn_positions_grid.push((V2::new(0.0, 3.0), true));
 
         Self {
+            t: 0,
             debug,
             trailer_mode: false,
             seed: seed.to_owned(),
@@ -132,6 +135,8 @@ impl Client {
 
             return;
         }
+
+        self.t += 1;
 
         let mut just_left_title = false;
         if let Some(title) = self.title_screen.as_mut() {
@@ -524,6 +529,17 @@ impl Client {
 
         raylib_sys::EndMode2D();
 
+        if (self.entities.players.inner.len() == 0)
+        {
+            let bpos = V2::new(60.0, 60.0);
+            let pos = bpos - V2::new(20.0, 0.0) + V2::norm_from_angle(self.t as f32 * 0.1);
+            sprites::draw_p("keys_arrows", 0, pos);
+            let pos = bpos + V2::new(20.0, 0.0) + V2::norm_from_angle(self.t as f32 * 0.1 + 3.141);
+            sprites::draw_p("keys_wasd", 0, pos);
+            let pos = bpos + V2::new(00.0, 20.0) + V2::norm_from_angle(self.t as f32 * 0.1 + 3.141 * 0.6);
+            sprites::draw_p("keys_gamepad", 0, pos);
+        }
+
         if let Some(title) = self.title_screen.as_mut() {
             title.draw();
         }
@@ -793,9 +809,17 @@ impl StateTransition {
 }
 
 fn create_outfit_switchers(rand: FroggyRand, timeline: &Timeline, players: &EntityContainer<PlayerLocal>, outfit_switchers: &mut EntityContainer<OutfitSwitcher>) {
+    if (players.inner.len() == 0) {
+        return;
+    }
+
     let to_create = 4 - outfit_switchers.inner.len();
 
     if to_create == 0 {
+        return;
+    }
+
+    if (rand.gen_unit(()) < 0.998) {
         return;
     }
 
@@ -816,6 +840,9 @@ fn create_outfit_switchers(rand: FroggyRand, timeline: &Timeline, players: &Enti
     }
 
     rand.shuffle("shuffle", &mut options);
+
+    // @HACK, create one at a time.
+    let to_create = 1;
 
     for (i, pos) in options.iter().take(to_create).enumerate() {
         let skin = Skin::rand_not_overlapping(rand.subrand(i), &players.inner, &outfit_switchers.inner);

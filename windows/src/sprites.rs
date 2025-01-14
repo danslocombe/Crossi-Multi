@@ -82,6 +82,10 @@ pub fn init_sprites() {
 
         load_frames("spr_font_linsenn_m5x7_numbers.png", Some(10));
 
+        load_frames("spr_keys_arrows.png", Some(1));
+        load_frames("spr_keys_wasd.png", Some(1));
+        load_frames("spr_keys_gamepad.png", Some(1));
+
         if (crate::DEMO) {
             load_frames("spr_demo_text.png", Some(1));
         }
@@ -145,6 +149,10 @@ pub fn get_sprite(name: &str) -> &[raylib_sys::Texture2D] {
         });
         &frame_vec[..]
     }
+}
+
+pub fn draw_p(name: &str, image_index: usize, p: V2) {
+    draw(name, image_index, p.x, p.y);
 }
 
 pub fn draw(name: &str, image_index: usize, x: f32, y: f32) {
