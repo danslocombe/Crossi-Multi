@@ -159,7 +159,8 @@ impl PropController {
                         }
                     }
                 },
-                RowType::LobbyMain | RowType::Lobby => {
+                //RowType::LobbyMain | RowType::Lobby => {
+                RowType::LobbyMain => {
                     if row.row_id.to_y() > 0 {
                         // @Dedup with above
                         // Copypaste

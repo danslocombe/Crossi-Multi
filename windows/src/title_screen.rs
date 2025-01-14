@@ -280,10 +280,14 @@ impl ActorController {
         self.t += 1;
 
         // Small offset so characters are moving on the beat.
-        let t_music = music_current_time_in_secs - 0.15;
+        //let t_music = music_current_time_in_secs - 0.15;
+        let t_music = music_current_time_in_secs;
 
-        let bps = 60.0 / 100.0;
-        let k = 4.0 * bps;
+        //let bps = 60.0 / 100.0;
+        let bpm = 128.0;
+        let bps = bpm / 60.0;
+        //let k = 4.0 * bps;
+        let k = bps * 1.0;
         let prev_rounded = (self.t_music * k).floor();
         let cur_rounded = (t_music * k).floor();
 
